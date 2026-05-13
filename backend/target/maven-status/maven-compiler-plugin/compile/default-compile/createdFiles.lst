@@ -1,0 +1,10 @@
+com\example\newstart\NewStartApplication.class
+com\example\newstart\controller\UserController.class
+com\example\newstart\entity\Habit.class
+com\example\newstart\repository\JournalRepository.class
+com\example\newstart\controller\HabitController.class
+com\example\newstart\repository\UserRepository.class
+com\example\newstart\controller\JournalController.class
+com\example\newstart\entity\JournalEntry.class
+com\example\newstart\repository\HabitRepository.class
+com\example\newstart\entity\User.class
