@@ -83,7 +83,7 @@ fun HomeContent(
         modifier = modifier
             .fillMaxSize()
             .statusBarsPadding(),
-        color = HomeBg
+        color = MaterialTheme.colorScheme.background
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
@@ -153,13 +153,13 @@ fun HomeHeader(
             Text(
                 text = stringResource(id = R.string.home_hello, userName),
                 fontSize = 14.sp,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
             )
             Text(
                 text = stringResource(id = R.string.home_welcome),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = MaterialTheme.colorScheme.onBackground
             )
         }
         
@@ -189,7 +189,7 @@ fun HomeSearchBar() {
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 10.dp),
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 2.dp
     ) {
         Row(
@@ -197,11 +197,15 @@ fun HomeSearchBar() {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray)
+            Icon(
+                Icons.Default.Search, 
+                contentDescription = null, 
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = stringResource(id = R.string.home_search_placeholder),
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                 fontSize = 14.sp
             )
         }
@@ -312,7 +316,7 @@ fun SectionHeader(titleRes: Int) {
             text = stringResource(id = titleRes),
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.Black
+            color = MaterialTheme.colorScheme.onBackground
         )
         Text(
             text = stringResource(id = R.string.home_see_all),
@@ -331,7 +335,7 @@ fun CourseCard(course: Course, onClick: () -> Unit) {
             .width(200.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 2.dp
     ) {
         Column {
@@ -346,13 +350,14 @@ fun CourseCard(course: Course, onClick: () -> Unit) {
                     text = course.title,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = course.author,
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
         }

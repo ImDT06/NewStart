@@ -117,7 +117,7 @@ fun WelcomeScreen(
                     .padding(horizontal = 24.dp)
                     .fillMaxWidth(),
                 shape = RoundedCornerShape(32.dp),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 4.dp
             ) {
                 Column(
@@ -130,7 +130,7 @@ fun WelcomeScreen(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        color = Color.Black,
+                        color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 22.sp
                     )
 

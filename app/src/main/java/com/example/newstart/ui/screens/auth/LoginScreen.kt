@@ -146,7 +146,7 @@ fun LoginContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
             .pointerInput(Unit) {
                 detectTapGestures(onTap = {
                     focusManager.clearFocus()
@@ -226,7 +226,7 @@ fun LoginContent(
                     .padding(top = 155.dp) // Đẩy xuống 155dp để tránh đè tiêu đề
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -279,7 +279,11 @@ fun LoginContent(
                                 onCheckedChange = onRememberMeChange,
                                 colors = CheckboxDefaults.colors(checkedColor = PrimaryBlue)
                             )
-                            Text(text = stringResource(id = R.string.login_remember_me), fontSize = 12.sp, color = TextGrey)
+                            Text(
+                                text = stringResource(id = R.string.login_remember_me), 
+                                fontSize = 12.sp, 
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
                         }
                         TextButton(onClick = { /* Forgot */ }) {
                             Text(text = stringResource(id = R.string.login_forgot_password), fontSize = 12.sp, color = PrimaryBlue)
@@ -346,7 +350,7 @@ fun LoginContent(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     text = stringResource(id = R.string.login_google),
-                                    color = Color.Black,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -417,11 +421,11 @@ fun AuthInputField(
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = PrimaryBlue,
-                unfocusedBorderColor = FieldBorder,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                 focusedLabelColor = PrimaryBlue,
-                unfocusedLabelColor = IconGrey,
-                focusedTextColor = Color.Black,
-                unfocusedTextColor = Color.Black,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                 errorBorderColor = MaterialTheme.colorScheme.error,
                 errorLabelColor = MaterialTheme.colorScheme.error
             ),

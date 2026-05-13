@@ -100,7 +100,7 @@ fun JournalEntryPanel(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surface)
             .verticalScroll(scrollState)
             .pointerInput(Unit) {
                 detectTapGestures(onTap = {
@@ -119,7 +119,11 @@ fun JournalEntryPanel(
             horizontalArrangement = Arrangement.Start
         ) {
             IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Black)
+                Icon(
+                    Icons.Default.Close, 
+                    contentDescription = "Close", 
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
 
@@ -220,7 +224,7 @@ fun JournalEntryPanel(
                     Icon(
                         Icons.Default.Close, 
                         contentDescription = "Retake", 
-                        tint = Color.Black,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -290,10 +294,10 @@ fun JournalEntryPanel(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape)
-                        .background(if (isSelected) Color(0xFFF0F0F0) else Color.Transparent)
+                        .background(if (isSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f) else Color.Transparent)
                         .border(
                             width = if (isSelected) 2.dp else 0.dp,
-                            color = if (isSelected) Color(0xFF1D5FE2) else Color.Transparent,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                             shape = CircleShape
                         )
                         .clickable { selectedEmoji = emoji },

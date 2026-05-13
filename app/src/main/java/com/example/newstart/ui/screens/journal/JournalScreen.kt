@@ -2,6 +2,7 @@ package com.example.newstart.ui.screens.journal
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -56,7 +57,11 @@ fun JournalScreen(
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(DeepSkyBlue, SkyBlue, Color.White)
+                    colors = if (isSystemInDarkTheme()) {
+                        listOf(Color(0xFF0F172A), Color(0xFF1E293B))
+                    } else {
+                        listOf(DeepSkyBlue, SkyBlue, Color.White)
+                    }
                 )
             )
     ) {
@@ -73,13 +78,13 @@ fun JournalScreen(
                     text = stringResource(id = R.string.journal_greeting),
                     fontSize = 28.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF0036D6)
+                    color = if (isSystemInDarkTheme()) Color.White else Color(0xFF0036D6)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(id = R.string.journal_subtitle),
                     fontSize = 15.sp,
-                    color = Color(0xFF1D5FE2).copy(alpha = 0.8f),
+                    color = (if (isSystemInDarkTheme()) Color.White else Color(0xFF1D5FE2)).copy(alpha = 0.8f),
                     lineHeight = 22.sp
                 )
             }
@@ -91,7 +96,7 @@ fun JournalScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
-                color = Color.White
+                color = MaterialTheme.colorScheme.surface
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -100,7 +105,7 @@ fun JournalScreen(
                     item {
                         // Date Header
                         Surface(
-                            color = Color(0xFFF1F5F9),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.padding(bottom = 24.dp)
                         ) {
@@ -111,7 +116,7 @@ fun JournalScreen(
                                 Icon(
                                     imageVector = Icons.Default.CalendarMonth,
                                     contentDescription = null,
-                                    tint = JournalBlue,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -119,7 +124,7 @@ fun JournalScreen(
                                     text = "04 Tháng 5, 2026",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = JournalBlue
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
@@ -142,6 +147,8 @@ fun TimelineEntryItem(
     entry: JournalEntry,
     isLast: Boolean
 ) {
+    val timelineColor = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.primary else JournalBlue
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -156,7 +163,7 @@ fun TimelineEntryItem(
                 text = entry.time,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = JournalBlue
+                color = timelineColor
             )
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -168,7 +175,7 @@ fun TimelineEntryItem(
                 if (!isLast) {
                     Canvas(modifier = Modifier.fillMaxHeight()) {
                         drawLine(
-                            color = JournalBlue.copy(alpha = 0.3f),
+                            color = timelineColor.copy(alpha = 0.3f),
                             start = Offset(size.width / 2, 0f),
                             end = Offset(size.width / 2, size.height),
                             strokeWidth = 2.dp.toPx()
@@ -179,7 +186,7 @@ fun TimelineEntryItem(
                 Surface(
                     modifier = Modifier.size(10.dp),
                     shape = CircleShape,
-                    color = JournalBlue
+                    color = timelineColor
                 ) {}
             }
         }
@@ -205,7 +212,7 @@ fun TimelineEntryItem(
                 Text(
                     text = entry.content,
                     fontSize = 15.sp,
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(top = 16.dp)
                 )
@@ -218,7 +225,7 @@ fun TimelineEntryItem(
                     modifier = Modifier
                         .size(width = 120.dp, height = 80.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color.LightGray)
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                 ) {
                     // Actual Image would go here
                 }

@@ -129,7 +129,7 @@ fun RegisterContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
             .pointerInput(Unit) {
                 detectTapGestures(onTap = {
                     focusManager.clearFocus()
@@ -212,7 +212,7 @@ fun RegisterContent(
                     .padding(top = 155.dp) // Đẩy điểm bắt đầu xuống 155dp để không đè chữ
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -420,11 +420,11 @@ fun RegisterInputField(
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = RegPrimaryBlue,
-                unfocusedBorderColor = RegFieldBorder,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                 focusedLabelColor = RegPrimaryBlue,
-                unfocusedLabelColor = RegIconGrey,
-                focusedTextColor = Color.Black,
-                unfocusedTextColor = Color.Black,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                 errorBorderColor = MaterialTheme.colorScheme.error,
                 errorLabelColor = MaterialTheme.colorScheme.error
             ),

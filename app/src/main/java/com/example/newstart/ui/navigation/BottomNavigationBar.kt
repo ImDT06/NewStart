@@ -44,7 +44,7 @@ fun MainBottomBar(navController: NavController) {
 
     if (showBottomBar) {
         NavigationBar(
-            containerColor = Color.White,
+            containerColor = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp
         ) {
             items.forEachIndexed { index, item ->
@@ -78,10 +78,10 @@ fun MainBottomBar(navController: NavController) {
                             ) 
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF1D5FE2),
-                            selectedTextColor = Color(0xFF1D5FE2),
-                            unselectedIconColor = Color.Gray,
-                            unselectedTextColor = Color.Gray,
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             indicatorColor = Color.Transparent
                         )
                     )

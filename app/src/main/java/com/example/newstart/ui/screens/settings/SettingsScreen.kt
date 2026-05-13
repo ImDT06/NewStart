@@ -98,8 +98,16 @@ fun SettingsScreen(
                     )
                     SettingsDivider()
                     SettingsItem(
-                        icon = Icons.Default.DarkMode,
-                        titleRes = R.string.settings_dark_mode,
+                        icon = when (themeMode) {
+                            ThemeMode.LIGHT -> Icons.Default.LightMode
+                            ThemeMode.DARK -> Icons.Default.DarkMode
+                            ThemeMode.SYSTEM -> Icons.Default.SettingsBrightness
+                        },
+                        title = when (themeMode) {
+                            ThemeMode.LIGHT -> "Chế độ sáng"
+                            ThemeMode.DARK -> "Chế độ tối"
+                            ThemeMode.SYSTEM -> "Chế độ hệ thống"
+                        },
                         onClick = { showThemePicker = true }
                     )
                 }
@@ -181,13 +189,25 @@ fun ThemeSelectionDialog(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
             
-            ThemeOption("Sáng", ThemeMode.LIGHT, currentMode == ThemeMode.LIGHT) {
+            ThemeOption(
+                label = "Sáng",
+                icon = Icons.Default.LightMode,
+                isSelected = currentMode == ThemeMode.LIGHT
+            ) {
                 onModeSelected(ThemeMode.LIGHT)
             }
-            ThemeOption("Tối", ThemeMode.DARK, currentMode == ThemeMode.DARK) {
+            ThemeOption(
+                label = "Tối",
+                icon = Icons.Default.DarkMode,
+                isSelected = currentMode == ThemeMode.DARK
+            ) {
                 onModeSelected(ThemeMode.DARK)
             }
-            ThemeOption("Mặc định hệ thống", ThemeMode.SYSTEM, currentMode == ThemeMode.SYSTEM) {
+            ThemeOption(
+                label = "Hệ thống",
+                icon = Icons.Default.SettingsBrightness,
+                isSelected = currentMode == ThemeMode.SYSTEM
+            ) {
                 onModeSelected(ThemeMode.SYSTEM)
             }
         }
@@ -197,7 +217,7 @@ fun ThemeSelectionDialog(
 @Composable
 fun ThemeOption(
     label: String,
-    mode: ThemeMode,
+    icon: ImageVector,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
@@ -208,13 +228,25 @@ fun ThemeOption(
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = label, 
+            fontSize = 16.sp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.weight(1f)
+        )
         RadioButton(
             selected = isSelected,
             onClick = onClick,
-            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF1D5FE2))
+            colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
         )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(text = label, fontSize = 16.sp)
     }
 }
 
@@ -244,7 +276,7 @@ fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 fun SettingsItem(
     icon: ImageVector,
-    titleRes: Int,
+    title: String,
     onClick: () -> Unit
 ) {
     Row(
@@ -270,7 +302,7 @@ fun SettingsItem(
         }
         Spacer(modifier = Modifier.width(16.dp))
         Text(
-            text = stringResource(id = titleRes),
+            text = title,
             fontSize = 16.sp,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
@@ -281,6 +313,19 @@ fun SettingsItem(
             tint = MaterialTheme.colorScheme.outlineVariant
         )
     }
+}
+
+@Composable
+fun SettingsItem(
+    icon: ImageVector,
+    titleRes: Int,
+    onClick: () -> Unit
+) {
+    SettingsItem(
+        icon = icon,
+        title = stringResource(id = titleRes),
+        onClick = onClick
+    )
 }
 
 @Composable
@@ -314,7 +359,7 @@ fun SettingsToggleItem(
         Text(
             text = stringResource(id = titleRes),
             fontSize = 16.sp,
-            color = Color.Black,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
         Switch(
@@ -322,7 +367,7 @@ fun SettingsToggleItem(
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = Color(0xFF1D5FE2)
+                checkedTrackColor = MaterialTheme.colorScheme.primary
             )
         )
     }

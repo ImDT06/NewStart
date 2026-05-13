@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.MotionEvent
 import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -45,6 +46,15 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContent {
             val themeMode by mainViewModel.themeMode.collectAsState()
+            
+            // Ép AppCompatDelegate tuân thủ themeMode để đồng bộ hệ thống
+            LaunchedEffect(themeMode) {
+                when (themeMode) {
+                    ThemeMode.LIGHT -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                    ThemeMode.DARK -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                    ThemeMode.SYSTEM -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+                }
+            }
 
             NewStartTheme(themeMode = themeMode) {
                 val navController = rememberNavController()
@@ -91,7 +101,7 @@ class MainActivity : AppCompatActivity() {
                                     },
                                     modifier = Modifier.size(64.dp),
                                     shape = CircleShape,
-                                    containerColor = Color(0xFF1D5FE2),
+                                    containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = Color.White,
                                     elevation = FloatingActionButtonDefaults.elevation(4.dp)
                                 ) {
@@ -122,7 +132,7 @@ class MainActivity : AppCompatActivity() {
                                 },
                                 sheetState = sheetState,
                                 dragHandle = { BottomSheetDefaults.DragHandle() },
-                                containerColor = Color.White,
+                                containerColor = MaterialTheme.colorScheme.surface,
                                 shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
                             ) {
                                 when (sheetContentType) {
