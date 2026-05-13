@@ -1,0 +1,92 @@
+<resources>
+    <string name="app_name">NewStart</string>
+
+    <!-- Welcome Screen -->
+    <string name="welcome_simple">Simple</string>
+    <string name="welcome_edu">edu</string>
+    <string name="welcome_slogan">Tận hưởng việc học ngay trong tầm tay!</string>
+    <string name="welcome_get_started">Bắt đầu ngay</string>
+    <string name="welcome_new_here">Bạn mới? </string>
+    <string name="welcome_sign_up">Đăng ký</string>
+
+    <!-- Login Screen -->
+    <string name="login_title">Đăng nhập</string>
+    <string name="login_subtitle">Trải nghiệm môi trường học tập tốt hơn</string>
+    <string name="login_label_email">Địa chỉ Email</string>
+    <string name="login_placeholder_email">Địa chỉ Email</string>
+    <string name="login_label_password">Mật khẩu</string>
+    <string name="login_placeholder_password">Mật khẩu</string>
+    <string name="login_remember_me">Ghi nhớ tôi</string>
+    <string name="login_forgot_password">Quên mật khẩu?</string>
+    <string name="login_btn_now">Đăng nhập</string>
+    <string name="login_or">HOẶC</string>
+    <string name="login_google">Đăng nhập với Google</string>
+
+    <!-- Register Screen -->
+    <string name="register_title">Đăng ký</string>
+    <string name="register_subtitle">Đăng ký để bắt đầu quá trình học tập của bạn</string>
+    <string name="register_label_name">Họ và tên</string>
+    <string name="register_placeholder_name">Họ và tên</string>
+    <string name="register_label_mobile">Số điện thoại</string>
+    <string name="register_placeholder_mobile">Số điện thoại</string>
+    <string name="register_label_password">Tạo mật khẩu</string>
+    <string name="register_placeholder_password">Nhập mật khẩu</string>
+    <string name="register_label_confirm">Xác nhận mật khẩu</string>
+    <string name="register_placeholder_confirm">Nhập lại mật khẩu</string>
+    <string name="register_terms_prefix">Bằng cách đăng ký, bạn chấp nhận </string>
+    <string name="register_terms_service">Điều khoản dịch vụ</string>
+    <string name="register_terms_and"> &amp; </string>
+    <string name="register_terms_privacy">Chính sách bảo mật</string>
+    <string name="register_btn_now">Đăng ký</string>
+    <string name="register_already_member">Đã là thành viên? </string>
+    <string name="register_login_now">Đăng nhập ngay</string>
+
+    <!-- Home Screen -->
+    <string name="home_welcome">Chào mừng đến với NewStart</string>
+    <string name="home_email">Email: %1$s</string>
+    <string name="home_view_details">Xem chi tiết</string>
+    <string name="home_loading">Đang tải người dùng…</string>
+    <string name="home_hello">Xin chào %1$s!</string>
+    <string name="home_search_placeholder">Tìm kiếm khóa học, bài học...</string>
+    <string name="home_category_courses">Khóa học</string>
+    <string name="home_category_exams">Kỳ thi</string>
+    <string name="home_category_library">Thư viện</string>
+    <string name="home_category_community">Cộng đồng</string>
+    <string name="home_popular_courses">Khóa học phổ biến</string>
+    <string name="home_see_all">Xem tất cả</string>
+    <string name="home_continue_learning">Tiếp tục học</string>
+    <string name="home_progress">%1$d%% hoàn thành</string>
+
+    <!-- Bottom Nav -->
+    <string name="nav_home">Trang chủ</string>
+    <string name="nav_journal">Nhật ký</string>
+    <string name="nav_scan">Quét mã</string>
+    <string name="nav_habits">Thói quen</string>
+    <string name="nav_profile">Cá nhân</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Cài đặt</string>
+    <string name="settings_account_section">Tài khoản</string>
+    <string name="settings_profile">Thông tin cá nhân</string>
+    <string name="settings_security">Bảo mật</string>
+    <string name="settings_preferences_section">Tùy chỉnh</string>
+    <string name="settings_language">Ngôn ngữ</string>
+    <string name="settings_notifications">Thông báo</string>
+    <string name="settings_dark_mode">Chế độ tối</string>
+    <string name="settings_support_section">Hỗ trợ</string>
+    <string name="settings_help_center">Trung tâm trợ giúp</string>
+    <string name="settings_logout">Đăng xuất</string>
+    <!-- Journal Screen -->
+    <string name="journal_title">Nhật ký</string>
+    <string name="journal_greeting">Chào buổi sáng! 🌸</string>
+    <string name="journal_subtitle">Hôm nay là một ngày tuyệt vời để ghi lại những khoảnh khắc đáng nhớ</string>
+    <string name="journal_entry_placeholder">Bạn đang nghĩ gì?</string>
+
+    <!-- Errors -->
+    <string name="error_email_empty">Email không được để trống</string>
+    <string name="error_email_invalid">Email không hợp lệ</string>
+    <string name="error_password_short">Mật khẩu phải từ 6 ký tự</string>
+    <string name="error_name_empty">Họ tên không được để trống</string>
+    <string name="error_mobile_empty">Số điện thoại không được để trống</string>
+    <string name="error_password_mismatch">Mật khẩu không khớp</string>
+</resources>

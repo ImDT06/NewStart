@@ -1,0 +1,92 @@
+<resources>
+    <string name="app_name">NewStart</string>
+
+    <!-- Welcome Screen -->
+    <string name="welcome_simple">Simple</string>
+    <string name="welcome_edu">edu</string>
+    <string name="welcome_slogan">Enjoy Your Education at Your Fingertips!</string>
+    <string name="welcome_get_started">Get Started</string>
+    <string name="welcome_new_here">New Here? </string>
+    <string name="welcome_sign_up">Sign Up</string>
+
+    <!-- Login Screen -->
+    <string name="login_title">Log In</string>
+    <string name="login_subtitle">Experience a better learning environment</string>
+    <string name="login_label_email">Email address</string>
+    <string name="login_placeholder_email">Email address</string>
+    <string name="login_label_password">Password</string>
+    <string name="login_placeholder_password">Password</string>
+    <string name="login_remember_me">Remember me</string>
+    <string name="login_forgot_password">Forgot password?</string>
+    <string name="login_btn_now">Log In</string>
+    <string name="login_or">OR</string>
+    <string name="login_google">Sign In with Google</string>
+
+    <!-- Register Screen -->
+    <string name="register_title">Sign Up</string>
+    <string name="register_subtitle">Register to Start Your Learning Process</string>
+    <string name="register_label_name">Full Name</string>
+    <string name="register_placeholder_name">Full Name</string>
+    <string name="register_label_mobile">Mobile number</string>
+    <string name="register_placeholder_mobile">Mobile number</string>
+    <string name="register_label_password">Create a Password</string>
+    <string name="register_placeholder_password">Enter a Password</string>
+    <string name="register_label_confirm">Confirm Password</string>
+    <string name="register_placeholder_confirm">Retype Password</string>
+    <string name="register_terms_prefix">By Signing up you accept our </string>
+    <string name="register_terms_service">Terms of Service</string>
+    <string name="register_terms_and"> &amp; </string>
+    <string name="register_terms_privacy">Privacy Policy</string>
+    <string name="register_btn_now">Sign Up</string>
+    <string name="register_already_member">Already a Member? </string>
+    <string name="register_login_now">Login Now</string>
+
+    <!-- Home Screen -->
+    <string name="home_welcome">Welcome to NewStart</string>
+    <string name="home_email">Email: %1$s</string>
+    <string name="home_view_details">View Details</string>
+    <string name="home_loading">Loading user…</string>
+    <string name="home_hello">Hello %1$s!</string>
+    <string name="home_search_placeholder">Search courses, lessons…</string>
+    <string name="home_category_courses">Courses</string>
+    <string name="home_category_exams">Exams</string>
+    <string name="home_category_library">Library</string>
+    <string name="home_category_community">Community</string>
+    <string name="home_popular_courses">Popular Courses</string>
+    <string name="home_see_all">See All</string>
+    <string name="home_continue_learning">Continue Learning</string>
+    <string name="home_progress">%1$d%% completed</string>
+
+    <!-- Bottom Nav -->
+    <string name="nav_home">Home</string>
+    <string name="nav_journal">Journal</string>
+    <string name="nav_scan">Scan</string>
+    <string name="nav_habits">Habits</string>
+    <string name="nav_profile">Profile</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_account_section">Account</string>
+    <string name="settings_profile">Profile Information</string>
+    <string name="settings_security">Security</string>
+    <string name="settings_preferences_section">Preferences</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_dark_mode">Dark Mode</string>
+    <string name="settings_support_section">Support</string>
+    <string name="settings_help_center">Help Center</string>
+    <string name="settings_logout">Logout</string>
+    <!-- Journal Screen -->
+    <string name="journal_title">Journal</string>
+    <string name="journal_greeting">Good Morning! 🌸</string>
+    <string name="journal_subtitle">Today is a wonderful day to record memorable moments</string>
+    <string name="journal_entry_placeholder">What\'s on your mind?</string>
+
+    <!-- Errors -->
+    <string name="error_email_empty">Email cannot be empty</string>
+    <string name="error_email_invalid">Invalid email</string>
+    <string name="error_password_short">Password must be at least 6 characters</string>
+    <string name="error_name_empty">Name cannot be empty</string>
+    <string name="error_mobile_empty">Mobile number cannot be empty</string>
+    <string name="error_password_mismatch">Passwords do not match</string>
+</resources>
