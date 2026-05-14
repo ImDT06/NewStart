@@ -1,5 +1,7 @@
 package com.example.newstart.ui.screens.auth
 
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -10,9 +12,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -37,18 +36,20 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.shape.CircleShape
-import androidx.core.os.LocaleListCompat
-import androidx.appcompat.app.AppCompatDelegate
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.newstart.R
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.SmallLanguageSwitcher
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
@@ -56,57 +57,62 @@ fun LoginScreen(
     onNavigateToRegister: () -> Unit,
     onLoginSuccess: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: LoginViewModel = hiltViewModel()
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var rememberMe by remember { mutableStateOf(false) }
-    
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val credentialManager = CredentialManager.create(context)
     var showLanguagePicker by remember { mutableStateOf(false) }
 
-    // Trạng thái lỗi
-    var emailError by remember { mutableStateOf<String?>(null) }
-    var passwordError by remember { mutableStateOf<String?>(null) }
-    
-    val context = LocalContext.current
-
-    fun validateAndLogin() {
-        var isValid = true
-        if (email.isBlank()) {
-            emailError = context.getString(R.string.error_email_empty)
-            isValid = false
-        } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            emailError = context.getString(R.string.error_email_invalid)
-            isValid = false
-        } else {
-            emailError = null
-        }
-
-        if (password.length < 6) {
-            passwordError = context.getString(R.string.error_password_short)
-            isValid = false
-        } else {
-            passwordError = null
-        }
-
-        if (isValid) onLoginSuccess()
-    }
-
     LoginContent(
-        email = email,
-        onEmailChange = { 
-            email = it
-            if (emailError != null) emailError = null 
+        email = viewModel.email,
+        onEmailChange = viewModel::onEmailChange,
+        password = viewModel.password,
+        onPasswordChange = viewModel::onPasswordChange,
+        passwordVisible = viewModel.passwordVisible,
+        onPasswordVisibleChange = viewModel::togglePasswordVisibility,
+        emailError = viewModel.emailError,
+        passwordError = viewModel.passwordError,
+        isLoading = viewModel.isLoading,
+        onLoginClick = {
+            viewModel.login(
+                onSuccess = onLoginSuccess,
+                onError = { error ->
+                    Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                }
+            )
         },
-        password = password,
-        onPasswordChange = { 
-            password = it
-            if (passwordError != null) passwordError = null
+        onGoogleLoginClick = {
+            val googleIdOption = GetGoogleIdOption.Builder()
+                .setFilterByAuthorizedAccounts(false)
+                .setServerClientId(context.getString(R.string.default_web_client_id))
+                .build()
+
+            val request = GetCredentialRequest.Builder()
+                .addCredentialOption(googleIdOption)
+                .build()
+
+            scope.launch {
+                try {
+                    val result = credentialManager.getCredential(context, request)
+                    val credential = result.credential
+                    
+                    if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                        val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                        viewModel.loginWithGoogle(
+                            idToken = googleIdTokenCredential.idToken,
+                            onSuccess = onLoginSuccess,
+                            onError = { error ->
+                                Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e("LoginScreen", "Google login error", e)
+                    Toast.makeText(context, "Đăng nhập Google thất bại", Toast.LENGTH_SHORT).show()
+                }
+            }
         },
-        emailError = emailError,
-        passwordError = passwordError,
-        rememberMe = rememberMe,
-        onRememberMeChange = { rememberMe = it },
-        onLoginClick = ::validateAndLogin,
         onRegisterClick = onNavigateToRegister,
         onBackClick = onNavigateBack,
         showLanguagePicker = showLanguagePicker,
@@ -121,11 +127,13 @@ fun LoginContent(
     onEmailChange: (String) -> Unit,
     password: String,
     onPasswordChange: (String) -> Unit,
+    passwordVisible: Boolean,
+    onPasswordVisibleChange: () -> Unit,
     emailError: String?,
     passwordError: String?,
-    rememberMe: Boolean,
-    onRememberMeChange: (Boolean) -> Unit,
+    isLoading: Boolean,
     onLoginClick: () -> Unit,
+    onGoogleLoginClick: () -> Unit,
     onRegisterClick: () -> Unit,
     onBackClick: () -> Unit,
     showLanguagePicker: Boolean,
@@ -140,14 +148,13 @@ fun LoginContent(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .pointerInput(Unit) {
-                detectTapGestures(onTap = {
+                detectTapGestures {
                     focusManager.clearFocus()
-                })
+                }
             }
             .verticalScroll(scrollState)
-            .imePadding() // Di chuyển imePadding lên trên để ưu tiên xử lý bàn phím
+            .imePadding()
     ) {
-        // Cấu trúc Box lồng ghép để tạo hiệu ứng lớp chồng (Layering)
         Box(modifier = Modifier.fillMaxWidth()) {
             // Blue Header Section
             Column(
@@ -185,7 +192,6 @@ fun LoginContent(
                         )
                     }
 
-                    // Language Switcher
                     SmallLanguageSwitcher(
                         onClick = { onToggleLanguagePicker(true) },
                         tintColor = MaterialTheme.colorScheme.onPrimary
@@ -254,6 +260,8 @@ fun LoginContent(
                         errorText = passwordError,
                         icon = Icons.Default.Lock,
                         isPassword = true,
+                        passwordVisible = passwordVisible,
+                        onPasswordVisibleChange = onPasswordVisibleChange,
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Done,
                             keyboardType = KeyboardType.Password
@@ -273,8 +281,8 @@ fun LoginContent(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(
-                                checked = rememberMe,
-                                onCheckedChange = onRememberMeChange,
+                                checked = false, // TODO: Implement remember me
+                                onCheckedChange = { },
                                 colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
                             )
                             Text(
@@ -300,6 +308,7 @@ fun LoginContent(
                 ) {
                     Button(
                         onClick = onLoginClick,
+                        enabled = !isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
@@ -310,12 +319,19 @@ fun LoginContent(
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 24.dp)
                     ) {
-                        Text(
-                            text = stringResource(id = R.string.login_btn_now),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Text(
+                                text = stringResource(id = R.string.login_btn_now),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
 
                     Row(
@@ -343,7 +359,7 @@ fun LoginContent(
                         verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         OutlinedButton(
-                            onClick = { /* Google Login */ },
+                            onClick = onGoogleLoginClick,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp),
@@ -387,7 +403,6 @@ fun LoginContent(
                     }
                 }
             }
-
         }
     }
 }
@@ -401,6 +416,8 @@ fun AuthInputField(
     icon: ImageVector,
     errorText: String? = null,
     isPassword: Boolean = false,
+    passwordVisible: Boolean = false,
+    onPasswordVisibleChange: (() -> Unit)? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
@@ -434,8 +451,19 @@ fun AuthInputField(
                     modifier = Modifier.size(20.dp)
                 )
             },
+            trailingIcon = {
+                if (isPassword && onPasswordVisibleChange != null) {
+                    IconButton(onClick = onPasswordVisibleChange) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
             isError = errorText != null,
-            visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+            visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -472,11 +500,13 @@ fun LoginScreenPreview() {
             onEmailChange = {},
             password = "password",
             onPasswordChange = {},
+            passwordVisible = false,
+            onPasswordVisibleChange = {},
             emailError = null,
             passwordError = null,
-            rememberMe = true,
-            onRememberMeChange = {},
+            isLoading = false,
             onLoginClick = {},
+            onGoogleLoginClick = {},
             onRegisterClick = {},
             onBackClick = {},
             showLanguagePicker = false,

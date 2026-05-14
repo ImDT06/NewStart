@@ -1,6 +1,8 @@
 package com.example.newstart.di
 
+import com.example.newstart.data.repository.AuthRepositoryImpl
 import com.example.newstart.data.repository.UserRepositoryImpl
+import com.example.newstart.domain.repository.AuthRepository
 import com.example.newstart.domain.repository.UserRepository
 import dagger.Binds
 import dagger.Module
@@ -17,4 +19,10 @@ abstract class RepositoryModule {
     abstract fun bindUserRepository(
         userRepositoryImpl: UserRepositoryImpl
     ): UserRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAuthRepository(
+        authRepositoryImpl: AuthRepositoryImpl
+    ): AuthRepository
 }
