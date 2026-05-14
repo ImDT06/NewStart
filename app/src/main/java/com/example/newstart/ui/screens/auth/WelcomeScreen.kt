@@ -33,14 +33,9 @@ import androidx.core.os.LocaleListCompat
 import androidx.appcompat.app.AppCompatDelegate
 import com.example.newstart.R
 import com.example.newstart.ui.theme.NewStartTheme
-import com.example.newstart.ui.util.LanguagePreviews
+import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.TransparentLanguageSwitcher
-
-private val WelDeepBlue = Color(0xFF0036D6)
-private val WelLightBlue = Color(0xFF1E61FF)
-private val WelWaveColor = Color(0xFF154EE8)
-private val WelButtonBlue = Color(0xFF2970FF)
 
 @Composable
 fun WelcomeScreen(
@@ -219,7 +214,7 @@ fun BackgroundGraphics(accentColor: Color) {
     }
 }
 
-@LanguagePreviews
+@AppCombinedPreviews
 @Composable
 fun WelcomeScreenPreview() {
     NewStartTheme {

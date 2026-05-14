@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,7 +27,7 @@ import com.example.newstart.R
 fun SmallLanguageSwitcher(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tintColor: Color = Color(0xFF1D5FE2) // Default Primary Blue
+    tintColor: Color = MaterialTheme.colorScheme.primary
 ) {
     val currentLocale = AppCompatDelegate.getApplicationLocales().toLanguageTags()
     val isVietnamese = currentLocale.contains("vi") || currentLocale.isEmpty()
@@ -35,7 +36,7 @@ fun SmallLanguageSwitcher(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 2.dp
     ) {
         Row(

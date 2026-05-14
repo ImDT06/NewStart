@@ -25,18 +25,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.newstart.R
 import com.example.newstart.ui.theme.NewStartTheme
-import com.example.newstart.ui.util.LanguagePreviews
-
-private val JournalBlue = Color(0xFF1D5FE2)
-private val SkyBlue = Color(0xFFE0F2FE)
-private val DeepSkyBlue = Color(0xFF7DD3FC)
+import com.example.newstart.ui.util.AppCombinedPreviews
 
 data class JournalEntry(
     val time: String,
     val moodEmoji: String,
     val content: String,
     val imageUrl: String? = null,
-    val color: Color = JournalBlue
+    val color: Color = Color.Unspecified
 )
 
 @Composable
@@ -57,11 +53,10 @@ fun JournalScreen(
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = if (isSystemInDarkTheme()) {
-                        listOf(Color(0xFF0F172A), Color(0xFF1E293B))
-                    } else {
-                        listOf(DeepSkyBlue, SkyBlue, Color.White)
-                    }
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.background
+                    )
                 )
             )
     ) {
@@ -78,13 +73,13 @@ fun JournalScreen(
                     text = stringResource(id = R.string.journal_greeting),
                     fontSize = 28.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = if (isSystemInDarkTheme()) Color.White else Color(0xFF0036D6)
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(id = R.string.journal_subtitle),
                     fontSize = 15.sp,
-                    color = (if (isSystemInDarkTheme()) Color.White else Color(0xFF1D5FE2)).copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                     lineHeight = 22.sp
                 )
             }
@@ -147,7 +142,7 @@ fun TimelineEntryItem(
     entry: JournalEntry,
     isLast: Boolean
 ) {
-    val timelineColor = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.primary else JournalBlue
+    val timelineColor = MaterialTheme.colorScheme.primary
 
     Row(
         modifier = Modifier
@@ -234,7 +229,7 @@ fun TimelineEntryItem(
     }
 }
 
-@LanguagePreviews
+@AppCombinedPreviews
 @Composable
 fun JournalScreenPreview() {
     NewStartTheme {

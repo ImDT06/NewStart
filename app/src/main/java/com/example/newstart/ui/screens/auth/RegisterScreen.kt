@@ -5,7 +5,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -45,7 +44,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.example.newstart.R
 import com.example.newstart.ui.theme.NewStartTheme
-import com.example.newstart.ui.util.LanguagePreviews
+import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.SmallLanguageSwitcher
 
@@ -125,9 +124,9 @@ fun RegisterContent(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .pointerInput(Unit) {
-                detectTapGestures(onTap = {
+                detectTapGestures {
                     focusManager.clearFocus()
-                })
+                }
             }
             .verticalScroll(scrollState)
             .imePadding()
@@ -426,9 +425,9 @@ fun RegisterInputField(
             visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = RegPrimaryBlue,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                focusedLabelColor = RegPrimaryBlue,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
                 unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 focusedTextColor = MaterialTheme.colorScheme.onSurface,
                 unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -451,7 +450,7 @@ fun RegisterInputField(
     }
 }
 
-@LanguagePreviews
+@AppCombinedPreviews
 @Composable
 fun RegisterScreenPreview() {
     NewStartTheme {
@@ -482,35 +481,4 @@ fun RegisterScreenPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Dark Mode", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
-@Composable
-fun RegisterScreenDarkPreview() {
-    NewStartTheme {
-        Surface(color = MaterialTheme.colorScheme.background) {
-            RegisterContent(
-                fullName = "",
-                onFullNameChange = {},
-                email = "",
-                onEmailChange = {},
-                mobile = "",
-                onMobileChange = {},
-                password = "",
-                onPasswordChange = {},
-                confirmPassword = "",
-                onConfirmPasswordChange = {},
-                acceptTerms = false,
-                onAcceptTermsChange = {},
-                fullNameError = null,
-                emailError = null,
-                mobileError = null,
-                passwordError = null,
-                confirmPasswordError = null,
-                onSignUpClick = {},
-                onLoginNowClick = {},
-                onBackClick = {},
-                showLanguagePicker = false,
-                onToggleLanguagePicker = {}
-            )
-        }
-    }
-}
+// Remove the redundant dark preview as it's now covered by AppCombinedPreviews

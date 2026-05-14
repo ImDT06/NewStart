@@ -29,16 +29,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.newstart.R
 import com.example.newstart.domain.model.User
 import com.example.newstart.ui.theme.NewStartTheme
-import com.example.newstart.ui.util.LanguagePreviews
+import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.SmallLanguageSwitcher
-
-private val HomePrimary = Color(0xFF1D5FE2)
-private val HomeBg = Color(0xFFF8FAFC)
-private val CardBlue = Color(0xFFE0E7FF)
-private val CardOrange = Color(0xFFFFF7ED)
-private val CardGreen = Color(0xFFF0FDF4)
-private val CardPurple = Color(0xFFFAF5FF)
 
 data class Category(val titleRes: Int, val icon: ImageVector, val color: Color)
 data class Course(val id: String, val title: String, val author: String, val progress: Int, val color: Color)
@@ -67,10 +60,10 @@ fun HomeContent(
     var showLanguagePicker by remember { mutableStateOf(false) }
 
     val categories = listOf(
-        Category(R.string.home_category_courses, Icons.AutoMirrored.Filled.MenuBook, CardBlue),
-        Category(R.string.home_category_exams, Icons.AutoMirrored.Filled.Assignment, CardOrange),
-        Category(R.string.home_category_library, Icons.Default.CollectionsBookmark, CardGreen),
-        Category(R.string.home_category_community, Icons.Default.Groups, CardPurple)
+        Category(R.string.home_category_courses, Icons.AutoMirrored.Filled.MenuBook, MaterialTheme.colorScheme.primaryContainer),
+        Category(R.string.home_category_exams, Icons.AutoMirrored.Filled.Assignment, MaterialTheme.colorScheme.secondaryContainer),
+        Category(R.string.home_category_library, Icons.Default.CollectionsBookmark, MaterialTheme.colorScheme.tertiaryContainer),
+        Category(R.string.home_category_community, Icons.Default.Groups, MaterialTheme.colorScheme.surfaceVariant)
     )
 
     val popularCourses = listOf(
@@ -172,11 +165,11 @@ fun HomeHeader(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable { /* Profile */ },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Person, contentDescription = "Profile", tint = HomePrimary)
+                Icon(Icons.Default.Person, contentDescription = "Profile", tint = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -219,20 +212,20 @@ fun ProgressCard() {
             .fillMaxWidth()
             .padding(20.dp),
         shape = RoundedCornerShape(24.dp),
-        color = HomePrimary
+        color = MaterialTheme.colorScheme.primary
     ) {
         Column(
             modifier = Modifier.padding(24.dp)
         ) {
             Text(
                 text = stringResource(id = R.string.home_continue_learning),
-                color = Color.White.copy(alpha = 0.8f),
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
                 fontSize = 14.sp
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "UI/UX Design Fundamental",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onPrimary,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -245,13 +238,13 @@ fun ProgressCard() {
                         .weight(1f)
                         .height(8.dp)
                         .clip(RoundedCornerShape(4.dp)),
-                    color = Color.White,
-                    trackColor = Color.White.copy(alpha = 0.3f),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    trackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f),
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = stringResource(id = R.string.home_progress, 65),
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -291,14 +284,19 @@ fun CategoryItem(category: Category) {
                 .clickable { /* Navigate */ },
             contentAlignment = Alignment.Center
         ) {
-            Icon(category.icon, contentDescription = null, tint = HomePrimary, modifier = Modifier.size(28.dp))
+            Icon(
+                category.icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
+            )
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(id = category.titleRes),
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
-            color = Color.DarkGray
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
         )
     }
 }
@@ -321,7 +319,7 @@ fun SectionHeader(titleRes: Int) {
         Text(
             text = stringResource(id = R.string.home_see_all),
             fontSize = 14.sp,
-            color = HomePrimary,
+            color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.clickable { /* See All */ }
         )
@@ -364,7 +362,7 @@ fun CourseCard(course: Course, onClick: () -> Unit) {
     }
 }
 
-@LanguagePreviews
+@AppCombinedPreviews
 @Composable
 fun HomeScreenPreview() {
     NewStartTheme {
