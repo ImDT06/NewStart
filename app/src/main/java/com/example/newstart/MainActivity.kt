@@ -91,8 +91,8 @@ class MainActivity : AppCompatActivity() {
                                     },
                                     modifier = Modifier.size(64.dp),
                                     shape = CircleShape,
-                                    containerColor = Color(0xFF1D5FE2),
-                                    contentColor = Color.White,
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
                                     elevation = FloatingActionButtonDefaults.elevation(4.dp)
                                 ) {
                                     Icon(
@@ -122,7 +122,7 @@ class MainActivity : AppCompatActivity() {
                                 },
                                 sheetState = sheetState,
                                 dragHandle = { BottomSheetDefaults.DragHandle() },
-                                containerColor = Color.White,
+                                containerColor = MaterialTheme.colorScheme.surface,
                                 shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
                             ) {
                                 when (sheetContentType) {

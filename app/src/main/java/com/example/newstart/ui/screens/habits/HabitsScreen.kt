@@ -47,7 +47,7 @@ fun HabitsScreen(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF8FAFC))
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
         // Header
@@ -62,15 +62,15 @@ fun HabitsScreen(modifier: Modifier = Modifier) {
                 text = stringResource(id = R.string.nav_habits),
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = MaterialTheme.colorScheme.onBackground
             )
             IconButton(
                 onClick = { /* Add Habit */ },
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(Color(0xFF1D5FE2))
+                    .background(MaterialTheme.colorScheme.primary)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
+                Icon(Icons.Default.Add, contentDescription = "Add", tint = MaterialTheme.colorScheme.onPrimary)
             }
         }
 
@@ -99,7 +99,7 @@ fun HabitCard(habit: Habit, onToggle: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 2.dp
     ) {
         Row(
@@ -132,12 +132,12 @@ fun HabitCard(habit: Habit, onToggle: () -> Unit) {
                         text = habit.name,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "Chuỗi ${habit.streak} ngày",
                         fontSize = 13.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -147,12 +147,12 @@ fun HabitCard(habit: Habit, onToggle: () -> Unit) {
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(if (habit.isDone) habit.color else Color(0xFFF1F5F9))
+                    .background(if (habit.isDone) habit.color else MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = "Done",
-                    tint = if (habit.isDone) Color.White else Color.LightGray
+                    tint = if (habit.isDone) Color.White else MaterialTheme.colorScheme.outline
                 )
             }
         }

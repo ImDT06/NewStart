@@ -49,12 +49,6 @@ import com.example.newstart.ui.util.LanguagePreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.SmallLanguageSwitcher
 
-private val RegPrimaryBlue = Color(0xFF1D5FE2)
-private val RegTextGrey = Color(0xFF6B7280)
-private val RegFieldBorder = Color(0xFFE5E7EB)
-private val RegIconGrey = Color(0xFF9CA3AF)
-private val RegWaveBlue = Color(0xFF0036D6)
-
 @Composable
 fun RegisterScreen(
     modifier: Modifier = Modifier,
@@ -129,7 +123,7 @@ fun RegisterContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
             .pointerInput(Unit) {
                 detectTapGestures(onTap = {
                     focusManager.clearFocus()
@@ -147,7 +141,10 @@ fun RegisterContent(
                     .height(180.dp)
                     .background(
                         brush = Brush.verticalGradient(
-                            colors = listOf(RegWaveBlue, RegWaveBlue.copy(alpha = 0.8f))
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            )
                         )
                     )
             ) {
@@ -168,7 +165,7 @@ fun RegisterContent(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -176,7 +173,7 @@ fun RegisterContent(
                     // Language Switcher
                     SmallLanguageSwitcher(
                         onClick = { onToggleLanguagePicker(true) },
-                        tintColor = Color.White
+                        tintColor = MaterialTheme.colorScheme.onPrimary
                     )
                 }
 
@@ -193,13 +190,13 @@ fun RegisterContent(
                 ) {
                     Text(
                         text = stringResource(id = R.string.register_title),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = stringResource(id = R.string.register_subtitle),
-                        color = Color.White.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
                         fontSize = 14.sp,
                         lineHeight = 18.sp
                     )
@@ -212,7 +209,7 @@ fun RegisterContent(
                     .padding(top = 155.dp) // Đẩy điểm bắt đầu xuống 155dp để không đè chữ
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -310,20 +307,20 @@ fun RegisterContent(
                         Checkbox(
                             checked = acceptTerms,
                             onCheckedChange = onAcceptTermsChange,
-                            colors = CheckboxDefaults.colors(checkedColor = RegPrimaryBlue)
+                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
                         )
                         Text(
                             text = buildAnnotatedString {
-                                withStyle(style = SpanStyle(color = RegTextGrey)) {
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
                                     append(stringResource(id = R.string.register_terms_prefix))
                                 }
-                                withStyle(style = SpanStyle(color = RegPrimaryBlue, fontWeight = FontWeight.Bold)) {
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
                                     append(stringResource(id = R.string.register_terms_service))
                                 }
-                                withStyle(style = SpanStyle(color = RegTextGrey)) {
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
                                     append(stringResource(id = R.string.register_terms_and))
                                 }
-                                withStyle(style = SpanStyle(color = RegPrimaryBlue, fontWeight = FontWeight.Bold)) {
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
                                     append(stringResource(id = R.string.register_terms_privacy))
                                 }
                             },
@@ -345,12 +342,14 @@ fun RegisterContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = RegPrimaryBlue),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             text = stringResource(id = R.string.register_btn_now),
-                            color = Color.White,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
@@ -363,11 +362,11 @@ fun RegisterContent(
                     ) {
                         Text(
                             text = buildAnnotatedString {
-                                withStyle(style = SpanStyle(color = RegTextGrey)) {
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
                                     append(stringResource(id = R.string.register_already_member))
                                 }
                                 append(" ")
-                                withStyle(style = SpanStyle(color = RegPrimaryBlue, fontWeight = FontWeight.Bold)) {
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
                                     append(stringResource(id = R.string.register_login_now))
                                 }
                             },
@@ -404,14 +403,22 @@ fun RegisterInputField(
             label = { Text(text = label) },
             placeholder = {
                 if (!isFocused && value.isEmpty()) {
-                    Text(text = placeholder, color = RegIconGrey, fontSize = 14.sp)
+                    Text(
+                        text = placeholder,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        fontSize = 14.sp
+                    )
                 }
             },
             leadingIcon = {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (errorText != null) MaterialTheme.colorScheme.error else RegIconGrey,
+                    tint = if (errorText != null) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                     modifier = Modifier.size(20.dp)
                 )
             },
@@ -419,12 +426,12 @@ fun RegisterInputField(
             visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = RegPrimaryBlue,
-                unfocusedBorderColor = RegFieldBorder,
-                focusedLabelColor = RegPrimaryBlue,
-                unfocusedLabelColor = RegIconGrey,
-                focusedTextColor = Color.Black,
-                unfocusedTextColor = Color.Black,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                 errorBorderColor = MaterialTheme.colorScheme.error,
                 errorLabelColor = MaterialTheme.colorScheme.error
             ),
