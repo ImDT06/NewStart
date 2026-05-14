@@ -51,13 +51,6 @@ import com.example.newstart.ui.util.LanguagePreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.SmallLanguageSwitcher
 
-// New Theme Colors
-private val PrimaryBlue = Color(0xFF1D5FE2)
-private val TextGrey = Color(0xFF6B7280)
-private val FieldBorder = Color(0xFFE5E7EB)
-private val IconGrey = Color(0xFF9CA3AF)
-private val WaveBlue = Color(0xFF0036D6)
-
 @Composable
 fun LoginScreen(
     onNavigateBack: () -> Unit,
@@ -164,14 +157,17 @@ fun LoginContent(
                     .height(180.dp)
                     .background(
                         brush = Brush.verticalGradient(
-                            colors = listOf(WaveBlue, WaveBlue.copy(alpha = 0.8f))
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            )
                         )
                     )
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .statusBarsPadding() // Sử dụng statusBarsPadding để sát đỉnh hơn
+                        .statusBarsPadding()
                         .padding(top = 8.dp, start = 16.dp, end = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -185,13 +181,16 @@ fun LoginContent(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(28.dp)
                         )
                     }
 
                     // Language Switcher
-                    SmallLanguageSwitcher(onClick = { onToggleLanguagePicker(true) })
+                    SmallLanguageSwitcher(
+                        onClick = { onToggleLanguagePicker(true) },
+                        tintColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 }
 
                 if (showLanguagePicker) {
@@ -201,19 +200,19 @@ fun LoginContent(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f) // Sử dụng weight để tận dụng không gian
-                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp), // Tăng bottom padding
+                        .weight(1f)
+                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
                     verticalArrangement = Arrangement.Bottom
                 ) {
                     Text(
                         text = stringResource(id = R.string.login_title),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = stringResource(id = R.string.login_subtitle),
-                        color = Color.White.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
                         fontSize = 14.sp,
                         lineHeight = 18.sp
                     )
@@ -223,7 +222,7 @@ fun LoginContent(
             // Form Section
             Column(
                 modifier = Modifier
-                    .padding(top = 155.dp) // Đẩy xuống 155dp để tránh đè tiêu đề
+                    .padding(top = 155.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(MaterialTheme.colorScheme.surface)
@@ -277,7 +276,12 @@ fun LoginContent(
                             Checkbox(
                                 checked = rememberMe,
                                 onCheckedChange = onRememberMeChange,
-                                colors = CheckboxDefaults.colors(checkedColor = PrimaryBlue)
+                                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                            )
+                            Text(
+                                text = stringResource(id = R.string.login_remember_me),
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = stringResource(id = R.string.login_remember_me), 
@@ -286,7 +290,11 @@ fun LoginContent(
                             )
                         }
                         TextButton(onClick = { /* Forgot */ }) {
-                            Text(text = stringResource(id = R.string.login_forgot_password), fontSize = 12.sp, color = PrimaryBlue)
+                            Text(
+                                text = stringResource(id = R.string.login_forgot_password),
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 }
@@ -298,17 +306,18 @@ fun LoginContent(
                 ) {
                     Button(
                         onClick = onLoginClick,
-                        enabled = true,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 24.dp)
                     ) {
                         Text(
                             text = stringResource(id = R.string.login_btn_now),
-                            color = Color.White,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
@@ -319,13 +328,20 @@ fun LoginContent(
                         modifier = Modifier.padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = FieldBorder)
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
                         Text(
                             text = stringResource(id = R.string.login_or),
                             modifier = Modifier.padding(horizontal = 16.dp),
                             fontSize = 12.sp,
-                            color = TextGrey)
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = FieldBorder)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
                     }
 
                     Column(
@@ -338,7 +354,7 @@ fun LoginContent(
                                 .fillMaxWidth()
                                 .height(56.dp),
                             shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, FieldBorder)
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
@@ -363,11 +379,11 @@ fun LoginContent(
                         ) {
                             Text(
                                 text = buildAnnotatedString {
-                                    withStyle(style = SpanStyle(color = TextGrey)) {
+                                    withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
                                         append(stringResource(id = R.string.welcome_new_here))
                                     }
-                                    append(" ") // Thêm khoảng trống rõ ràng
-                                    withStyle(style = SpanStyle(color = PrimaryBlue, fontWeight = FontWeight.Bold)) {
+                                    append(" ")
+                                    withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
                                         append(stringResource(id = R.string.welcome_sign_up))
                                     }
                                 },
@@ -405,14 +421,22 @@ fun AuthInputField(
             label = { Text(text = label) },
             placeholder = {
                 if (!isFocused && value.isEmpty()) {
-                    Text(text = placeholder, color = IconGrey, fontSize = 14.sp)
+                    Text(
+                        text = placeholder,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        fontSize = 14.sp
+                    )
                 }
             },
             leadingIcon = {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (errorText != null) MaterialTheme.colorScheme.error else IconGrey,
+                    tint = if (errorText != null) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                     modifier = Modifier.size(20.dp)
                 )
             },

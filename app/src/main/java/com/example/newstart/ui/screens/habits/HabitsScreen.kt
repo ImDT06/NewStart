@@ -68,9 +68,9 @@ fun HabitsScreen(modifier: Modifier = Modifier) {
                 onClick = { /* Add Habit */ },
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(Color(0xFF1D5FE2))
+                    .background(MaterialTheme.colorScheme.primary)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
+                Icon(Icons.Default.Add, contentDescription = "Add", tint = MaterialTheme.colorScheme.onPrimary)
             }
         }
 

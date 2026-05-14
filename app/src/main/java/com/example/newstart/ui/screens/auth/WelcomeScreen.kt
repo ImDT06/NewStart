@@ -52,10 +52,10 @@ fun WelcomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(WelDeepBlue)
+            .background(MaterialTheme.colorScheme.primary)
     ) {
         // Abstract Background Shapes (Waves)
-        BackgroundGraphics()
+        BackgroundGraphics(MaterialTheme.colorScheme.primaryContainer)
 
         // Language Switcher in Top Right
         TransparentLanguageSwitcher(
@@ -88,7 +88,7 @@ fun WelcomeScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.MenuBook,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(80.dp)
                 )
 
@@ -96,14 +96,14 @@ fun WelcomeScreen(
 
                 Text(
                     text = stringResource(id = R.string.welcome_simple),
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontSize = 54.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 1.sp
                 )
                 Text(
                     text = stringResource(id = R.string.welcome_edu),
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontSize = 54.sp,
                     fontWeight = FontWeight.ExtraBold,
                     modifier = Modifier.offset(y = (-15).dp),
@@ -143,15 +143,15 @@ fun WelcomeScreen(
                             .fillMaxWidth()
                             .height(54.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = WelButtonBlue
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             text = stringResource(id = R.string.welcome_get_started),
                             fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            fontWeight = FontWeight.Bold
                         )
                     }
 
@@ -164,14 +164,14 @@ fun WelcomeScreen(
                             .fillMaxWidth()
                             .height(54.dp),
                         shape = RoundedCornerShape(12.dp),
-                        border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                     ) {
                         Text(
                             text = buildAnnotatedString {
-                                withStyle(style = SpanStyle(color = Color.Gray, fontSize = 14.sp, fontWeight = FontWeight.Medium)) {
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, fontWeight = FontWeight.Medium)) {
                                     append(stringResource(id = R.string.welcome_new_here))
                                 }
-                                withStyle(style = SpanStyle(color = WelButtonBlue, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)) {
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)) {
                                     append(stringResource(id = R.string.welcome_sign_up))
                                 }
                             }
@@ -184,7 +184,7 @@ fun WelcomeScreen(
 }
 
 @Composable
-fun BackgroundGraphics() {
+fun BackgroundGraphics(accentColor: Color) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
@@ -197,7 +197,7 @@ fun BackgroundGraphics() {
             quadraticTo(width * 0.5f, height * 0.6f, 0f, height * 0.4f)
             close()
         }
-        drawPath(path1, WelWaveColor.copy(alpha = 0.5f))
+        drawPath(path1, accentColor.copy(alpha = 0.5f))
 
         // Middle Overlapping Wave
         val path2 = Path().apply {
@@ -207,7 +207,7 @@ fun BackgroundGraphics() {
             cubicTo(width * 0.7f, height * 0.8f, width * 0.3f, height * 0.6f, 0f, height * 0.7f)
             close()
         }
-        drawPath(path2, WelLightBlue.copy(alpha = 0.3f))
+        drawPath(path2, accentColor.copy(alpha = 0.3f))
 
         // Bottom Left Wave
         val path3 = Path().apply {
@@ -215,7 +215,7 @@ fun BackgroundGraphics() {
             quadraticTo(width * 0.4f, height * 0.8f, 0f, height)
             close()
         }
-        drawPath(path3, WelWaveColor.copy(alpha = 0.4f))
+        drawPath(path3, accentColor.copy(alpha = 0.4f))
     }
 }
 
