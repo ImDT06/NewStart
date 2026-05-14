@@ -25,7 +25,7 @@ import com.example.newstart.R
 import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.theme.ThemeMode
-import com.example.newstart.ui.util.LanguagePreviews
+import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -382,7 +382,7 @@ fun SettingsDivider() {
     )
 }
 
-@LanguagePreviews
+@AppCombinedPreviews
 @Composable
 fun SettingsScreenPreview() {
     NewStartTheme {

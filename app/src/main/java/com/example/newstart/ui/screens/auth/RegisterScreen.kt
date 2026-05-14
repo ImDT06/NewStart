@@ -1,19 +1,17 @@
 package com.example.newstart.ui.screens.auth
 
+import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -35,17 +34,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.os.LocaleListCompat
 import com.example.newstart.R
 import com.example.newstart.ui.theme.NewStartTheme
-import com.example.newstart.ui.util.LanguagePreviews
+import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.SmallLanguageSwitcher
 
@@ -56,6 +50,7 @@ fun RegisterScreen(
     onRegisterSuccess: () -> Unit = {},
     viewModel: RegisterViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     var showLanguagePicker by remember { mutableStateOf(false) }
 
     RegisterContent(
@@ -63,27 +58,33 @@ fun RegisterScreen(
         onFullNameChange = viewModel::onFullNameChange,
         email = viewModel.email,
         onEmailChange = viewModel::onEmailChange,
-        mobile = viewModel.mobile,
-        onMobileChange = viewModel::onMobileChange,
         password = viewModel.password,
         onPasswordChange = viewModel::onPasswordChange,
+        passwordVisible = viewModel.passwordVisible,
+        onPasswordVisibleChange = viewModel::togglePasswordVisibility,
         confirmPassword = viewModel.confirmPassword,
         onConfirmPasswordChange = viewModel::onConfirmPasswordChange,
+        confirmPasswordVisible = viewModel.confirmPasswordVisible,
+        onConfirmPasswordVisibleChange = viewModel::toggleConfirmPasswordVisibility,
         acceptTerms = viewModel.acceptTerms,
         onAcceptTermsChange = viewModel::onAcceptTermsChange,
         fullNameError = viewModel.fullNameError,
         emailError = viewModel.emailError,
-        mobileError = viewModel.mobileError,
         passwordError = viewModel.passwordError,
         confirmPasswordError = viewModel.confirmPasswordError,
+        isLoading = viewModel.isLoading,
         onSignUpClick = {
-            if (viewModel.validateAndRegister()) {
-                onRegisterSuccess()
-            }
+            viewModel.register(
+                onSuccess = {
+                    Toast.makeText(context, "Đăng ký thành công! Vui lòng kiểm tra Email để xác thực tài khoản.", Toast.LENGTH_LONG).show()
+                    onRegisterSuccess()
+                },
+                onError = { error ->
+                    Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                }
+            )
         },
-        onLoginNowClick = {
-            onRegisterSuccess()
-        },
+        onLoginNowClick = onNavigateBack,
         onBackClick = onNavigateBack,
         showLanguagePicker = showLanguagePicker,
         onToggleLanguagePicker = { showLanguagePicker = it },
@@ -97,19 +98,21 @@ fun RegisterContent(
     onFullNameChange: (String) -> Unit,
     email: String,
     onEmailChange: (String) -> Unit,
-    mobile: String,
-    onMobileChange: (String) -> Unit,
     password: String,
     onPasswordChange: (String) -> Unit,
+    passwordVisible: Boolean,
+    onPasswordVisibleChange: () -> Unit,
     confirmPassword: String,
     onConfirmPasswordChange: (String) -> Unit,
+    confirmPasswordVisible: Boolean,
+    onConfirmPasswordVisibleChange: () -> Unit,
     acceptTerms: Boolean,
     onAcceptTermsChange: (Boolean) -> Unit,
     fullNameError: String?,
     emailError: String?,
-    mobileError: String?,
     passwordError: String?,
     confirmPasswordError: String?,
+    isLoading: Boolean,
     onSignUpClick: () -> Unit,
     onLoginNowClick: () -> Unit,
     onBackClick: () -> Unit,
@@ -125,14 +128,13 @@ fun RegisterContent(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .pointerInput(Unit) {
-                detectTapGestures(onTap = {
+                detectTapGestures {
                     focusManager.clearFocus()
-                })
+                }
             }
             .verticalScroll(scrollState)
             .imePadding()
     ) {
-        // Cấu trúc Box lồng ghép để tạo hiệu ứng lớp chồng (Layering)
         Box(modifier = Modifier.fillMaxWidth()) {
             // Blue Header Section
             Column(
@@ -170,7 +172,6 @@ fun RegisterContent(
                         )
                     }
 
-                    // Language Switcher
                     SmallLanguageSwitcher(
                         onClick = { onToggleLanguagePicker(true) },
                         tintColor = MaterialTheme.colorScheme.onPrimary
@@ -185,7 +186,7 @@ fun RegisterContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp), // Tăng padding để đẩy chữ lên cao hẳn
+                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
                     verticalArrangement = Arrangement.Bottom
                 ) {
                     Text(
@@ -206,7 +207,7 @@ fun RegisterContent(
             // Form Section
             Column(
                 modifier = Modifier
-                    .padding(top = 155.dp) // Đẩy điểm bắt đầu xuống 155dp để không đè chữ
+                    .padding(top = 155.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(MaterialTheme.colorScheme.surface)
@@ -248,22 +249,6 @@ fun RegisterContent(
                     )
 
                     RegisterInputField(
-                        value = mobile,
-                        onValueChange = onMobileChange,
-                        label = stringResource(id = R.string.register_label_mobile),
-                        placeholder = stringResource(id = R.string.register_placeholder_mobile),
-                        errorText = mobileError,
-                        icon = Icons.Default.Phone,
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Next,
-                            keyboardType = KeyboardType.Phone
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                        )
-                    )
-
-                    RegisterInputField(
                         value = password,
                         onValueChange = onPasswordChange,
                         label = stringResource(id = R.string.register_label_password),
@@ -271,6 +256,8 @@ fun RegisterContent(
                         errorText = passwordError,
                         icon = Icons.Default.Lock,
                         isPassword = true,
+                        passwordVisible = passwordVisible,
+                        onPasswordVisibleChange = onPasswordVisibleChange,
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Next,
                             keyboardType = KeyboardType.Password
@@ -288,6 +275,8 @@ fun RegisterContent(
                         errorText = confirmPasswordError,
                         icon = Icons.Default.Lock,
                         isPassword = true,
+                        passwordVisible = confirmPasswordVisible,
+                        onPasswordVisibleChange = onConfirmPasswordVisibleChange,
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Done,
                             keyboardType = KeyboardType.Password
@@ -338,7 +327,7 @@ fun RegisterContent(
                 ) {
                     Button(
                         onClick = onSignUpClick,
-                        enabled = true,
+                        enabled = !isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
@@ -348,12 +337,19 @@ fun RegisterContent(
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text(
-                            text = stringResource(id = R.string.register_btn_now),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Text(
+                                text = stringResource(id = R.string.register_btn_now),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
 
                     TextButton(
@@ -389,6 +385,8 @@ fun RegisterInputField(
     icon: ImageVector,
     errorText: String? = null,
     isPassword: Boolean = false,
+    passwordVisible: Boolean = false,
+    onPasswordVisibleChange: (() -> Unit)? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
@@ -422,13 +420,24 @@ fun RegisterInputField(
                     modifier = Modifier.size(20.dp)
                 )
             },
+            trailingIcon = {
+                if (isPassword && onPasswordVisibleChange != null) {
+                    IconButton(onClick = onPasswordVisibleChange) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
             isError = errorText != null,
-            visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+            visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = RegPrimaryBlue,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                focusedLabelColor = RegPrimaryBlue,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
                 unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 focusedTextColor = MaterialTheme.colorScheme.onSurface,
                 unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -451,7 +460,7 @@ fun RegisterInputField(
     }
 }
 
-@LanguagePreviews
+@AppCombinedPreviews
 @Composable
 fun RegisterScreenPreview() {
     NewStartTheme {
@@ -460,57 +469,26 @@ fun RegisterScreenPreview() {
             onFullNameChange = {},
             email = "john.doe@example.com",
             onEmailChange = {},
-            mobile = "0123456789",
-            onMobileChange = {},
             password = "password123",
             onPasswordChange = {},
+            passwordVisible = false,
+            onPasswordVisibleChange = {},
             confirmPassword = "password123",
             onConfirmPasswordChange = {},
+            confirmPasswordVisible = false,
+            onConfirmPasswordVisibleChange = {},
             acceptTerms = true,
             onAcceptTermsChange = {},
             fullNameError = null,
             emailError = null,
-            mobileError = null,
             passwordError = null,
             confirmPasswordError = null,
+            isLoading = false,
             onSignUpClick = {},
             onLoginNowClick = {},
             onBackClick = {},
             showLanguagePicker = false,
             onToggleLanguagePicker = {}
         )
-    }
-}
-
-@Preview(showBackground = true, name = "Dark Mode", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
-@Composable
-fun RegisterScreenDarkPreview() {
-    NewStartTheme {
-        Surface(color = MaterialTheme.colorScheme.background) {
-            RegisterContent(
-                fullName = "",
-                onFullNameChange = {},
-                email = "",
-                onEmailChange = {},
-                mobile = "",
-                onMobileChange = {},
-                password = "",
-                onPasswordChange = {},
-                confirmPassword = "",
-                onConfirmPasswordChange = {},
-                acceptTerms = false,
-                onAcceptTermsChange = {},
-                fullNameError = null,
-                emailError = null,
-                mobileError = null,
-                passwordError = null,
-                confirmPasswordError = null,
-                onSignUpClick = {},
-                onLoginNowClick = {},
-                onBackClick = {},
-                showLanguagePicker = false,
-                onToggleLanguagePicker = {}
-            )
-        }
     }
 }

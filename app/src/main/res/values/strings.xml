@@ -89,4 +89,5 @@
     <string name="error_name_empty">Họ tên không được để trống</string>
     <string name="error_mobile_empty">Số điện thoại không được để trống</string>
     <string name="error_password_mismatch">Mật khẩu không khớp</string>
+    <string name="default_web_client_id">190520353806-io28c2tuu4fjkddpvdkcagdqosp8fvf7.apps.googleusercontent.com</string>
 </resources>

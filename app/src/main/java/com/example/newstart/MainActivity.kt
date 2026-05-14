@@ -20,7 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -70,7 +69,7 @@ class MainActivity : AppCompatActivity() {
                     Screen.Journal.route,
                     Screen.Scan.route,
                     Screen.Habits.route,
-                    Screen.Profile.route
+                    Screen.Profile.route,
                 ).contains(currentRoute)
 
                 val sheetState = rememberModalBottomSheetState(
@@ -139,7 +138,7 @@ class MainActivity : AppCompatActivity() {
                                     SheetContent.JournalEntry -> {
                                         JournalEntryPanel(
                                             onDismiss = { showBottomSheet = false },
-                                            onPost = { emoji, text, imageUri ->
+                                            onPost = { _, _, _ ->
                                                 // Handle Post with image
                                                 showBottomSheet = false
                                             }
@@ -163,7 +162,7 @@ class MainActivity : AppCompatActivity() {
                 v.getGlobalVisibleRect(outRect)
                 if (!outRect.contains(event.rawX.toInt(), event.rawY.toInt())) {
                     v.clearFocus()
-                    val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                    val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
                     imm.hideSoftInputFromWindow(v.windowToken, 0)
                 }
             }

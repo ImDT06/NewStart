@@ -47,6 +47,7 @@ import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.example.newstart.R
 import com.example.newstart.ui.theme.NewStartTheme
+import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePreviews
 import java.io.File
 import java.text.SimpleDateFormat
@@ -167,14 +168,14 @@ fun JournalEntryPanel(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Kỹ thuật "Ghost Text" nâng cao: Đo kích thước nội dung thật
+                        // Ghost text and basic text field are fine staying white on dark overlay
                         Text(
                             text = if (text.isEmpty()) "Bạn đang nghĩ gì?" else text,
                             color = Color.Transparent, 
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 2.dp) // Giữ khoảng trống nhỏ cho cursor
+                            modifier = Modifier.padding(horizontal = 2.dp)
                         )
 
                         BasicTextField(
@@ -252,8 +253,15 @@ fun JournalEntryPanel(
                         }
                     },
                 shape = CircleShape,
-                color = if (isReadyToPost) Color.White else Color.Transparent,
-                border = if (!isReadyToPost) BorderStroke(6.dp, Color.LightGray) else BorderStroke(1.dp, Color.LightGray)
+                color = if (isReadyToPost) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    Color.Transparent
+                },
+                border = BorderStroke(
+                    width = if (isReadyToPost) 1.dp else 6.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     if (!isReadyToPost) {
@@ -262,14 +270,14 @@ fun JournalEntryPanel(
                             modifier = Modifier
                                 .size(60.dp)
                                 .clip(CircleShape)
-                                .background(Color.LightGray.copy(alpha = 0.5f))
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                         )
                     } else {
                         // Icon gửi
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Send",
-                            tint = Color(0xFF1D5FE2),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(36.dp)
                         )
                     }
@@ -406,11 +414,11 @@ private fun getOutputDirectory(context: android.content.Context): File {
     return if (mediaDir != null && mediaDir.exists()) mediaDir else context.filesDir
 }
 
-@LanguagePreviews
+@AppCombinedPreviews
 @Composable
 fun JournalEntryPanelPreview() {
     NewStartTheme {
-        Surface(color = Color.White) {
+        Surface(color = MaterialTheme.colorScheme.background) {
             JournalEntryPanel(
                 onDismiss = {},
                 onPost = { _, _, _ -> }
