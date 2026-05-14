@@ -76,6 +76,13 @@
     <string name="settings_support_section">Hỗ trợ</string>
     <string name="settings_help_center">Trung tâm trợ giúp</string>
     <string name="settings_logout">Đăng xuất</string>
+    <string name="settings_theme_light">Chế độ sáng</string>
+    <string name="settings_theme_dark">Chế độ tối</string>
+    <string name="settings_theme_system">Chế độ hệ thống</string>
+    <string name="settings_theme_select">Chọn giao diện</string>
+    <string name="settings_confirm_logout_title">Đăng xuất</string>
+    <string name="settings_confirm_logout_msg">Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này không?</string>
+    <string name="settings_cancel">Hủy</string>
     <!-- Journal Screen -->
     <string name="journal_title">Nhật ký</string>
     <string name="journal_greeting">Chào buổi sáng! 🌸</string>

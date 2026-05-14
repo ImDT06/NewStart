@@ -6,10 +6,10 @@ import android.os.Bundle
 import android.view.MotionEvent
 import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -20,12 +20,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.newstart.ui.MainViewModel
+import com.example.newstart.ui.AuthState
 import com.example.newstart.ui.navigation.MainBottomBar
 import com.example.newstart.ui.navigation.NavGraph
 import com.example.newstart.ui.navigation.Screen
@@ -34,6 +36,7 @@ import com.example.newstart.ui.theme.ThemeMode
 import com.example.newstart.ui.util.SheetContent
 import com.example.newstart.ui.screens.journal.JournalEntryPanel
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.appcompat.app.AppCompatDelegate
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -45,106 +48,101 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContent {
             val themeMode by mainViewModel.themeMode.collectAsState()
+            val authState by mainViewModel.authState.collectAsState()
             
-            // Ép AppCompatDelegate tuân thủ themeMode để đồng bộ hệ thống
-            LaunchedEffect(themeMode) {
-                when (themeMode) {
-                    ThemeMode.LIGHT -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-                    ThemeMode.DARK -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                    ThemeMode.SYSTEM -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-                }
-            }
-
             NewStartTheme(themeMode = themeMode) {
-                val navController = rememberNavController()
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentRoute = navBackStackEntry?.destination?.route
+                if (authState == AuthState.Loading) {
+                    // Màn hình trống hoàn toàn trong lúc xác thực để tránh hiện tượng nháy layout
+                    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                } else {
+                    val navController = rememberNavController()
+                    val navBackStackEntry by navController.currentBackStackEntryAsState()
+                    val currentRoute = navBackStackEntry?.destination?.route
 
-                var showBottomSheet by remember { mutableStateOf(false) }
-                var sheetContentType by remember { mutableStateOf(SheetContent.None) }
+                    var showBottomSheet by remember { mutableStateOf(false) }
+                    var sheetContentType by remember { mutableStateOf(SheetContent.None) }
 
-                // Determine if we should show the FAB based on the screen
-                val showFab = listOf(
-                    Screen.Home.route,
-                    Screen.Journal.route,
-                    Screen.Scan.route,
-                    Screen.Habits.route,
-                    Screen.Profile.route,
-                ).contains(currentRoute)
+                    // FAB và BottomBar chỉ hiện khi đã đăng nhập và không nằm ở các trang Auth
+                    val isAuthRoute = listOf(Screen.Welcome.route, Screen.Login.route, Screen.Register.route).contains(currentRoute)
+                    val showShell = authState == AuthState.Authenticated && !isAuthRoute
 
-                val sheetState = rememberModalBottomSheetState(
-                    skipPartiallyExpanded = true
-                )
+                    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    bottomBar = {
-                        MainBottomBar(navController = navController)
-                    },
-                    floatingActionButtonPosition = FabPosition.Center,
-                    floatingActionButton = {
-                        if (showFab) {
-                            // Container to properly align and overlap the FAB
-                            Box(modifier = Modifier.offset(y = 60.dp)) {
-                                FloatingActionButton(
-                                    onClick = {
-                                        // State-Driven Logic: Handle click based on current route
-                                        when (currentRoute) {
-                                            Screen.Journal.route -> {
-                                                sheetContentType = SheetContent.JournalEntry
-                                                showBottomSheet = true
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        bottomBar = {
+                            if (showShell) {
+                                MainBottomBar(navController = navController)
+                            }
+                        },
+                        floatingActionButtonPosition = FabPosition.Center,
+                        floatingActionButton = {
+                            if (showShell) {
+                                Box(modifier = Modifier.offset(y = 60.dp)) {
+                                    FloatingActionButton(
+                                        onClick = {
+                                            // Logic linh hoạt: Mặc định mở Journal, hoặc tùy biến theo route
+                                            when (currentRoute) {
+                                                Screen.Habits.route -> {
+                                                    // TODO: Mở sheet thêm thói quen
+                                                    sheetContentType = SheetContent.JournalEntry // Tạm thời
+                                                    showBottomSheet = true
+                                                }
+                                                else -> {
+                                                    sheetContentType = SheetContent.JournalEntry
+                                                    showBottomSheet = true
+                                                }
                                             }
-                                            // Tính năng quét mã đã được gỡ bỏ ở các mục khác theo yêu cầu
-                                            else -> { }
-                                        }
-                                    },
-                                    modifier = Modifier.size(64.dp),
-                                    shape = CircleShape,
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = Color.White,
-                                    elevation = FloatingActionButtonDefaults.elevation(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add,
-                                        contentDescription = "Add",
-                                        modifier = Modifier.size(32.dp)
-                                    )
+                                        },
+                                        modifier = Modifier.size(64.dp),
+                                        shape = CircleShape,
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                                        elevation = FloatingActionButtonDefaults.elevation(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "Add",
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                ) { innerPadding ->
-                    // Sử dụng Box không có padding top để cho phép content tràn màn hình (Edge-to-Edge)
-                    // Chỉ áp dụng padding bottom để tránh bị BottomBar che khuất
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(bottom = innerPadding.calculateBottomPadding())
-                    ) {
-                        NavGraph(navController = navController)
+                    ) { innerPadding ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = if (showShell) innerPadding.calculateBottomPadding() else 0.dp)
+                        ) {
+                            NavGraph(
+                                navController = navController,
+                                startDestination = if (authState == AuthState.Authenticated) Screen.Home.route else Screen.Welcome.route
+                            )
 
-                        if (showBottomSheet) {
-                            ModalBottomSheet(
-                                onDismissRequest = { 
-                                    showBottomSheet = false
-                                    sheetContentType = SheetContent.None
-                                },
-                                sheetState = sheetState,
-                                dragHandle = { BottomSheetDefaults.DragHandle() },
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
-                            ) {
-                                when (sheetContentType) {
-                                    SheetContent.JournalEntry -> {
-                                        JournalEntryPanel(
-                                            onDismiss = { showBottomSheet = false },
-                                            onPost = { _, _, _ ->
-                                                // Handle Post with image
-                                                showBottomSheet = false
-                                            }
-                                        )
+                            if (showBottomSheet) {
+                                ModalBottomSheet(
+                                    onDismissRequest = { 
+                                        showBottomSheet = false
+                                        sheetContentType = SheetContent.None
+                                    },
+                                    sheetState = sheetState,
+                                    dragHandle = { BottomSheetDefaults.DragHandle() },
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+                                ) {
+                                    when (sheetContentType) {
+                                        SheetContent.JournalEntry -> {
+                                            JournalEntryPanel(
+                                                onDismiss = { showBottomSheet = false },
+                                                onPost = { emoji, text, uri ->
+                                                    mainViewModel.saveJournalEntry(emoji, text, uri)
+                                                    showBottomSheet = false
+                                                }
+                                            )
+                                        }
+                                        else -> Box(Modifier.size(1.dp))
                                     }
-                                    else -> Box(Modifier.size(1.dp))
                                 }
                             }
                         }

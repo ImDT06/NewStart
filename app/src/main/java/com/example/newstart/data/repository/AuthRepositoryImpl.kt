@@ -88,6 +88,15 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
+        return try {
+            firebaseAuth.sendPasswordResetEmail(email).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun loginWithGoogle(idToken: String): Result<User> {
         return try {
             val credential = GoogleAuthProvider.getCredential(idToken, null)

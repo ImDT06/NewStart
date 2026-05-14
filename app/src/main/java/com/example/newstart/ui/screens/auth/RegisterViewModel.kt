@@ -49,7 +49,6 @@ class RegisterViewModel @Inject constructor(
     fun onPasswordChange(newValue: String) {
         password = newValue
         passwordError = null
-        // Re-validate mismatch if confirm password exists
         if (confirmPassword.isNotEmpty() && newValue != confirmPassword) {
             confirmPasswordError = context.getString(R.string.error_password_mismatch)
         } else {
@@ -89,7 +88,6 @@ class RegisterViewModel @Inject constructor(
             val result = authRepository.registerWithEmail(fullName, email, password)
             
             result.onSuccess {
-                // Tự động gửi email xác thực ngay sau khi đăng ký thành công
                 authRepository.sendEmailVerification()
                 isLoading = false
                 onSuccess()

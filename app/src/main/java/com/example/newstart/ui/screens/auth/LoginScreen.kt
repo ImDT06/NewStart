@@ -63,6 +63,51 @@ fun LoginScreen(
     val scope = rememberCoroutineScope()
     val credentialManager = CredentialManager.create(context)
     var showLanguagePicker by remember { mutableStateOf(false) }
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
+    var resetEmail by remember { mutableStateOf("") }
+
+    if (showForgotPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = { showForgotPasswordDialog = false },
+            title = { Text("Quên mật khẩu") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Nhập email của bạn để nhận liên kết đặt lại mật khẩu.")
+                    OutlinedTextField(
+                        value = resetEmail,
+                        onValueChange = { resetEmail = it },
+                        label = { Text("Email") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.sendPasswordReset(
+                            email = resetEmail,
+                            onSuccess = {
+                                Toast.makeText(context, "Liên kết đã được gửi vào Email của bạn", Toast.LENGTH_LONG).show()
+                                showForgotPasswordDialog = false
+                            },
+                            onError = { error ->
+                                Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    }
+                ) {
+                    Text("Gửi yêu cầu")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showForgotPasswordDialog = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
 
     LoginContent(
         email = viewModel.email,
@@ -113,6 +158,10 @@ fun LoginScreen(
                 }
             }
         },
+        onForgotPasswordClick = {
+            resetEmail = viewModel.email
+            showForgotPasswordDialog = true
+        },
         onRegisterClick = onNavigateToRegister,
         onBackClick = onNavigateBack,
         showLanguagePicker = showLanguagePicker,
@@ -134,6 +183,7 @@ fun LoginContent(
     isLoading: Boolean,
     onLoginClick: () -> Unit,
     onGoogleLoginClick: () -> Unit,
+    onForgotPasswordClick: () -> Unit,
     onRegisterClick: () -> Unit,
     onBackClick: () -> Unit,
     showLanguagePicker: Boolean,
@@ -276,22 +326,10 @@ fun LoginContent(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(
-                                checked = false, // TODO: Implement remember me
-                                onCheckedChange = { },
-                                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
-                            )
-                            Text(
-                                text = stringResource(id = R.string.login_remember_me),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        TextButton(onClick = { /* Forgot */ }) {
+                        TextButton(onClick = onForgotPasswordClick) {
                             Text(
                                 text = stringResource(id = R.string.login_forgot_password),
                                 fontSize = 12.sp,
@@ -507,6 +545,7 @@ fun LoginScreenPreview() {
             isLoading = false,
             onLoginClick = {},
             onGoogleLoginClick = {},
+            onForgotPasswordClick = {},
             onRegisterClick = {},
             onBackClick = {},
             showLanguagePicker = false,

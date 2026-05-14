@@ -77,6 +77,19 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    fun sendPasswordReset(email: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        if (email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            onError("Vui lòng nhập email hợp lệ")
+            return
+        }
+
+        viewModelScope.launch {
+            val result = authRepository.sendPasswordResetEmail(email)
+            result.onSuccess { onSuccess() }
+                .onFailure { onError(it.message ?: "Gửi yêu cầu thất bại") }
+        }
+    }
+
     private fun validate(): Boolean {
         var isValid = true
         if (email.isBlank()) {
