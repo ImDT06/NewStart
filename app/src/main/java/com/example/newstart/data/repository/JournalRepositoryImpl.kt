@@ -1,16 +1,26 @@
 package com.example.newstart.data.repository
 
+import android.content.Context
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import com.example.newstart.domain.model.JournalEntry
 import com.example.newstart.domain.repository.JournalRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.storage.FirebaseStorage
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,23 +29,24 @@ import javax.inject.Singleton
 class JournalRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
-    private val storage: FirebaseStorage
+    @ApplicationContext private val context: Context,
 ) : JournalRepository {
+
+    private val client = OkHttpClient()
 
     override suspend fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?): Result<Unit> {
         return try {
             val userId = auth.currentUser?.uid ?: throw Exception("User not logged in")
             var imageUrl: String? = null
 
-            // Upload image to Firebase Storage if exists
+            // Upload ảnh lên Cloudinary nếu có
             if (imageUri != null) {
-                val fileName = "journal_${userId}_${System.currentTimeMillis()}.jpg"
-                val storageRef = storage.reference.child("journals/$userId/$fileName")
-                storageRef.putFile(imageUri).await()
-                imageUrl = storageRef.downloadUrl.await().toString()
+                imageUrl = withContext(Dispatchers.IO) {
+                    uploadToCloudinary(imageUri)
+                }
+                if (imageUrl == null) throw Exception("Failed to upload image to Cloudinary")
             }
 
-            // Create Journal Entry
             val entry = JournalEntry(
                 userId = userId,
                 emoji = emoji,
@@ -44,11 +55,61 @@ class JournalRepositoryImpl @Inject constructor(
                 timestamp = Date()
             )
 
-            // Save to Firestore
-            firestore.collection("journals").add(entry).await()
+            // Sử dụng document() để lấy reference trước, lấy ID sau đó mới set data
+            val docRef = firestore.collection("journals").document()
+            val entryWithId = entry.copy(id = docRef.id)
+            
+            docRef.set(entryWithId).await()
+            android.util.Log.d("JournalRepository", "Entry saved successfully with ID: ${docRef.id}")
             Result.success(Unit)
         } catch (e: Exception) {
+            android.util.Log.e("JournalRepository", "Error saving entry: ${e.message}", e)
             Result.failure(e)
+        }
+    }
+
+    private fun uploadToCloudinary(uri: Uri): String? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val bytes = inputStream?.use { it.readBytes() } ?: return null
+            
+            val requestBody = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("file", "image.jpg", 
+                    bytes.toRequestBody("image/*".toMediaTypeOrNull()))
+                .addFormDataPart("upload_preset", "diary_preset")
+                .build()
+
+            val request = Request.Builder()
+                .url("https://api.cloudinary.com/v1_1/drlm8myhl/image/upload")
+                .post(requestBody)
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val responseData = response.body?.string()
+                
+                if (response.isSuccessful && responseData != null) {
+                    val jsonObject = JSONObject(responseData)
+                    return jsonObject.getString("secure_url")
+                } else {
+                    val errorMsg = try {
+                        JSONObject(responseData ?: "{}").getJSONObject("error").getString("message")
+                    } catch (e: Exception) {
+                        "Mã lỗi ${response.code}"
+                    }
+                    
+                    // Hiện lỗi trực tiếp lên màn hình để bạn dễ debug
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(context, "Cloudinary: $errorMsg", Toast.LENGTH_LONG).show()
+                    }
+                    
+                    android.util.Log.e("Cloudinary", "Upload failed: $responseData")
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("Cloudinary", "Upload failed: ${e.message}", e)
+            null
         }
     }
 
@@ -64,14 +125,23 @@ class JournalRepositoryImpl @Inject constructor(
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    android.util.Log.e("JournalRepository", "Error fetching entries: ${error.message}", error)
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    val entries = snapshot.toObjects(JournalEntry::class.java)
+                    android.util.Log.d("JournalRepository", "Raw documents count: ${snapshot.size()}")
+                    val entries = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            doc.toObject(JournalEntry::class.java)?.copy(id = doc.id)
+                        } catch (e: Exception) {
+                            android.util.Log.e("JournalRepository", "Error parsing doc ${doc.id}: ${e.message}")
+                            null
+                        }
+                    }
+                    android.util.Log.d("JournalRepository", "Successfully parsed entries: ${entries.size}")
                     trySend(entries)
                 }
             }
-
         awaitClose { subscription.remove() }
     }
 }

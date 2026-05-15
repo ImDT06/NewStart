@@ -60,9 +60,15 @@ dependencies {
     implementation(libs.androidx.camera.video)
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.camera.extensions)
+    implementation(libs.androidx.concurrent.futures)
+    implementation(libs.guava)
+    implementation(libs.listenable.future)
 
     // Coil
     implementation(libs.coil.compose)
+
+    // OkHttp
+    implementation(libs.okhttp)
 
     // Navigation
     implementation(libs.androidx.navigation.compose)

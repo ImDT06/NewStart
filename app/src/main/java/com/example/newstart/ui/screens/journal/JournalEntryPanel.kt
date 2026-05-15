@@ -33,14 +33,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalInspectionMode
-import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.concurrent.futures.await
 import coil.compose.AsyncImage
 import com.example.newstart.R
 import com.example.newstart.ui.theme.NewStartTheme
@@ -67,7 +67,7 @@ fun JournalEntryPanel(
     val executor = remember { Executors.newSingleThreadExecutor() }
     val imageCapture = remember { ImageCapture.Builder().build() }
     
-    var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
+    var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var flashMode by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
     var zoomRatio by remember { mutableFloatStateOf(1f) }
 
@@ -103,7 +103,6 @@ fun JournalEntryPanel(
     }
 
     val emojis = listOf("😊", "🥰", "😴", "😫", "🚵", "🔥", "✨", "🎉")
-    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
@@ -256,7 +255,7 @@ fun JournalEntryPanel(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = if (text.isEmpty()) "Bạn đang nghĩ gì?" else text,
+                                text = text.ifEmpty { "Bạn đang nghĩ gì?" },
                                 color = Color.Transparent, 
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium,
@@ -487,6 +486,11 @@ fun CameraPreview(
     }
 
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    LaunchedEffect(cameraProviderFuture) {
+        cameraProvider = cameraProviderFuture.await()
+    }
     
     AndroidView(
         factory = { ctx ->
@@ -495,34 +499,31 @@ fun CameraPreview(
             }
         },
         update = { previewView ->
-            cameraProviderFuture.addListener({
-                val cameraProvider = cameraProviderFuture.get()
+            val safeCameraProvider = cameraProvider ?: return@AndroidView
+            
+            val preview = Preview.Builder().build().also {
+                it.surfaceProvider = previewView.surfaceProvider
+            }
+
+            val cameraSelector = CameraSelector.Builder()
+                .requireLensFacing(lensFacing)
+                .build()
+
+            imageCapture.flashMode = flashMode
+
+            try {
+                safeCameraProvider.unbindAll()
+                val camera = safeCameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    cameraSelector,
+                    preview,
+                    imageCapture
+                )
                 
-                val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
-                }
-
-                val cameraSelector = CameraSelector.Builder()
-                    .requireLensFacing(lensFacing)
-                    .build()
-
-                imageCapture.flashMode = flashMode
-
-                try {
-                    cameraProvider.unbindAll()
-                    val camera = cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        cameraSelector,
-                        preview,
-                        imageCapture
-                    )
-                    
-                    camera.cameraControl.setZoomRatio(zoomRatio)
-                    
-                } catch (e: Exception) {
-                    Log.e("CameraPreview", "Use case binding failed", e)
-                }
-            }, ContextCompat.getMainExecutor(context))
+                camera.cameraControl.setZoomRatio(zoomRatio)
+            } catch (e: Exception) {
+                Log.e("CameraPreview", "Use case binding failed", e)
+            }
         },
         modifier = modifier
     )

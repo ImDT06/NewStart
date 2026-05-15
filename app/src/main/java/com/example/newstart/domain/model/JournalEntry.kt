@@ -1,5 +1,6 @@
 package com.example.newstart.domain.model
 
+import com.google.firebase.firestore.ServerTimestamp
 import java.util.Date
 
 data class JournalEntry(
@@ -8,5 +9,6 @@ data class JournalEntry(
     val emoji: String = "",
     val text: String = "",
     val imageUrl: String? = null,
-    val timestamp: Date = Date()
+    @ServerTimestamp
+    val timestamp: Date? = null
 )
