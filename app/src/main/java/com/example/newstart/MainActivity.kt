@@ -23,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -35,6 +36,7 @@ import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.theme.ThemeMode
 import com.example.newstart.ui.util.SheetContent
 import com.example.newstart.ui.screens.journal.JournalEntryPanel
+import com.example.newstart.ui.screens.habits.NewHabitSheet
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.appcompat.app.AppCompatDelegate
 
@@ -52,8 +54,21 @@ class MainActivity : AppCompatActivity() {
             
             NewStartTheme(themeMode = themeMode) {
                 if (authState == AuthState.Loading) {
-                    // Màn hình trống hoàn toàn trong lúc xác thực để tránh hiện tượng nháy layout
-                    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                    // Màn hình chờ thương hiệu (Splash) cực gọn
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Bạn có thể đặt Logo app ở đây
+                        Text(
+                            text = "NewStart",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 } else {
                     val navController = rememberNavController()
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -72,7 +87,13 @@ class MainActivity : AppCompatActivity() {
                         modifier = Modifier.fillMaxSize(),
                         bottomBar = {
                             if (showShell) {
-                                MainBottomBar(navController = navController)
+                                MainBottomBar(
+                                    navController = navController,
+                                    onHabitClickAgain = {
+                                        sheetContentType = SheetContent.HabitSelection
+                                        showBottomSheet = true
+                                    }
+                                )
                             }
                         },
                         floatingActionButtonPosition = FabPosition.Center,
@@ -81,11 +102,10 @@ class MainActivity : AppCompatActivity() {
                                 Box(modifier = Modifier.offset(y = 60.dp)) {
                                     FloatingActionButton(
                                         onClick = {
-                                            // Logic linh hoạt: Mặc định mở Journal, hoặc tùy biến theo route
+                                            // Logic linh hoạt
                                             when (currentRoute) {
                                                 Screen.Habits.route -> {
-                                                    // TODO: Mở sheet thêm thói quen
-                                                    sheetContentType = SheetContent.JournalEntry // Tạm thời
+                                                    sheetContentType = SheetContent.HabitSelection
                                                     showBottomSheet = true
                                                 }
                                                 else -> {
@@ -133,10 +153,22 @@ class MainActivity : AppCompatActivity() {
                                 ) {
                                     when (sheetContentType) {
                                         SheetContent.JournalEntry -> {
+                                            val isUploading by mainViewModel.isUploading.collectAsState()
                                             JournalEntryPanel(
                                                 onDismiss = { showBottomSheet = false },
                                                 onPost = { emoji, text, uri ->
-                                                    mainViewModel.saveJournalEntry(emoji, text, uri)
+                                                    mainViewModel.saveJournalEntry(emoji, text, uri) {
+                                                        showBottomSheet = false
+                                                    }
+                                                },
+                                                isUploading = isUploading
+                                            )
+                                        }
+                                        SheetContent.HabitSelection -> {
+                                            NewHabitSheet(
+                                                onDismiss = { showBottomSheet = false },
+                                                onHabitSelected = { preset ->
+                                                    // Logic lưu thói quen mới
                                                     showBottomSheet = false
                                                 }
                                             )

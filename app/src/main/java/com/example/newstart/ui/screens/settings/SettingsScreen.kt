@@ -1,7 +1,9 @@
 package com.example.newstart.ui.screens.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -14,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -28,6 +31,122 @@ import com.example.newstart.ui.theme.ThemeMode
 import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
 
+@Composable
+fun ProfileHeaderCard(
+    name: String,
+    email: String,
+    onEditAvatar: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        shape = RoundedCornerShape(32.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.padding(24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(contentAlignment = Alignment.BottomEnd) {
+                Surface(
+                    modifier = Modifier.size(80.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = name.take(1).uppercase(),
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+                
+                Surface(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clickable(onClick = onEditAvatar),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary,
+                    border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = "Edit Avatar",
+                        tint = Color.White,
+                        modifier = Modifier.padding(6.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.width(20.dp))
+            
+            Column {
+                Text(
+                    text = name,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = email,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Thành viên Premium",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickStatsRow() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        StatItem(label = "Nhật ký", value = "12", modifier = Modifier.weight(1f))
+        StatItem(label = "Thói quen", value = "85%", modifier = Modifier.weight(1f))
+        StatItem(label = "Chuỗi", value = "5 ngày", modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+fun StatItem(label: String, value: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = value, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+            Text(text = label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -39,6 +158,7 @@ fun SettingsScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     val themeMode by mainViewModel.themeMode.collectAsState()
     val currentUser by mainViewModel.currentUser.collectAsState()
+    val isDark = isSystemInDarkTheme()
 
     if (showLogoutDialog) {
         AlertDialog(
@@ -69,114 +189,123 @@ fun SettingsScreen(
             CenterAlignedTopAppBar(
                 title = { 
                     Text(
-                        text = stringResource(id = R.string.settings_title),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
+                        text = "Thông tin cá nhân",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 22.sp
                     ) 
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = Color.Transparent
                 )
             )
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        LazyColumn(
-            modifier = modifier
+        Box(
+            modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Profile Header
-            item {
-                ProfileHeader(
-                    name = currentUser?.name ?: "Người dùng",
-                    email = currentUser?.email ?: ""
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = if (isDark) {
+                            listOf(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), MaterialTheme.colorScheme.background)
+                        } else {
+                            listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), MaterialTheme.colorScheme.background)
+                        }
+                    )
                 )
-            }
-
-            // Account Section
-            item { SectionTitle(titleRes = R.string.settings_account_section) }
-            item {
-                SettingsCard {
-                    SettingsItem(
-                        icon = Icons.Default.Person,
-                        titleRes = R.string.settings_profile,
-                        onClick = {}
-                    )
-                    SettingsDivider()
-                    SettingsItem(
-                        icon = Icons.Default.Shield,
-                        titleRes = R.string.settings_security,
-                        onClick = {}
+        ) {
+            LazyColumn(
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(bottom = 100.dp, start = 20.dp, end = 20.dp)
+            ) {
+                // Profile Header Card
+                item {
+                    ProfileHeaderCard(
+                        name = currentUser?.name ?: "Người dùng",
+                        email = currentUser?.email ?: "",
+                        onEditAvatar = { /* Logic đổi avatar */ }
                     )
                 }
-            }
 
-            // Preferences Section
-            item { SectionTitle(titleRes = R.string.settings_preferences_section) }
-            item {
-                SettingsCard {
-                    SettingsItem(
-                        icon = Icons.Default.Language,
-                        titleRes = R.string.settings_language,
-                        onClick = { showLanguagePicker = true }
-                    )
-                    SettingsDivider()
-                    SettingsItem(
-                        icon = Icons.Default.Notifications,
-                        titleRes = R.string.settings_notifications,
-                        onClick = {}
-                    )
-                    SettingsDivider()
-                    SettingsItem(
-                        icon = when (themeMode) {
-                            ThemeMode.LIGHT -> Icons.Default.LightMode
-                            ThemeMode.DARK -> Icons.Default.DarkMode
-                            ThemeMode.SYSTEM -> Icons.Default.SettingsBrightness
-                        },
-                        title = when (themeMode) {
-                            ThemeMode.LIGHT -> stringResource(id = R.string.settings_theme_light)
-                            ThemeMode.DARK -> stringResource(id = R.string.settings_theme_dark)
-                            ThemeMode.SYSTEM -> stringResource(id = R.string.settings_theme_system)
-                        },
-                        onClick = { showThemePicker = true }
-                    )
+                // Stats Section
+                item {
+                    QuickStatsRow()
                 }
-            }
 
-            // Support Section
-            item { SectionTitle(titleRes = R.string.settings_support_section) }
-            item {
-                SettingsCard {
-                    SettingsItem(
-                        icon = Icons.Default.HelpCenter,
-                        titleRes = R.string.settings_help_center,
-                        onClick = {}
-                    )
+                // Settings Groups
+                item { SectionTitle(titleRes = R.string.settings_account_section) }
+                item {
+                    SettingsCard {
+                        SettingsItem(
+                            icon = Icons.Default.Person,
+                            titleRes = R.string.settings_profile,
+                            onClick = {}
+                        )
+                        SettingsDivider()
+                        SettingsItem(
+                            icon = Icons.Default.Shield,
+                            titleRes = R.string.settings_security,
+                            onClick = {}
+                        )
+                    }
                 }
-            }
 
-            // Logout
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = { showLogoutDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.error
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    contentPadding = PaddingValues(16.dp)
-                ) {
-                    Icon(Icons.Default.Logout, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(id = R.string.settings_logout),
-                        fontWeight = FontWeight.Bold
-                    )
+                item { SectionTitle(titleRes = R.string.settings_preferences_section) }
+                item {
+                    SettingsCard {
+                        SettingsItem(
+                            icon = Icons.Default.Language,
+                            titleRes = R.string.settings_language,
+                            onClick = { showLanguagePicker = true }
+                        )
+                        SettingsDivider()
+                        SettingsItem(
+                            icon = when (themeMode) {
+                                ThemeMode.LIGHT -> Icons.Default.LightMode
+                                ThemeMode.DARK -> Icons.Default.DarkMode
+                                ThemeMode.SYSTEM -> Icons.Default.SettingsBrightness
+                            },
+                            title = when (themeMode) {
+                                ThemeMode.LIGHT -> stringResource(id = R.string.settings_theme_light)
+                                ThemeMode.DARK -> stringResource(id = R.string.settings_theme_dark)
+                                ThemeMode.SYSTEM -> stringResource(id = R.string.settings_theme_system)
+                            },
+                            onClick = { showThemePicker = true }
+                        )
+                        SettingsDivider()
+                        SettingsToggleItem(
+                            icon = Icons.Default.Notifications,
+                            titleRes = R.string.settings_notifications,
+                            checked = true,
+                            onCheckedChange = {}
+                        )
+                    }
+                }
+
+                // Danger Zone
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = { showLogoutDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(16.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.2f))
+                    ) {
+                        Icon(Icons.Default.Logout, contentDescription = null)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = stringResource(id = R.string.settings_logout),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
                 }
             }
         }

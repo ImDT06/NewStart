@@ -28,10 +28,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import android.media.MediaActionSound
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,7 +62,8 @@ import java.util.concurrent.Executors
 @Composable
 fun JournalEntryPanel(
     onDismiss: () -> Unit,
-    onPost: (String, String, Uri?) -> Unit // Emoji, Text, ImageUri
+    onPost: (String, String, Uri?) -> Unit, // Emoji, Text, ImageUri
+    isUploading: Boolean = false
 ) {
     var text by remember { mutableStateOf("") }
     var selectedEmoji by remember { mutableStateOf("😊") }
@@ -64,8 +72,16 @@ fun JournalEntryPanel(
     
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val haptic = LocalHapticFeedback.current
+    val mediaActionSound = remember { MediaActionSound() }
     val executor = remember { Executors.newSingleThreadExecutor() }
     val imageCapture = remember { ImageCapture.Builder().build() }
+    
+    // Nạp sẵn âm thanh để tránh bị trễ
+    LaunchedEffect(Unit) {
+        mediaActionSound.load(MediaActionSound.SHUTTER_CLICK)
+        mediaActionSound.load(MediaActionSound.FOCUS_COMPLETE)
+    }
     
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var flashMode by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
@@ -246,9 +262,9 @@ fun JournalEntryPanel(
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     Surface(
-                        color = (if (isTextOnlyMode) MaterialTheme.colorScheme.primary else Color.Black).copy(alpha = 0.4f),
+                        color = (if (isTextOnlyMode) MaterialTheme.colorScheme.primary else Color.Black).copy(alpha = 0.6f),
                         shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
                     ) {
                         Box(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -311,8 +327,11 @@ fun JournalEntryPanel(
                 if (showSendButton) {
                     // Send Button - Enabled only when there's text or an image
                     FilledIconButton(
-                        onClick = { onPost(selectedEmoji, text, capturedImageUri) },
-                        enabled = hasContent,
+                        onClick = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onPost(selectedEmoji, text, capturedImageUri) 
+                        },
+                        enabled = hasContent && !isUploading,
                         modifier = Modifier.size(80.dp),
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
@@ -321,11 +340,19 @@ fun JournalEntryPanel(
                             disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                         )
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Send, 
-                            contentDescription = "Send",
-                            modifier = Modifier.size(36.dp)
-                        )
+                        if (isUploading) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(32.dp),
+                                strokeWidth = 3.dp
+                            )
+                        } else {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send, 
+                                contentDescription = "Send",
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
                     }
                 } else {
                     // Gradient Capture Button (Only in Camera Mode with no image)
@@ -344,16 +371,25 @@ fun JournalEntryPanel(
                             .padding(8.dp)
                             .clip(CircleShape)
                             .background(Color.White)
-                            .clickable {
-                                takePhoto(
-                                    context = context,
-                                    imageCapture = imageCapture,
-                                    executor = executor,
-                                    onImageCaptured = { 
-                                        capturedImageUri = it 
-                                        isTextOnlyMode = false
-                                    },
-                                    onError = { Log.e("Camera", "Capture failed", it) }
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onPress = {
+                                        try {
+                                            mediaActionSound.play(MediaActionSound.SHUTTER_CLICK)
+                                        } catch (e: Exception) {
+                                            Log.e("Camera", "Shutter sound failed", e)
+                                        }
+                                        takePhoto(
+                                            context = context,
+                                            imageCapture = imageCapture,
+                                            executor = executor,
+                                            onImageCaptured = { 
+                                                capturedImageUri = it 
+                                                isTextOnlyMode = false
+                                            },
+                                            onError = { Log.e("Camera", "Capture failed", it) }
+                                        )
+                                    }
                                 )
                             }
                     )
@@ -430,7 +466,10 @@ fun JournalEntryPanel(
                             color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                             shape = CircleShape
                         )
-                        .clickable { selectedEmoji = emoji },
+                        .clickable { 
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            selectedEmoji = emoji 
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -474,6 +513,17 @@ fun CameraPreview(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val isPreview = LocalInspectionMode.current
+    val mediaActionSound = remember { MediaActionSound() }
+    
+    var focusTapOffset by remember { mutableStateOf<Offset?>(null) }
+    
+    // Tự động xóa vòng tròn lấy nét sau 1 giây
+    LaunchedEffect(focusTapOffset) {
+        if (focusTapOffset != null) {
+            kotlinx.coroutines.delay(1000)
+            focusTapOffset = null
+        }
+    }
     
     if (isPreview) {
         Box(
@@ -492,40 +542,99 @@ fun CameraPreview(
         cameraProvider = cameraProviderFuture.await()
     }
     
-    AndroidView(
-        factory = { ctx ->
-            PreviewView(ctx).apply {
-                scaleType = PreviewView.ScaleType.FILL_CENTER
-            }
-        },
-        update = { previewView ->
-            val safeCameraProvider = cameraProvider ?: return@AndroidView
-            
-            val preview = Preview.Builder().build().also {
-                it.surfaceProvider = previewView.surfaceProvider
-            }
-
-            val cameraSelector = CameraSelector.Builder()
-                .requireLensFacing(lensFacing)
-                .build()
-
-            imageCapture.flashMode = flashMode
-
-            try {
-                safeCameraProvider.unbindAll()
-                val camera = safeCameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    cameraSelector,
-                    preview,
-                    imageCapture
-                )
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { ctx ->
+                PreviewView(ctx).apply {
+                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                }
+            },
+            update = { previewView ->
+                val safeCameraProvider = cameraProvider ?: return@AndroidView
                 
-                camera.cameraControl.setZoomRatio(zoomRatio)
-            } catch (e: Exception) {
-                Log.e("CameraPreview", "Use case binding failed", e)
+                val preview = Preview.Builder().build().also {
+                    it.surfaceProvider = previewView.surfaceProvider
+                }
+
+                val cameraSelector = CameraSelector.Builder()
+                    .requireLensFacing(lensFacing)
+                    .build()
+
+                imageCapture.flashMode = flashMode
+
+                try {
+                    safeCameraProvider.unbindAll()
+                    val cameraInstance = safeCameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        cameraSelector,
+                        preview,
+                        imageCapture
+                    )
+                    cameraInstance.cameraControl.setZoomRatio(zoomRatio)
+
+                    // Thiết lập chạm để lấy nét - Cải tiến: Thêm Log để kiểm tra
+                    previewView.setOnTouchListener { v, event ->
+                        if (event.action == android.view.MotionEvent.ACTION_UP) {
+                            val factory = previewView.meteringPointFactory
+                            val point = factory.createPoint(event.x, event.y)
+                            val action = FocusMeteringAction.Builder(point).build()
+                            
+                            cameraInstance.cameraControl.startFocusAndMetering(action)
+                            
+                            // Hiển thị vòng tròn và phát âm thanh
+                            focusTapOffset = Offset(event.x, event.y)
+                            try {
+                                mediaActionSound.play(MediaActionSound.FOCUS_COMPLETE)
+                            } catch (e: Exception) {
+                                Log.e("Camera", "Sound play failed", e)
+                            }
+                            v.performClick()
+                            true
+                        } else {
+                            true // Trả về true để nhận các sự kiện tiếp theo
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("CameraPreview", "Use case binding failed", e)
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Vòng tròn lấy nét Overlay - Đảm bảo vẽ đè lên AndroidView
+        focusTapOffset?.let { offset ->
+            Box(Modifier.fillMaxSize()) {
+                FocusCircle(offset)
             }
-        },
-        modifier = modifier
+        }
+    }
+}
+
+@Composable
+fun FocusCircle(offset: Offset) {
+    val infiniteTransition = rememberInfiniteTransition(label = "focus")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1.2f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(400, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
+
+    Box(
+        modifier = Modifier
+            .offset(
+                x = (offset.x / LocalContext.current.resources.displayMetrics.density).dp - 35.dp,
+                y = (offset.y / LocalContext.current.resources.displayMetrics.density).dp - 35.dp
+            )
+            .size(70.dp)
+            .border(2.dp, Color(0xFFFFCC00).copy(alpha = 0.8f), CircleShape)
+            .padding(10.dp)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .border(1.dp, Color(0xFFFFCC00).copy(alpha = 0.5f), CircleShape)
     )
 }
 

@@ -4,5 +4,6 @@ enum class SheetContent {
     None,
     Scan,
     JournalEntry,
-    Settings
+    Settings,
+    HabitSelection
 }

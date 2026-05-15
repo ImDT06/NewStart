@@ -39,4 +39,10 @@ class JournalViewModel @Inject constructor(
             }
         }
     }
+
+    fun deleteEntry(entryId: String) {
+        viewModelScope.launch {
+            journalRepository.deleteJournalEntry(entryId)
+        }
+    }
 }

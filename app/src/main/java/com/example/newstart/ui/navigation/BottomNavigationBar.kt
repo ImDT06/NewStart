@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -28,7 +29,10 @@ data class BottomNavItem(
 )
 
 @Composable
-fun MainBottomBar(navController: NavController) {
+fun MainBottomBar(
+    navController: NavController,
+    onHabitClickAgain: () -> Unit = {}
+) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
@@ -60,7 +64,9 @@ fun MainBottomBar(navController: NavController) {
                     NavigationBarItem(
                         selected = currentRoute == item.screen.route,
                         onClick = {
-                            if (currentRoute != item.screen.route) {
+                            if (currentRoute == item.screen.route && item.screen == Screen.Habits) {
+                                onHabitClickAgain()
+                            } else if (currentRoute != item.screen.route) {
                                 navController.navigate(item.screen.route) {
                                     popUpTo(Screen.Home.route) { saveState = true }
                                     launchSingleTop = true
@@ -68,7 +74,14 @@ fun MainBottomBar(navController: NavController) {
                                 }
                             }
                         },
-                        icon = { Icon(item.icon, contentDescription = null) },
+                        icon = { 
+                            val icon = if (currentRoute == Screen.Habits.route && item.screen == Screen.Habits) {
+                                Icons.Default.Add
+                            } else {
+                                item.icon
+                            }
+                            Icon(icon, contentDescription = null) 
+                        },
                         label = { 
                             Text(
                                 text = stringResource(id = item.labelRes),

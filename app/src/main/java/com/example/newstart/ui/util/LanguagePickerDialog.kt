@@ -89,15 +89,6 @@ fun LanguagePickerDialog(
                         }
                     }
                 }
-                
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .padding(end = 16.dp, top = 8.dp)
-                ) {
-                    Text("Đóng")
-                }
             }
         }
     }

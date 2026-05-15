@@ -104,11 +104,7 @@ fun NavGraph(
 
         // Màn hình Home
         composable(route = Screen.Home.route) {
-            HomeScreen(
-                onNavigateToDetail = { userId ->
-                    navController.navigate(Screen.Detail.createRoute(userId))
-                }
-            )
+            HomeScreen()
         }
 
         composable(route = Screen.Journal.route) {

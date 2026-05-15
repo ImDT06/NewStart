@@ -1,7 +1,10 @@
 package com.example.newstart.ui.screens.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -9,8 +12,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Assignment
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,24 +22,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.newstart.R
 import com.example.newstart.domain.model.User
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.SmallLanguageSwitcher
 
-data class Category(val titleRes: Int, val icon: ImageVector, val color: Color)
-data class Course(val id: String, val title: String, val author: String, val progress: Int, val color: Color)
+data class Habit(val id: String, val name: String, val icon: String, val color: Color, val isCompleted: Boolean)
+data class Todo(val id: String, val task: String, val isDone: Boolean, val priority: Priority)
+enum class Priority { LOW, MEDIUM, HIGH }
 
 @Composable
 fun HomeScreen(
-    onNavigateToDetail: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -46,7 +44,6 @@ fun HomeScreen(
     
     HomeContent(
         user = userState,
-        onNavigateToDetail = onNavigateToDetail,
         modifier = modifier
     )
 }
@@ -54,255 +51,263 @@ fun HomeScreen(
 @Composable
 fun HomeContent(
     user: User?,
-    onNavigateToDetail: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showLanguagePicker by remember { mutableStateOf(false) }
-
-    val categories = listOf(
-        Category(R.string.home_category_courses, Icons.AutoMirrored.Filled.MenuBook, MaterialTheme.colorScheme.primaryContainer),
-        Category(R.string.home_category_exams, Icons.AutoMirrored.Filled.Assignment, MaterialTheme.colorScheme.secondaryContainer),
-        Category(R.string.home_category_library, Icons.Default.CollectionsBookmark, MaterialTheme.colorScheme.tertiaryContainer),
-        Category(R.string.home_category_community, Icons.Default.Groups, MaterialTheme.colorScheme.surfaceVariant)
+    val habits = listOf(
+        Habit("1", "Uống nước", "💧", Color(0xFF2196F3), true),
+        Habit("2", "Đọc sách", "📚", Color(0xFF4CAF50), false),
+        Habit("3", "Thiền", "🧘", Color(0xFFFF9800), false),
+        Habit("4", "Chạy bộ", "🏃", Color(0xFFE91E63), true)
     )
 
-    val popularCourses = listOf(
-        Course("1", "Advanced Kotlin", "Jane Doe", 0, Color(0xFF6366F1)),
-        Course("2", "Jetpack Compose Pro", "John Smith", 0, Color(0xFFEC4899)),
-        Course("3", "Android Architecture", "Alex Johnson", 0, Color(0xFF10B981))
+    val todos = listOf(
+        Todo("1", "Hoàn thành UI trang chủ", false, Priority.HIGH),
+        Todo("2", "Gửi báo cáo đồ án", true, Priority.MEDIUM),
+        Todo("3", "Mua đồ ăn tối", false, Priority.LOW)
     )
 
     Surface(
-        modifier = modifier
-            .fillMaxSize()
-            .statusBarsPadding(),
+        modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 24.dp)
+                contentPadding = PaddingValues(bottom = 100.dp)
             ) {
-                // Header Section
+                // Header & Mood
                 item {
-                    HomeHeader(
-                        userName = user?.name ?: "Guest",
-                        onLanguageClick = { showLanguagePicker = true }
+                    HomeHeaderSection(
+                        userName = user?.name ?: "Guest"
                     )
                 }
 
-                // Search Bar
+                // Daily Progress Card
                 item {
-                    HomeSearchBar()
+                    DailyOverviewCard()
                 }
 
-                // Continue Learning / Progress Card
+                // Habits Section
                 item {
-                    ProgressCard()
-                }
-
-                // Categories Grid
-                item {
-                    CategorySection(categories)
-                }
-
-                // Popular Courses
-                item {
-                    SectionHeader(titleRes = R.string.home_popular_courses)
-                }
-
-                item {
+                    SectionHeader(title = "Thói quen hôm nay", action = "Tất cả")
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(popularCourses) { course ->
-                            CourseCard(course = course, onClick = { onNavigateToDetail(course.id) })
+                        items(habits) { habit ->
+                            HabitItem(habit)
                         }
                     }
                 }
-            }
 
-            if (showLanguagePicker) {
-                LanguagePickerDialog(onDismiss = { showLanguagePicker = false })
-            }
-        }
-    }
-}
+                // Todo Section
+                item {
+                    SectionHeader(title = "Việc cần làm", action = "Thêm")
+                }
+                
+                items(todos) { todo ->
+                    TodoItem(todo)
+                }
 
-@Composable
-fun HomeHeader(
-    userName: String,
-    onLanguageClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column {
-            Text(
-                text = stringResource(id = R.string.home_hello, userName),
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-            )
-            Text(
-                text = stringResource(id = R.string.home_welcome),
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
-        
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SmallLanguageSwitcher(onClick = onLanguageClick)
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable { /* Profile */ },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Person, contentDescription = "Profile", tint = MaterialTheme.colorScheme.primary)
+                // AI Insight Preview
+                item {
+                    AIInsightCard()
+                }
             }
         }
     }
 }
 
 @Composable
-fun HomeSearchBar() {
-    Surface(
+fun HomeHeaderSection(userName: String) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp
+            .padding(20.dp)
     ) {
         Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                Icons.Default.Search, 
-                contentDescription = null, 
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = stringResource(id = R.string.home_search_placeholder),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                fontSize = 14.sp
-            )
-        }
-    }
-}
-
-@Composable
-fun ProgressCard() {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.primary
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp)
-        ) {
-            Text(
-                text = stringResource(id = R.string.home_continue_learning),
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                fontSize = 14.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "UI/UX Design Fundamental",
-                color = MaterialTheme.colorScheme.onPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(20.dp))
-            
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                LinearProgressIndicator(
-                    progress = { 0.65f },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    trackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f),
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = stringResource(id = R.string.home_progress, 65),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun CategorySection(categories: List<Category>) {
-    Column(modifier = Modifier.padding(top = 8.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            categories.forEach { category ->
-                CategoryItem(category)
+            Column {
+                Text(
+                    text = "Chào ngày mới,",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                )
+                Text(
+                    text = userName,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(20.dp))
+        
+        Text(
+            text = "Hôm nay bạn thấy thế nào?",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            val moods = listOf("😊", "😐", "😔", "😫", "🔥")
+            moods.forEach { mood ->
+                Surface(
+                    modifier = Modifier.size(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    onClick = { /* Log Mood */ }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(mood, fontSize = 24.sp)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun CategoryItem(category: Category) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+fun DailyOverviewCard() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp),
+        shape = RoundedCornerShape(32.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f))
     ) {
-        Box(
-            modifier = Modifier
-                .size(60.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(category.color)
-                .clickable { /* Navigate */ },
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.padding(24.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                category.icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(80.dp)) {
+                CircularProgressIndicator(
+                    progress = { 0.65f },
+                    modifier = Modifier.fillMaxSize(),
+                    strokeWidth = 8.dp,
+                    trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f),
+                    strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                Text("65%", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            }
+            
+            Spacer(modifier = Modifier.width(20.dp))
+            
+            Column {
+                Text(
+                    text = "Tiến độ ngày",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Text(
+                    text = "Bạn đã hoàn thành 8/12 mục tiêu. Cố gắng lên!",
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun HabitItem(habit: Habit) {
+    Surface(
+        modifier = Modifier.width(100.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = if (habit.isCompleted) habit.color else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, habit.color.copy(alpha = 0.3f))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(habit.icon, fontSize = 28.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = habit.name,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (habit.isCompleted) Color.White else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
             )
         }
-        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+@Composable
+fun TodoItem(todo: Todo) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = todo.isDone,
+            onCheckedChange = {},
+            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
         Text(
-            text = stringResource(id = category.titleRes),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
+            text = todo.task,
+            modifier = Modifier.weight(1f),
+            textDecoration = if (todo.isDone) androidx.compose.ui.text.style.TextDecoration.LineThrough else null,
+            color = if (todo.isDone) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface
+        )
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(
+                    when (todo.priority) {
+                        Priority.HIGH -> Color(0xFFFF4444)
+                        Priority.MEDIUM -> Color(0xFFFFBB33)
+                        Priority.LOW -> Color(0xFF00C851)
+                    }
+                )
         )
     }
 }
 
 @Composable
-fun SectionHeader(titleRes: Int) {
+fun AIInsightCard() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f))
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("AI Gợi ý", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Bạn thường làm việc hiệu quả nhất vào 9h sáng. Hãy sắp xếp các việc HIGH priority vào khung giờ này nhé!",
+                fontSize = 14.sp,
+                lineHeight = 20.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun SectionHeader(title: String, action: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -310,55 +315,13 @@ fun SectionHeader(titleRes: Int) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Text(
-            text = stringResource(id = titleRes),
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = stringResource(id = R.string.home_see_all),
+            text = action,
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.clickable { /* See All */ }
+            fontWeight = FontWeight.Medium
         )
-    }
-}
-
-@Composable
-fun CourseCard(course: Course, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .width(200.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp
-    ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
-                    .background(course.color)
-            )
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = course.title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = course.author,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-        }
     }
 }
 
@@ -367,8 +330,7 @@ fun CourseCard(course: Course, onClick: () -> Unit) {
 fun HomeScreenPreview() {
     NewStartTheme {
         HomeContent(
-            user = User("1", "Hilt User", "hilt@example.com"),
-            onNavigateToDetail = {}
+            user = User("1", "Trọng", "trong@example.com")
         )
     }
 }

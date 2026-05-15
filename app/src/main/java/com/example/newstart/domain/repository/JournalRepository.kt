@@ -6,5 +6,6 @@ import kotlinx.coroutines.flow.Flow
 
 interface JournalRepository {
     suspend fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?): Result<Unit>
+    suspend fun deleteJournalEntry(entryId: String): Result<Unit>
     fun getJournalEntries(): Flow<List<JournalEntry>>
 }
