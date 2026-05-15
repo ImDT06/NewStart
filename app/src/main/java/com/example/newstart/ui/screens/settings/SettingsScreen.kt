@@ -1,5 +1,8 @@
 package com.example.newstart.ui.screens.settings
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,11 +22,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.example.newstart.R
 import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.theme.NewStartTheme
@@ -35,6 +40,7 @@ import com.example.newstart.ui.util.LanguagePickerDialog
 fun ProfileHeaderCard(
     name: String,
     email: String,
+    avatarUri: Uri?,
     onEditAvatar: () -> Unit
 ) {
     ElevatedCard(
@@ -55,12 +61,21 @@ fun ProfileHeaderCard(
                     color = MaterialTheme.colorScheme.primaryContainer
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = name.take(1).uppercase(),
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        if (avatarUri != null) {
+                            AsyncImage(
+                                model = avatarUri,
+                                contentDescription = "Avatar",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Text(
+                                text = name.take(1).uppercase(),
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
                     }
                 }
                 
@@ -156,9 +171,19 @@ fun SettingsScreen(
     var showLanguagePicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
+    
     val themeMode by mainViewModel.themeMode.collectAsState()
+    val avatarUri by mainViewModel.avatarUri.collectAsState()
     val currentUser by mainViewModel.currentUser.collectAsState()
     val isDark = isSystemInDarkTheme()
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            mainViewModel.setAvatarUri(uri)
+        }
+    }
 
     if (showLogoutDialog) {
         AlertDialog(
@@ -225,7 +250,8 @@ fun SettingsScreen(
                     ProfileHeaderCard(
                         name = currentUser?.name ?: "Người dùng",
                         email = currentUser?.email ?: "",
-                        onEditAvatar = { /* Logic đổi avatar */ }
+                        avatarUri = avatarUri,
+                        onEditAvatar = { galleryLauncher.launch("image/*") }
                     )
                 }
 
