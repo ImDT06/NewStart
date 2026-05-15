@@ -9,10 +9,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -21,41 +19,37 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalInspectionMode
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.concurrent.futures.await
 import coil.compose.AsyncImage
 import com.example.newstart.R
 import com.example.newstart.ui.theme.NewStartTheme
-import com.example.newstart.ui.util.LanguagePreviews
+import com.example.newstart.ui.util.AppCombinedPreviews
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.style.TextAlign
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,12 +60,26 @@ fun JournalEntryPanel(
     var text by remember { mutableStateOf("") }
     var selectedEmoji by remember { mutableStateOf("😊") }
     var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var isTextOnlyMode by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val executor = remember { Executors.newSingleThreadExecutor() }
     val imageCapture = remember { ImageCapture.Builder().build() }
     
+    var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
+    var flashMode by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
+    var zoomRatio by remember { mutableFloatStateOf(1f) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            capturedImageUri = uri
+            isTextOnlyMode = false
+        }
+    }
+
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -95,13 +103,11 @@ fun JournalEntryPanel(
     }
 
     val emojis = listOf("😊", "🥰", "😴", "😫", "🚵", "🔥", "✨", "🎉")
-    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .verticalScroll(scrollState)
             .pointerInput(Unit) {
                 detectTapGestures(onTap = {
                     focusManager.clearFocus()
@@ -111,12 +117,13 @@ fun JournalEntryPanel(
             .imePadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Nút Close ở góc trên bên trái
+        // Top Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
-            horizontalArrangement = Arrangement.Start
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onDismiss) {
                 Icon(
@@ -125,16 +132,24 @@ fun JournalEntryPanel(
                     tint = MaterialTheme.colorScheme.onSurface
                 )
             }
+            
+            Text(
+                text = "Tạo khoảnh khắc",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.size(48.dp))
         }
 
-        // Camera Preview hoặc Ảnh đã chụp - Hình vuông, bo góc cực lớn
+        // Camera Preview hoặc Ảnh đã chụp - Tỉ lệ Vuông (1:1)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(48.dp)) // Bo góc TikTok/Locket
-                .background(Color.DarkGray),
+                .clip(RoundedCornerShape(32.dp))
+                .background(if (isTextOnlyMode) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f) else Color.Black),
             contentAlignment = Alignment.Center
         ) {
             if (capturedImageUri != null) {
@@ -144,142 +159,257 @@ fun JournalEntryPanel(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
+            } else if (isTextOnlyMode) {
+                // Chế độ chỉ nhập văn bản
+                Icon(
+                    Icons.Default.EditNote, 
+                    contentDescription = null, 
+                    modifier = Modifier.size(100.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                )
             } else if (hasCameraPermission) {
                 CameraPreview(
                     modifier = Modifier.fillMaxSize(),
-                    imageCapture = imageCapture
+                    imageCapture = imageCapture,
+                    lensFacing = lensFacing,
+                    flashMode = flashMode,
+                    zoomRatio = zoomRatio
                 )
+                
+                // Camera Controls Overlays
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // Flash & Flip Buttons
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        IconButton(
+                            onClick = { 
+                                flashMode = when(flashMode) {
+                                    ImageCapture.FLASH_MODE_OFF -> ImageCapture.FLASH_MODE_ON
+                                    else -> ImageCapture.FLASH_MODE_OFF
+                                }
+                            },
+                            modifier = Modifier
+                                .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                                .size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (flashMode == ImageCapture.FLASH_MODE_OFF) Icons.Default.FlashOff else Icons.Default.FlashOn,
+                                contentDescription = "Flash",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { 
+                                lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) 
+                                    CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK 
+                            },
+                            modifier = Modifier
+                                .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                                .size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FlipCameraAndroid,
+                                contentDescription = "Flip",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    // Zoom Controls
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 16.dp)
+                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        ZoomOption(label = "1x", isSelected = zoomRatio == 1f) { zoomRatio = 1f }
+                        ZoomOption(label = "2x", isSelected = zoomRatio == 2f) { zoomRatio = 2f }
+                    }
+                }
             }
 
-            // TEXT OVERLAY: Tự động co dãn theo nội dung (Wrap Content)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 32.dp, end = 32.dp, bottom = 24.dp),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                Surface(
-                    color = Color.Black.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+            // TEXT OVERLAY - Hiện khi ĐÃ chụp xong HOẶC ở TextOnlyMode
+            if (capturedImageUri != null || isTextOnlyMode) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 32.dp, vertical = 24.dp),
+                    contentAlignment = Alignment.BottomCenter
                 ) {
-                    Box(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
+                    Surface(
+                        color = (if (isTextOnlyMode) MaterialTheme.colorScheme.primary else Color.Black).copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
                     ) {
-                        // Kỹ thuật "Ghost Text" nâng cao: Đo kích thước nội dung thật
-                        Text(
-                            text = if (text.isEmpty()) "Bạn đang nghĩ gì?" else text,
-                            color = Color.Transparent, 
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 2.dp) // Giữ khoảng trống nhỏ cho cursor
-                        )
-
-                        BasicTextField(
-                            value = text,
-                            onValueChange = { text = it },
-                            textStyle = LocalTextStyle.current.copy(
-                                color = Color.White, 
+                        Box(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = text.ifEmpty { "Bạn đang nghĩ gì?" },
+                                color = Color.Transparent, 
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium,
-                                textAlign = TextAlign.Center
-                            ),
-                            cursorBrush = SolidColor(Color.White),
-                            modifier = Modifier.matchParentSize(), // Buộc TextField khớp chính xác với Ghost Text
-                            decorationBox = { innerTextField ->
-                                if (text.isEmpty()) {
-                                    Text(
-                                        "Bạn đang nghĩ gì?", 
-                                        color = Color.White.copy(alpha = 0.6f), 
-                                        fontSize = 16.sp,
-                                        textAlign = TextAlign.Center
-                                    )
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 2.dp)
+                            )
+
+                            BasicTextField(
+                                value = text,
+                                onValueChange = { text = it },
+                                textStyle = LocalTextStyle.current.copy(
+                                    color = Color.White, 
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                ),
+                                cursorBrush = SolidColor(Color.White),
+                                modifier = Modifier.matchParentSize(),
+                                decorationBox = { innerTextField ->
+                                    if (text.isEmpty()) {
+                                        Text(
+                                            "Bạn đang nghĩ gì?", 
+                                            color = Color.White.copy(alpha = 0.6f), 
+                                            fontSize = 16.sp,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                    innerTextField()
                                 }
-                                innerTextField()
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.weight(1f))
 
-        // BOTTOM CONTROLS: [Retake (X)] [Capture/Send] [Spacer]
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 48.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        // Main Controls
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Nút Hủy ảnh đã chụp (X)
-            if (capturedImageUri != null) {
-                IconButton(
-                    onClick = { capturedImageUri = null },
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Close, 
-                        contentDescription = "Retake", 
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            } else {
-                Spacer(modifier = Modifier.size(48.dp))
-            }
-
-            // Nút Chụp / Nút Gửi (Hiện icon gửi nếu có ảnh HOẶC có text)
-            val isReadyToPost = capturedImageUri != null || text.isNotBlank()
+            // Capture Button / Send Button Logic
+            val hasContent = capturedImageUri != null || text.isNotBlank()
+            val showSendButton = capturedImageUri != null || isTextOnlyMode
             
-            Surface(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clickable {
-                        if (isReadyToPost) {
-                            onPost(selectedEmoji, text, capturedImageUri)
-                        } else {
-                            takePhoto(
-                                context = context,
-                                imageCapture = imageCapture,
-                                executor = executor,
-                                onImageCaptured = { capturedImageUri = it },
-                                onError = { Log.e("Camera", "Capture failed", it) }
-                            )
-                        }
-                    },
-                shape = CircleShape,
-                color = if (isReadyToPost) Color.White else Color.Transparent,
-                border = if (!isReadyToPost) BorderStroke(6.dp, Color.LightGray) else BorderStroke(1.dp, Color.LightGray)
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    if (!isReadyToPost) {
-                        // Nút chụp: vòng tròn trong
-                        Box(
-                            modifier = Modifier
-                                .size(60.dp)
-                                .clip(CircleShape)
-                                .background(Color.LightGray.copy(alpha = 0.5f))
+                if (showSendButton) {
+                    // Send Button - Enabled only when there's text or an image
+                    FilledIconButton(
+                        onClick = { onPost(selectedEmoji, text, capturedImageUri) },
+                        enabled = hasContent,
+                        modifier = Modifier.size(80.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                         )
-                    } else {
-                        // Icon gửi
+                    ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            Icons.AutoMirrored.Filled.Send, 
                             contentDescription = "Send",
-                            tint = Color(0xFF1D5FE2),
                             modifier = Modifier.size(36.dp)
                         )
                     }
+                } else {
+                    // Gradient Capture Button (Only in Camera Mode with no image)
+                    val gradientBrush = Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.secondary
+                        )
+                    )
+                    
+                    Box(
+                        modifier = Modifier
+                            .size(88.dp)
+                            .clip(CircleShape)
+                            .border(width = 5.dp, brush = gradientBrush, shape = CircleShape)
+                            .padding(8.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .clickable {
+                                takePhoto(
+                                    context = context,
+                                    imageCapture = imageCapture,
+                                    executor = executor,
+                                    onImageCaptured = { 
+                                        capturedImageUri = it 
+                                        isTextOnlyMode = false
+                                    },
+                                    onError = { Log.e("Camera", "Capture failed", it) }
+                                )
+                            }
+                    )
+                }
+
+                // Retake / Back to Camera Button
+                if (capturedImageUri != null || isTextOnlyMode) {
+                    IconButton(
+                        onClick = { 
+                            capturedImageUri = null
+                            isTextOnlyMode = false
+                        },
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = 48.dp)
+                            .size(48.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = if (capturedImageUri != null) Icons.Default.Refresh else Icons.Default.PhotoCamera,
+                            contentDescription = "Camera"
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.size(48.dp))
+            // Gallery Button
+            if (capturedImageUri == null && !isTextOnlyMode) {
+                Button(
+                    onClick = { galleryLauncher.launch("image/*") },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    shape = RoundedCornerShape(20.dp),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                ) {
+                    Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Chọn từ thư viện", fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // Skip Photo Text
+            if (capturedImageUri == null && !isTextOnlyMode) {
+                TextButton(onClick = { isTextOnlyMode = true }) {
+                    Text(
+                        "Bỏ qua ảnh",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 14.sp
+                    )
+                }
+            }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.weight(1f))
 
         // Emoji Selection
         LazyRow(
@@ -294,7 +424,7 @@ fun JournalEntryPanel(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape)
-                        .background(if (isSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f) else Color.Transparent)
+                        .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent)
                         .border(
                             width = if (isSelected) 2.dp else 0.dp,
                             color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
@@ -305,21 +435,41 @@ fun JournalEntryPanel(
                 ) {
                     Text(
                         text = emoji, 
-                        fontSize = if (isSelected) 32.sp else 28.sp // Phóng to nhẹ khi chọn
+                        fontSize = if (isSelected) 32.sp else 28.sp
                     )
                 }
             }
         }
         
-        // Thêm Spacer ở cuối để đẩy nội dung lên cao
-        Spacer(modifier = Modifier.height(100.dp))
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+fun ZoomOption(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = label,
+            color = if (isSelected) Color(0xFFFFCC00) else Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
 @Composable
 fun CameraPreview(
     modifier: Modifier = Modifier,
-    imageCapture: ImageCapture
+    imageCapture: ImageCapture,
+    lensFacing: Int = CameraSelector.LENS_FACING_BACK,
+    flashMode: Int = ImageCapture.FLASH_MODE_OFF,
+    zoomRatio: Float = 1f
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -336,33 +486,44 @@ fun CameraPreview(
     }
 
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    LaunchedEffect(cameraProviderFuture) {
+        cameraProvider = cameraProviderFuture.await()
+    }
     
     AndroidView(
         factory = { ctx ->
-            val previewView = PreviewView(ctx).apply {
-                scaleType = PreviewView.ImplementationMode.COMPATIBLE.let { PreviewView.ScaleType.FILL_CENTER }
+            PreviewView(ctx).apply {
+                scaleType = PreviewView.ScaleType.FILL_CENTER
             }
+        },
+        update = { previewView ->
+            val safeCameraProvider = cameraProvider ?: return@AndroidView
             
-            cameraProviderFuture.addListener({
-                val cameraProvider = cameraProviderFuture.get()
-                val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
-                }
+            val preview = Preview.Builder().build().also {
+                it.surfaceProvider = previewView.surfaceProvider
+            }
 
-                try {
-                    cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.DEFAULT_BACK_CAMERA,
-                        preview,
-                        imageCapture
-                    )
-                } catch (e: Exception) {
-                    Log.e("CameraPreview", "Use case binding failed", e)
-                }
-            }, ContextCompat.getMainExecutor(ctx))
-            
-            previewView
+            val cameraSelector = CameraSelector.Builder()
+                .requireLensFacing(lensFacing)
+                .build()
+
+            imageCapture.flashMode = flashMode
+
+            try {
+                safeCameraProvider.unbindAll()
+                val camera = safeCameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    cameraSelector,
+                    preview,
+                    imageCapture
+                )
+                
+                camera.cameraControl.setZoomRatio(zoomRatio)
+            } catch (e: Exception) {
+                Log.e("CameraPreview", "Use case binding failed", e)
+            }
         },
         modifier = modifier
     )
@@ -406,11 +567,11 @@ private fun getOutputDirectory(context: android.content.Context): File {
     return if (mediaDir != null && mediaDir.exists()) mediaDir else context.filesDir
 }
 
-@LanguagePreviews
+@AppCombinedPreviews
 @Composable
 fun JournalEntryPanelPreview() {
     NewStartTheme {
-        Surface(color = Color.White) {
+        Surface(color = MaterialTheme.colorScheme.background) {
             JournalEntryPanel(
                 onDismiss = {},
                 onPost = { _, _, _ -> }

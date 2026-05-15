@@ -76,6 +76,13 @@
     <string name="settings_support_section">Support</string>
     <string name="settings_help_center">Help Center</string>
     <string name="settings_logout">Logout</string>
+    <string name="settings_theme_light">Light Mode</string>
+    <string name="settings_theme_dark">Dark Mode</string>
+    <string name="settings_theme_system">System Mode</string>
+    <string name="settings_theme_select">Select Theme</string>
+    <string name="settings_confirm_logout_title">Logout</string>
+    <string name="settings_confirm_logout_msg">Are you sure you want to log out of this account?</string>
+    <string name="settings_cancel">Cancel</string>
     <!-- Journal Screen -->
     <string name="journal_title">Journal</string>
     <string name="journal_greeting">Good Morning! 🌸</string>

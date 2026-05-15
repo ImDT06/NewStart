@@ -25,11 +25,12 @@ import com.example.newstart.ui.screens.PlaceholderScreen
 @Composable
 fun NavGraph(
     navController: NavHostController,
+    startDestination: String,
     modifier: Modifier = Modifier
 ) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Welcome.route,
+        startDestination = startDestination,
         modifier = modifier,
         enterTransition = {
             fadeIn(animationSpec = tween(300)) + slideIntoContainer(
@@ -123,13 +124,7 @@ fun NavGraph(
         }
 
         composable(route = Screen.Profile.route) {
-            SettingsScreen(
-                onLogout = {
-                    navController.navigate(Screen.Welcome.route) {
-                        popUpTo(Screen.Welcome.route) { inclusive = true }
-                    }
-                }
-            )
+            SettingsScreen()
         }
 
         // Màn hình Detail

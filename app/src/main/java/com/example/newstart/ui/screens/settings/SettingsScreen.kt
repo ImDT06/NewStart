@@ -25,19 +25,44 @@ import com.example.newstart.R
 import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.theme.ThemeMode
-import com.example.newstart.ui.util.LanguagePreviews
+import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onLogout: () -> Unit,
     modifier: Modifier = Modifier,
     mainViewModel: MainViewModel = hiltViewModel()
 ) {
     var showLanguagePicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
     val themeMode by mainViewModel.themeMode.collectAsState()
+    val currentUser by mainViewModel.currentUser.collectAsState()
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text(stringResource(id = R.string.settings_confirm_logout_title)) },
+            text = { Text(stringResource(id = R.string.settings_confirm_logout_msg)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        mainViewModel.logout()
+                        showLogoutDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(stringResource(id = R.string.settings_logout), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text(stringResource(id = R.string.settings_cancel))
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -63,6 +88,14 @@ fun SettingsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Profile Header
+            item {
+                ProfileHeader(
+                    name = currentUser?.name ?: "Người dùng",
+                    email = currentUser?.email ?: ""
+                )
+            }
+
             // Account Section
             item { SectionTitle(titleRes = R.string.settings_account_section) }
             item {
@@ -104,9 +137,9 @@ fun SettingsScreen(
                             ThemeMode.SYSTEM -> Icons.Default.SettingsBrightness
                         },
                         title = when (themeMode) {
-                            ThemeMode.LIGHT -> "Chế độ sáng"
-                            ThemeMode.DARK -> "Chế độ tối"
-                            ThemeMode.SYSTEM -> "Chế độ hệ thống"
+                            ThemeMode.LIGHT -> stringResource(id = R.string.settings_theme_light)
+                            ThemeMode.DARK -> stringResource(id = R.string.settings_theme_dark)
+                            ThemeMode.SYSTEM -> stringResource(id = R.string.settings_theme_system)
                         },
                         onClick = { showThemePicker = true }
                     )
@@ -129,7 +162,7 @@ fun SettingsScreen(
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
-                    onClick = onLogout,
+                    onClick = { showLogoutDialog = true },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -165,6 +198,50 @@ fun SettingsScreen(
     }
 }
 
+@Composable
+fun ProfileHeader(
+    name: String,
+    email: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = name.take(1).uppercase(),
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(20.dp))
+        
+        Column {
+            Text(
+                text = name,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = email,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThemeSelectionDialog(
@@ -183,28 +260,28 @@ fun ThemeSelectionDialog(
                 .padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp)
         ) {
             Text(
-                "Chọn giao diện",
+                text = stringResource(id = R.string.settings_theme_select),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
             
             ThemeOption(
-                label = "Sáng",
+                label = stringResource(id = R.string.settings_theme_light),
                 icon = Icons.Default.LightMode,
                 isSelected = currentMode == ThemeMode.LIGHT
             ) {
                 onModeSelected(ThemeMode.LIGHT)
             }
             ThemeOption(
-                label = "Tối",
+                label = stringResource(id = R.string.settings_theme_dark),
                 icon = Icons.Default.DarkMode,
                 isSelected = currentMode == ThemeMode.DARK
             ) {
                 onModeSelected(ThemeMode.DARK)
             }
             ThemeOption(
-                label = "Hệ thống",
+                label = stringResource(id = R.string.settings_theme_system),
                 icon = Icons.Default.SettingsBrightness,
                 isSelected = currentMode == ThemeMode.SYSTEM
             ) {
@@ -382,10 +459,10 @@ fun SettingsDivider() {
     )
 }
 
-@LanguagePreviews
+@AppCombinedPreviews
 @Composable
 fun SettingsScreenPreview() {
     NewStartTheme {
-        SettingsScreen(onLogout = {})
+        SettingsScreen()
     }
 }
