@@ -32,6 +32,7 @@ fun NewHabitSheet(
     onDismiss: () -> Unit,
     onHabitSelected: (HabitPreset) -> Unit
 ) {
+    var showCustomDialog by remember { mutableStateOf(false) }
     val categories = listOf("Popular", "Health", "Sports", "Mind", "Study")
     var selectedCategory by remember { mutableStateOf("Popular") }
     
@@ -47,12 +48,23 @@ fun NewHabitSheet(
         HabitPreset("Active Calorie", "🔥")
     )
 
+    if (showCustomDialog) {
+        CustomHabitDialog(
+            onDismiss = { showCustomDialog = false },
+            onConfirm = { name, icon ->
+                onHabitSelected(HabitPreset(name, icon))
+                showCustomDialog = false
+            }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
             .padding(top = 8.dp)
     ) {
+        // ... Handle, Header, Categories, Preset List code ...
         // Handle
         Box(
             modifier = Modifier
@@ -125,7 +137,7 @@ fun NewHabitSheet(
             contentAlignment = Alignment.Center
         ) {
             Button(
-                onClick = { /* Custom Habit */ },
+                onClick = { showCustomDialog = true },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4D67)),
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.height(44.dp).fillMaxWidth(0.6f)
@@ -134,6 +146,61 @@ fun NewHabitSheet(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CustomHabitDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var icon by remember { mutableStateOf("✨") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Tạo thói quen mới", color = Color.White) },
+        containerColor = Color(0xFF1D1D1F),
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Tên thói quen") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFFFF4D67)
+                    )
+                )
+                OutlinedTextField(
+                    value = icon,
+                    onValueChange = { icon = it },
+                    label = { Text("Biểu tượng (Emoji)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFFFF4D67)
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (name.isNotBlank()) onConfirm(name, icon) },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4D67))
+            ) {
+                Text("Tạo")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Hủy", color = Color.Gray)
+            }
+        }
+    )
 }
 
 @Composable

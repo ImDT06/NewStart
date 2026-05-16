@@ -137,7 +137,8 @@ class MainActivity : AppCompatActivity() {
                         ) {
                             NavGraph(
                                 navController = navController,
-                                startDestination = if (authState == AuthState.Authenticated) Screen.Home.route else Screen.Welcome.route
+                                startDestination = if (authState == AuthState.Authenticated) Screen.Home.route else Screen.Welcome.route,
+                                mainViewModel = mainViewModel
                             )
 
                             if (showBottomSheet) {
@@ -168,8 +169,20 @@ class MainActivity : AppCompatActivity() {
                                             NewHabitSheet(
                                                 onDismiss = { showBottomSheet = false },
                                                 onHabitSelected = { preset ->
-                                                    // Logic lưu thói quen mới
-                                                    showBottomSheet = false
+                                                    // Chuyển đổi màu Color của Compose sang chuỗi Hex chuẩn
+                                                    val colorInt = (preset.color.red * 255).toInt() shl 16 or
+                                                                  (preset.color.green * 255).toInt() shl 8 or
+                                                                  (preset.color.blue * 255).toInt()
+                                                    val colorHex = String.format("#%06X", colorInt)
+
+                                                    mainViewModel.saveHabit(
+                                                        name = preset.name,
+                                                        icon = preset.icon,
+                                                        goal = "1",
+                                                        colorHex = colorHex
+                                                    ) {
+                                                        showBottomSheet = false
+                                                    }
                                                 }
                                             )
                                         }

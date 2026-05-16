@@ -22,10 +22,13 @@ import com.example.newstart.ui.screens.journal.JournalScreen
 import com.example.newstart.ui.screens.habits.HabitsScreen
 import com.example.newstart.ui.screens.PlaceholderScreen
 
+import com.example.newstart.ui.MainViewModel
+
 @Composable
 fun NavGraph(
     navController: NavHostController,
     startDestination: String,
+    mainViewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
     NavHost(
@@ -116,7 +119,7 @@ fun NavGraph(
         }
 
         composable(route = Screen.Habits.route) {
-            HabitsScreen()
+            HabitsScreen(mainViewModel = mainViewModel)
         }
 
         composable(route = Screen.Profile.route) {

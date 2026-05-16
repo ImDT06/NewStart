@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -26,30 +28,31 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.newstart.R
+import com.example.newstart.domain.model.Habit
+import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.theme.NewStartTheme
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
+import java.time.temporal.TemporalAdjusters
 import java.util.*
 
-data class Habit(
-    val id: String,
-    val name: String,
-    val icon: String,
-    val progress: String,
-    val goal: String,
-    val streak: Int? = null,
-    val color: Color,
-    val isCompleted: Boolean = false
-)
-
 @Composable
-fun HabitsScreen(modifier: Modifier = Modifier) {
-    val habits = listOf(
-        Habit("1", "Zhongwen", "🇨🇳", "47m 44s", "1h", null, Color(0xFFFF3B30), true),
-        Habit("2", "Read a book", "📚", "0", "1h", 1, Color(0xFF1D1D1F)),
-        Habit("3", "Drink water", "💧", "0", "3000 ml", null, Color(0xFF1D1D1F))
-    )
+fun HabitsScreen(
+    mainViewModel: MainViewModel, // Truyền từ Activity qua NavGraph
+    modifier: Modifier = Modifier,
+    viewModel: HabitsViewModel = hiltViewModel()
+) {
+    val habits by viewModel.habits.collectAsState()
+    val selectedDate by mainViewModel.selectedHabitDate.collectAsState()
+    
+    // Sync HabitsViewModel date with MainViewModel date
+    LaunchedEffect(selectedDate) {
+        viewModel.onDateSelected(selectedDate)
+    }
 
     Column(
         modifier = modifier
@@ -57,6 +60,7 @@ fun HabitsScreen(modifier: Modifier = Modifier) {
             .background(Color.Black) // Luôn để nền đen theo mẫu
             .statusBarsPadding()
     ) {
+        // ... (Top Bar)
         // Top Bar
         Row(
             modifier = Modifier
@@ -80,7 +84,7 @@ fun HabitsScreen(modifier: Modifier = Modifier) {
             }
 
             Text(
-                text = "Today",
+                text = if (selectedDate == LocalDate.now()) "Today" else selectedDate.format(DateTimeFormatter.ofPattern("MMM dd")),
                 color = Color.White,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
@@ -99,43 +103,60 @@ fun HabitsScreen(modifier: Modifier = Modifier) {
             }
         }
 
-        // Horizontal Date Picker
+        // Horizontal Date Picker with Weekly Paging
         val today = LocalDate.now()
-        val days = (0..6).map { today.plusDays(it.toLong() - 3) }
-        
-        LazyRow(
+        val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500) // 1000 weeks range
+
+        HorizontalPager(
+            state = pagerState,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            contentPadding = PaddingValues(horizontal = 16.dp)
-        ) {
-            items(days) { day ->
-                val isSelected = day == today
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(horizontal = 6.dp)
-                ) {
-                    Text(
-                        text = day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH),
-                        color = Color.Gray,
-                        fontSize = 9.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Surface(
-                        modifier = Modifier.size(32.dp),
-                        shape = CircleShape,
-                        color = Color.Transparent,
-                        border = if (isSelected) BorderStroke(1.5.dp, Color(0xFFFF4D67)) else null,
-                        onClick = { /* Select date */ }
+                .padding(vertical = 8.dp)
+        ) { page ->
+            val weekStart = remember(page) {
+                today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                    .plusWeeks((page - 500).toLong())
+            }
+            val weekDays = remember(weekStart) { (0..6).map { weekStart.plusDays(it.toLong()) } }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                weekDays.forEach { day ->
+                    val isSelected = day == selectedDate
+                    val isToday = day == today
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { mainViewModel.onHabitDateSelected(day) }
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = day.dayOfMonth.toString(),
-                                color = if (isSelected) Color.White else Color.Gray,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
+                        Text(
+                            text = day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).uppercase(),
+                            color = if (isSelected) Color.White else Color.Gray,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Surface(
+                            modifier = Modifier.size(40.dp),
+                            shape = CircleShape,
+                            color = if (isSelected) Color(0xFFFF4D67) else Color.Transparent,
+                            border = if (!isSelected && isToday) BorderStroke(2.dp, Color(0xFFFF4D67)) else null
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = day.dayOfMonth.toString(),
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
                         }
                     }
                 }
@@ -151,18 +172,57 @@ fun HabitsScreen(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(habits) { habit ->
-                HabitItem(habit)
+                HabitItem(
+                    habit = habit,
+                    onToggle = { viewModel.toggleHabit(habit.id, !habit.isCompleted) },
+                    onDelete = { viewModel.deleteHabit(habit.id) }
+                )
             }
         }
     }
 }
 
 @Composable
-fun HabitItem(habit: Habit) {
+fun HabitItem(
+    habit: Habit,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Xóa thói quen") },
+            text = { Text("Bạn có chắc chắn muốn xóa '${habit.name}'?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDelete()
+                    showDeleteDialog = false
+                }) {
+                    Text("Xóa", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
+    val color = remember(habit.colorHex) {
+        try {
+            Color(android.graphics.Color.parseColor(habit.colorHex))
+        } catch (e: Exception) {
+            Color(0xFF1D5FE2)
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = habit.color.copy(alpha = if (habit.isCompleted) 1f else 0.12f)
+        color = color.copy(alpha = if (habit.isCompleted) 1f else 0.12f)
     ) {
         Row(
             modifier = Modifier
@@ -172,7 +232,9 @@ fun HabitItem(habit: Habit) {
         ) {
             // Icon
             Surface(
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier
+                    .size(32.dp)
+                    .clickable { showDeleteDialog = true }, // Nhấn vào icon để xóa
                 shape = RoundedCornerShape(8.dp),
                 color = Color.White.copy(alpha = 0.1f)
             ) {
@@ -191,7 +253,7 @@ fun HabitItem(habit: Habit) {
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    if (habit.streak != null) {
+                    if (habit.streak > 0) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             Icons.Default.LocalFireDepartment, 
@@ -216,7 +278,7 @@ fun HabitItem(habit: Habit) {
 
             // Action Button
             IconButton(
-                onClick = { /* Action */ },
+                onClick = onToggle,
                 modifier = Modifier
                     .size(24.dp)
                     .clip(CircleShape)
@@ -233,6 +295,7 @@ fun HabitItem(habit: Habit) {
     }
 }
 
+/*
 @Preview(showBackground = true)
 @Composable
 fun HabitsScreenPreview() {
@@ -240,3 +303,4 @@ fun HabitsScreenPreview() {
         HabitsScreen()
     }
 }
+*/

@@ -4,14 +4,18 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.newstart.data.preferences.UserPreferencesRepository
+import com.example.newstart.domain.model.Habit
 import com.example.newstart.domain.model.User
 import com.example.newstart.domain.repository.AuthRepository
+import com.example.newstart.domain.repository.HabitRepository
 import com.example.newstart.domain.repository.JournalRepository
 import com.example.newstart.domain.repository.UserRepository
 import com.example.newstart.ui.theme.ThemeMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 enum class AuthState {
@@ -23,8 +27,16 @@ class MainViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val authRepository: AuthRepository,
     private val journalRepository: JournalRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val habitRepository: HabitRepository
 ) : ViewModel() {
+
+    private val _selectedHabitDate = MutableStateFlow(LocalDate.now())
+    val selectedHabitDate: StateFlow<LocalDate> = _selectedHabitDate.asStateFlow()
+
+    fun onHabitDateSelected(date: LocalDate) {
+        _selectedHabitDate.value = date
+    }
 
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
@@ -102,6 +114,25 @@ class MainViewModel @Inject constructor(
             _isUploading.value = false
             if (result.isSuccess) {
                 onSuccess()
+            }
+        }
+    }
+
+    fun saveHabit(name: String, icon: String, goal: String, colorHex: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            val newHabit = Habit(
+                name = name,
+                icon = icon,
+                goal = goal,
+                colorHex = colorHex,
+                date = _selectedHabitDate.value.format(DateTimeFormatter.ISO_LOCAL_DATE)
+            )
+            val result = habitRepository.saveHabit(newHabit)
+            if (result.isSuccess) {
+                onSuccess()
+            } else {
+                // In lỗi ra Logcat để kiểm tra
+                android.util.Log.e("MainViewModel", "Lưu thói quen thất bại: ${result.exceptionOrNull()?.message}")
             }
         }
     }
