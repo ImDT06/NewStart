@@ -46,7 +46,10 @@
     <string name="home_email">Email: %1$s</string>
     <string name="home_view_details">Xem chi tiết</string>
     <string name="home_loading">Đang tải người dùng…</string>
-    <string name="home_hello">Xin chào %1$s!</string>
+    <string name="home_hello_morning">Chào buổi sáng, %1$s!</string>
+    <string name="home_hello_noon">Chào buổi trưa, %1$s!</string>
+    <string name="home_hello_afternoon">Chào buổi chiều, %1$s!</string>
+    <string name="home_hello_evening">Chào buổi tối, %1$s!</string>
     <string name="home_search_placeholder">Tìm kiếm khóa học, bài học...</string>
     <string name="home_category_courses">Khóa học</string>
     <string name="home_category_exams">Kỳ thi</string>
@@ -85,7 +88,10 @@
     <string name="settings_cancel">Hủy</string>
     <!-- Journal Screen -->
     <string name="journal_title">Nhật ký</string>
-    <string name="journal_greeting">Chào buổi sáng! 🌸</string>
+    <string name="journal_greeting_morning">Chào buổi sáng!</string>
+    <string name="journal_greeting_noon">Chào buổi trưa!</string>
+    <string name="journal_greeting_afternoon">Chào buổi chiều!</string>
+    <string name="journal_greeting_evening">Chào buổi tối!</string>
     <string name="journal_subtitle">Hôm nay là một ngày tuyệt vời để ghi lại những khoảnh khắc đáng nhớ</string>
     <string name="journal_entry_placeholder">Bạn đang nghĩ gì?</string>
 

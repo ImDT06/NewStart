@@ -1,7 +1,11 @@
 package com.example.newstart.ui.screens.habits
 
+import android.media.AudioManager
+import android.media.ToneGenerator
+import android.view.SoundEffectConstants
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -14,8 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,6 +56,7 @@ fun HabitsScreen(
 ) {
     val habits by viewModel.habits.collectAsState()
     val selectedDate by mainViewModel.selectedHabitDate.collectAsState()
+    var habitToDelete by remember { mutableStateOf<Habit?>(null) }
     
     // Sync HabitsViewModel date with MainViewModel date
     LaunchedEffect(selectedDate) {
@@ -166,18 +175,102 @@ fun HabitsScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         // Habit List
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(habits) { habit ->
-                HabitItem(
-                    habit = habit,
-                    onToggle = { viewModel.toggleHabit(habit.id, !habit.isCompleted) },
-                    onDelete = { viewModel.deleteHabit(habit.id) }
+        if (habits.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "Chưa có thói quen nào cho ngày này.",
+                    color = Color.Gray,
+                    fontSize = 14.sp
                 )
             }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 100.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(
+                    items = habits,
+                    key = { it.id }
+                ) { habit ->
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = {
+                            if (it == SwipeToDismissBoxValue.EndToStart) {
+                                habitToDelete = habit
+                                false
+                            } else false
+                        }
+                    )
+
+                    // Reset swipe state when dialog is dismissed
+                    LaunchedEffect(habitToDelete) {
+                        if (habitToDelete == null) {
+                            dismissState.reset()
+                        }
+                    }
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = false,
+                        backgroundContent = {
+                            val isSwiping = dismissState.targetValue != SwipeToDismissBoxValue.Settled
+                            val backgroundColor = if (isSwiping && dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                                Color.Red.copy(alpha = 0.8f)
+                            } else {
+                                Color.Transparent
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(backgroundColor),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                if (isSwiping && dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        tint = Color.White,
+                                        modifier = Modifier.padding(end = 16.dp)
+                                    )
+                                }
+                            }
+                        },
+                        content = {
+                            HabitItem(
+                                habit = habit,
+                                onToggle = { viewModel.toggleHabit(habit, !habit.isCompleted) }
+                            )
+                        }
+                    )
+                }
+            }
+        }
+
+        // Delete Confirmation Dialog
+        habitToDelete?.let { habit ->
+            AlertDialog(
+                onDismissRequest = { habitToDelete = null },
+                title = { Text("Xóa thói quen?") },
+                text = { Text("Bạn có chắc chắn muốn xóa thói quen '${habit.name}' không?") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteHabit(habit.id)
+                            habitToDelete = null
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Xóa")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { habitToDelete = null }) {
+                        Text("Hủy")
+                    }
+                }
+            )
         }
     }
 }
@@ -185,32 +278,8 @@ fun HabitsScreen(
 @Composable
 fun HabitItem(
     habit: Habit,
-    onToggle: () -> Unit,
-    onDelete: () -> Unit
+    onToggle: () -> Unit
 ) {
-    var showDeleteDialog by remember { mutableStateOf(false) }
-
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Xóa thói quen") },
-            text = { Text("Bạn có chắc chắn muốn xóa '${habit.name}'?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    onDelete()
-                    showDeleteDialog = false
-                }) {
-                    Text("Xóa", color = Color.Red)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Hủy")
-                }
-            }
-        )
-    }
-
     val color = remember(habit.colorHex) {
         try {
             Color(android.graphics.Color.parseColor(habit.colorHex))
@@ -232,9 +301,7 @@ fun HabitItem(
         ) {
             // Icon
             Surface(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clickable { showDeleteDialog = true }, // Nhấn vào icon để xóa
+                modifier = Modifier.size(32.dp),
                 shape = RoundedCornerShape(8.dp),
                 color = Color.White.copy(alpha = 0.1f)
             ) {
@@ -270,26 +337,38 @@ fun HabitItem(
                     }
                 }
                 Text(
-                    text = "${habit.progress}/${habit.goal}",
+                    text = if (habit.reminderTime != null) {
+                        "${habit.progress}/${habit.goal} • 🔔 ${habit.reminderTime}"
+                    } else {
+                        "${habit.progress}/${habit.goal}"
+                    },
                     color = Color.Gray.copy(alpha = 0.7f),
                     fontSize = 11.sp
                 )
             }
 
             // Action Button
-            IconButton(
-                onClick = onToggle,
+            Box(
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(20.dp) // Thu nhỏ toàn bộ nút xuống 20dp
                     .clip(CircleShape)
-                    .background(if (habit.isCompleted) Color.Black.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f))
+                    .border(
+                        width = 1.2.dp, // Viền mỏng hơn cho tinh tế
+                        color = if (habit.isCompleted) Color.Transparent else Color.White.copy(alpha = 0.4f),
+                        shape = CircleShape
+                    )
+                    .background(if (habit.isCompleted) Color.White.copy(alpha = 0.2f) else Color.Transparent)
+                    .clickable { onToggle() },
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = if (habit.isCompleted) Icons.Default.Check else Icons.Default.Add,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(14.dp)
-                )
+                if (habit.isCompleted) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(12.dp) // Dấu tích nhỏ gọn, cân xứng
+                    )
+                }
             }
         }
     }

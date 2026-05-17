@@ -46,7 +46,10 @@
     <string name="home_email">Email: %1$s</string>
     <string name="home_view_details">View Details</string>
     <string name="home_loading">Loading user…</string>
-    <string name="home_hello">Hello %1$s!</string>
+    <string name="home_hello_morning">Good Morning, %1$s!</string>
+    <string name="home_hello_noon">Good Noon, %1$s!</string>
+    <string name="home_hello_afternoon">Good Afternoon, %1$s!</string>
+    <string name="home_hello_evening">Good Evening, %1$s!</string>
     <string name="home_search_placeholder">Search courses, lessons…</string>
     <string name="home_category_courses">Courses</string>
     <string name="home_category_exams">Exams</string>
@@ -85,7 +88,10 @@
     <string name="settings_cancel">Cancel</string>
     <!-- Journal Screen -->
     <string name="journal_title">Journal</string>
-    <string name="journal_greeting">Good Morning! 🌸</string>
+    <string name="journal_greeting_morning">Good Morning!</string>
+    <string name="journal_greeting_noon">Good Noon!</string>
+    <string name="journal_greeting_afternoon">Good Afternoon!</string>
+    <string name="journal_greeting_evening">Good Evening!</string>
     <string name="journal_subtitle">Today is a wonderful day to record memorable moments</string>
     <string name="journal_entry_placeholder">What\'s on your mind?</string>
 

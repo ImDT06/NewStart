@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.newstart.R
 import com.example.newstart.domain.model.User
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.util.AppCombinedPreviews
@@ -131,16 +132,18 @@ fun HomeHeaderSection(userName: String) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
+                val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+                val greetingRes = when (hour) {
+                    in 5..10 -> R.string.home_hello_morning
+                    in 11..13 -> R.string.home_hello_noon
+                    in 14..17 -> R.string.home_hello_afternoon
+                    else -> R.string.home_hello_evening
+                }
                 Text(
-                    text = "Chào ngày mới,",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                )
-                Text(
-                    text = userName,
-                    fontSize = 24.sp,
+                    text = stringResource(id = greetingRes, userName),
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
         }

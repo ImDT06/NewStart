@@ -40,6 +40,15 @@ import com.example.newstart.ui.screens.habits.NewHabitSheet
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.appcompat.app.AppCompatDelegate
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.ui.platform.LocalContext
+
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
     private val mainViewModel: MainViewModel by viewModels()
@@ -53,6 +62,15 @@ class MainActivity : AppCompatActivity() {
             val authState by mainViewModel.authState.collectAsState()
             
             NewStartTheme(themeMode = themeMode) {
+                val context = LocalContext.current
+                val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { isGranted ->
+                    if (!isGranted) {
+                        // Thông báo cho người dùng rằng họ sẽ không nhận được nhắc nhở
+                    }
+                }
+
                 if (authState == AuthState.Loading) {
                     // Màn hình chờ thương hiệu (Splash) cực gọn
                     Box(
@@ -102,6 +120,17 @@ class MainActivity : AppCompatActivity() {
                                 Box(modifier = Modifier.offset(y = 60.dp)) {
                                     FloatingActionButton(
                                         onClick = {
+                                            // Yêu cầu quyền thông báo nếu cần (Android 13+)
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                if (ContextCompat.checkSelfPermission(
+                                                        context,
+                                                        Manifest.permission.POST_NOTIFICATIONS
+                                                    ) != PackageManager.PERMISSION_GRANTED
+                                                ) {
+                                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                }
+                                            }
+
                                             // Logic linh hoạt
                                             when (currentRoute) {
                                                 Screen.Habits.route -> {
@@ -166,20 +195,25 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                         SheetContent.HabitSelection -> {
+                                            val selectedHabitDate by mainViewModel.selectedHabitDate.collectAsState()
                                             NewHabitSheet(
+                                                initialDate = selectedHabitDate,
                                                 onDismiss = { showBottomSheet = false },
-                                                onHabitSelected = { preset ->
+                                                onHabitSelected = { name, icon, time, mins, color, date ->
                                                     // Chuyển đổi màu Color của Compose sang chuỗi Hex chuẩn
-                                                    val colorInt = (preset.color.red * 255).toInt() shl 16 or
-                                                                  (preset.color.green * 255).toInt() shl 8 or
-                                                                  (preset.color.blue * 255).toInt()
+                                                    val colorInt = (color.red * 255).toInt() shl 16 or
+                                                                  (color.green * 255).toInt() shl 8 or
+                                                                  (color.blue * 255).toInt()
                                                     val colorHex = String.format("#%06X", colorInt)
 
                                                     mainViewModel.saveHabit(
-                                                        name = preset.name,
-                                                        icon = preset.icon,
+                                                        name = name,
+                                                        icon = icon,
                                                         goal = "1",
-                                                        colorHex = colorHex
+                                                        colorHex = colorHex,
+                                                        reminderTime = time,
+                                                        reminderMinutesBefore = mins,
+                                                        date = date // Sử dụng ngày được chọn trong dialog
                                                     ) {
                                                         showBottomSheet = false
                                                     }

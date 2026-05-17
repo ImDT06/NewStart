@@ -1,10 +1,12 @@
 package com.example.newstart.data.repository
 
+import android.content.Context
 import com.example.newstart.domain.model.Habit
 import com.example.newstart.domain.repository.HabitRepository
+import com.example.newstart.util.HabitReminderManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -15,7 +17,8 @@ import javax.inject.Singleton
 @Singleton
 class HabitRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    @ApplicationContext private val context: Context
 ) : HabitRepository {
 
     override suspend fun saveHabit(habit: Habit): Result<Unit> {
@@ -29,6 +32,10 @@ class HabitRepositoryImpl @Inject constructor(
             
             val habitWithUserId = habit.copy(id = docRef.id, userId = userId)
             docRef.set(habitWithUserId).await()
+            
+            // Đặt báo thức nhắc nhở
+            HabitReminderManager.scheduleReminder(context, habitWithUserId)
+            
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -38,16 +45,26 @@ class HabitRepositoryImpl @Inject constructor(
     override suspend fun deleteHabit(habitId: String): Result<Unit> {
         return try {
             firestore.collection("habits").document(habitId).delete().await()
+            HabitReminderManager.cancelReminder(context, habitId)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    override suspend fun toggleHabitCompletion(habitId: String, isCompleted: Boolean): Result<Unit> {
+    override suspend fun toggleHabitCompletion(habit: Habit, isCompleted: Boolean): Result<Unit> {
         return try {
-            firestore.collection("habits").document(habitId)
+            firestore.collection("habits").document(habit.id)
                 .update("isCompleted", isCompleted).await()
+            
+            if (isCompleted) {
+                // Nếu đã hoàn thành -> Hủy nhắc nhở
+                HabitReminderManager.cancelReminder(context, habit.id)
+            } else {
+                // Nếu bỏ chọn hoàn thành -> Đặt lại nhắc nhở nếu có cài giờ
+                HabitReminderManager.scheduleReminder(context, habit.copy(isCompleted = false))
+            }
+
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

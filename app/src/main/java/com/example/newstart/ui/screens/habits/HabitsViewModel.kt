@@ -47,9 +47,9 @@ class HabitsViewModel @Inject constructor(
         }
     }
 
-    fun toggleHabit(habitId: String, isCompleted: Boolean) {
+    fun toggleHabit(habit: Habit, isCompleted: Boolean) {
         viewModelScope.launch {
-            repository.toggleHabitCompletion(habitId, isCompleted)
+            repository.toggleHabitCompletion(habit, isCompleted)
         }
     }
 

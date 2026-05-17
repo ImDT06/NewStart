@@ -22,5 +22,7 @@ data class Habit(
     var isCompleted: Boolean = false,
 
     val date: String = "", // Định dạng "yyyy-MM-dd"
+    val reminderTime: String? = null, // Định dạng "HH:mm"
+    val reminderMinutesBefore: Int = 0,
     val createdAt: Date = Date()
 )

@@ -118,14 +118,26 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun saveHabit(name: String, icon: String, goal: String, colorHex: String, onSuccess: () -> Unit) {
+    fun saveHabit(
+        name: String, 
+        icon: String, 
+        goal: String, 
+        colorHex: String, 
+        reminderTime: String? = null,
+        reminderMinutesBefore: Int = 0,
+        date: LocalDate? = null,
+        onSuccess: () -> Unit
+    ) {
         viewModelScope.launch {
+            val finalDate = date ?: _selectedHabitDate.value
             val newHabit = Habit(
                 name = name,
                 icon = icon,
                 goal = goal,
                 colorHex = colorHex,
-                date = _selectedHabitDate.value.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                date = finalDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                reminderTime = reminderTime,
+                reminderMinutesBefore = reminderMinutesBefore
             )
             val result = habitRepository.saveHabit(newHabit)
             if (result.isSuccess) {
