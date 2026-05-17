@@ -31,21 +31,59 @@ fun NavGraph(
     mainViewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
+    val bottomNavRoutes = listOf(
+        Screen.Home.route,
+        Screen.Journal.route,
+        Screen.Scan.route,
+        Screen.Habits.route,
+        Screen.Profile.route
+    )
+
     NavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier,
         enterTransition = {
-            fadeIn(animationSpec = tween(300)) + slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(300)
-            )
+            val initialRoute = initialState.destination.route
+            val targetRoute = targetState.destination.route
+            
+            val initialIndex = bottomNavRoutes.indexOf(initialRoute)
+            val targetIndex = bottomNavRoutes.indexOf(targetRoute)
+            
+            if (initialIndex != -1 && targetIndex != -1) {
+                val direction = if (targetIndex > initialIndex) 
+                    AnimatedContentTransitionScope.SlideDirection.Left 
+                else 
+                    AnimatedContentTransitionScope.SlideDirection.Right
+                
+                fadeIn(animationSpec = tween(300)) + slideIntoContainer(
+                    direction,
+                    animationSpec = tween(300)
+                )
+            } else {
+                fadeIn(animationSpec = tween(300))
+            }
         },
         exitTransition = {
-            fadeOut(animationSpec = tween(300)) + slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(300)
-            )
+            val initialRoute = initialState.destination.route
+            val targetRoute = targetState.destination.route
+            
+            val initialIndex = bottomNavRoutes.indexOf(initialRoute)
+            val targetIndex = bottomNavRoutes.indexOf(targetRoute)
+            
+            if (initialIndex != -1 && targetIndex != -1) {
+                val direction = if (targetIndex > initialIndex) 
+                    AnimatedContentTransitionScope.SlideDirection.Left 
+                else 
+                    AnimatedContentTransitionScope.SlideDirection.Right
+                
+                fadeOut(animationSpec = tween(300)) + slideOutOfContainer(
+                    direction,
+                    animationSpec = tween(300)
+                )
+            } else {
+                fadeOut(animationSpec = tween(300))
+            }
         },
         popEnterTransition = {
             fadeIn(animationSpec = tween(300)) + slideIntoContainer(

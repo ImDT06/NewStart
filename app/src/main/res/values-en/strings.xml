@@ -89,6 +89,28 @@
     <string name="journal_subtitle">Today is a wonderful day to record memorable moments</string>
     <string name="journal_entry_placeholder">What\'s on your mind?</string>
 
+    <!-- Habits Screen -->
+    <string name="habits_filter_all">All</string>
+    <string name="habits_today">Today</string>
+    <string name="habits_streak_day">Day</string>
+    <string name="habits_delete_title">Delete habit</string>
+    <string name="habits_delete_msg">Are you sure you want to delete \'%1$s\'?</string>
+    <string name="habits_delete_confirm">Delete</string>
+    <string name="habits_cancel">Cancel</string>
+
+    <!-- New Habit Sheet -->
+    <string name="habits_new_title">New Habit</string>
+    <string name="habits_cat_popular">Popular</string>
+    <string name="habits_cat_health">Health</string>
+    <string name="habits_cat_sports">Sports</string>
+    <string name="habits_cat_mind">Mind</string>
+    <string name="habits_cat_study">Study</string>
+    <string name="habits_btn_custom">Custom Habit</string>
+    <string name="habits_custom_dialog_title">Create New Habit</string>
+    <string name="habits_custom_name_label">Habit Name</string>
+    <string name="habits_custom_icon_label">Icon (Emoji)</string>
+    <string name="habits_btn_create">Create</string>
+
     <!-- Errors -->
     <string name="error_email_empty">Email cannot be empty</string>
     <string name="error_email_invalid">Invalid email</string>

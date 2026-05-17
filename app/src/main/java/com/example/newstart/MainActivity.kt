@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
@@ -39,6 +40,7 @@ import com.example.newstart.ui.screens.journal.JournalEntryPanel
 import com.example.newstart.ui.screens.habits.NewHabitSheet
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.ui.draw.shadow
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -54,14 +56,12 @@ class MainActivity : AppCompatActivity() {
             
             NewStartTheme(themeMode = themeMode) {
                 if (authState == AuthState.Loading) {
-                    // Màn hình chờ thương hiệu (Splash) cực gọn
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Bạn có thể đặt Logo app ở đây
                         Text(
                             text = "NewStart",
                             style = MaterialTheme.typography.headlineLarge,
@@ -77,7 +77,6 @@ class MainActivity : AppCompatActivity() {
                     var showBottomSheet by remember { mutableStateOf(false) }
                     var sheetContentType by remember { mutableStateOf(SheetContent.None) }
 
-                    // FAB và BottomBar chỉ hiện khi đã đăng nhập và không nằm ở các trang Auth
                     val isAuthRoute = listOf(Screen.Welcome.route, Screen.Login.route, Screen.Register.route).contains(currentRoute)
                     val showShell = authState == AuthState.Authenticated && !isAuthRoute
 
@@ -99,33 +98,32 @@ class MainActivity : AppCompatActivity() {
                         floatingActionButtonPosition = FabPosition.Center,
                         floatingActionButton = {
                             if (showShell) {
-                                Box(modifier = Modifier.offset(y = 60.dp)) {
-                                    FloatingActionButton(
-                                        onClick = {
-                                            // Logic linh hoạt
-                                            when (currentRoute) {
-                                                Screen.Habits.route -> {
-                                                    sheetContentType = SheetContent.HabitSelection
-                                                    showBottomSheet = true
-                                                }
-                                                else -> {
-                                                    sheetContentType = SheetContent.JournalEntry
-                                                    showBottomSheet = true
-                                                }
+                                FloatingActionButton(
+                                    onClick = {
+                                        when (currentRoute) {
+                                            Screen.Habits.route -> {
+                                                sheetContentType = SheetContent.HabitSelection
+                                                showBottomSheet = true
                                             }
-                                        },
-                                        modifier = Modifier.size(64.dp),
-                                        shape = CircleShape,
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                                        elevation = FloatingActionButtonDefaults.elevation(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Add,
-                                            contentDescription = "Add",
-                                            modifier = Modifier.size(32.dp)
-                                        )
-                                    }
+                                            else -> {
+                                                sheetContentType = SheetContent.JournalEntry
+                                                showBottomSheet = true
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .offset(y = 52.dp),
+                                    shape = CircleShape,
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = Color.White,
+                                    elevation = FloatingActionButtonDefaults.elevation(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Add",
+                                        modifier = Modifier.size(28.dp)
+                                    )
                                 }
                             }
                         }
@@ -169,7 +167,6 @@ class MainActivity : AppCompatActivity() {
                                             NewHabitSheet(
                                                 onDismiss = { showBottomSheet = false },
                                                 onHabitSelected = { preset ->
-                                                    // Chuyển đổi màu Color của Compose sang chuỗi Hex chuẩn
                                                     val colorInt = (preset.color.red * 255).toInt() shl 16 or
                                                                   (preset.color.green * 255).toInt() shl 8 or
                                                                   (preset.color.blue * 255).toInt()

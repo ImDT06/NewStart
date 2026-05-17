@@ -17,9 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.newstart.R
 
 data class HabitPreset(
     val name: String,
@@ -33,8 +35,16 @@ fun NewHabitSheet(
     onHabitSelected: (HabitPreset) -> Unit
 ) {
     var showCustomDialog by remember { mutableStateOf(false) }
-    val categories = listOf("Popular", "Health", "Sports", "Mind", "Study")
-    var selectedCategory by remember { mutableStateOf("Popular") }
+    
+    val categories = listOf(
+        stringResource(R.string.habits_cat_popular),
+        stringResource(R.string.habits_cat_health),
+        stringResource(R.string.habits_cat_sports),
+        stringResource(R.string.habits_cat_mind),
+        stringResource(R.string.habits_cat_study)
+    )
+    
+    var selectedCategory by remember { mutableStateOf(categories[0]) }
     
     val presets = listOf(
         HabitPreset("Walk", "🚶"),
@@ -61,17 +71,16 @@ fun NewHabitSheet(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(top = 8.dp)
     ) {
-        // ... Handle, Header, Categories, Preset List code ...
         // Handle
         Box(
             modifier = Modifier
                 .width(40.dp)
                 .height(4.dp)
                 .clip(CircleShape)
-                .background(Color.Gray.copy(alpha = 0.5f))
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                 .align(Alignment.CenterHorizontally)
         )
 
@@ -84,11 +93,16 @@ fun NewHabitSheet(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, null, tint = Color.White)
+                Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurface)
             }
-            Text("New Habit", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = stringResource(R.string.habits_new_title), 
+                color = MaterialTheme.colorScheme.onSurface, 
+                fontSize = 18.sp, 
+                fontWeight = FontWeight.Bold
+            )
             IconButton(onClick = { /* Store/Shop */ }) {
-                Icon(Icons.Default.Storefront, null, tint = Color(0xFFFF4D67))
+                Icon(Icons.Default.Storefront, null, tint = MaterialTheme.colorScheme.primary)
             }
         }
 
@@ -104,12 +118,12 @@ fun NewHabitSheet(
                 val isSelected = selectedCategory == category
                 Surface(
                     onClick = { selectedCategory = category },
-                    color = if (isSelected) Color(0xFFFF4D67) else Color(0xFF1D1D1F),
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Text(
                         text = category,
-                        color = Color.White,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                         fontSize = 13.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
@@ -138,11 +152,15 @@ fun NewHabitSheet(
         ) {
             Button(
                 onClick = { showCustomDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4D67)),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.height(44.dp).fillMaxWidth(0.6f)
             ) {
-                Text("Custom Habit", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(
+                    text = stringResource(R.string.habits_btn_custom), 
+                    fontWeight = FontWeight.Bold, 
+                    fontSize = 14.sp
+                )
             }
         }
     }
@@ -159,30 +177,30 @@ fun CustomHabitDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Tạo thói quen mới", color = Color.White) },
-        containerColor = Color(0xFF1D1D1F),
+        title = { Text(stringResource(R.string.habits_custom_dialog_title), color = MaterialTheme.colorScheme.onSurface) },
+        containerColor = MaterialTheme.colorScheme.surface,
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Tên thói quen") },
+                    label = { Text(stringResource(R.string.habits_custom_name_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFFFF4D67)
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary
                     )
                 )
                 OutlinedTextField(
                     value = icon,
                     onValueChange = { icon = it },
-                    label = { Text("Biểu tượng (Emoji)") },
+                    label = { Text(stringResource(R.string.habits_custom_icon_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFFFF4D67)
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary
                     )
                 )
             }
@@ -190,14 +208,14 @@ fun CustomHabitDialog(
         confirmButton = {
             Button(
                 onClick = { if (name.isNotBlank()) onConfirm(name, icon) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4D67))
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text("Tạo")
+                Text(stringResource(R.string.habits_btn_create))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Hủy", color = Color.Gray)
+                Text(stringResource(R.string.habits_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -209,7 +227,7 @@ fun PresetItem(preset: HabitPreset, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        color = Color(0xFF1D1D1F).copy(alpha = 0.5f),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         shape = RoundedCornerShape(20.dp)
     ) {
         Row(
@@ -218,10 +236,10 @@ fun PresetItem(preset: HabitPreset, onClick: () -> Unit) {
         ) {
             Text(preset.icon, fontSize = 20.sp)
             Spacer(modifier = Modifier.width(12.dp))
-            Text(preset.name, color = Color.White, fontSize = 14.sp, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.FavoriteBorder, null, tint = Color(0xFFFF4D67), modifier = Modifier.size(18.dp))
+            Text(preset.name, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            Icon(Icons.Default.FavoriteBorder, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
         }
     }
 }

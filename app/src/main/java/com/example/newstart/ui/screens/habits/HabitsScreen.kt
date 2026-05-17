@@ -23,12 +23,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.launch
 import com.example.newstart.R
 import com.example.newstart.domain.model.Habit
 import com.example.newstart.ui.MainViewModel
@@ -48,7 +50,14 @@ fun HabitsScreen(
 ) {
     val habits by viewModel.habits.collectAsState()
     val selectedDate by mainViewModel.selectedHabitDate.collectAsState()
+    val scope = rememberCoroutineScope()
     
+    val today = LocalDate.now()
+    val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500) // 1000 weeks range
+
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    val isVietnamese = locale.language == "vi"
+
     // Sync HabitsViewModel date with MainViewModel date
     LaunchedEffect(selectedDate) {
         viewModel.onDateSelected(selectedDate)
@@ -57,10 +66,9 @@ fun HabitsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black) // Luôn để nền đen theo mẫu
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
-        // ... (Top Bar)
         // Top Bar
         Row(
             modifier = Modifier
@@ -70,7 +78,7 @@ fun HabitsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                color = Color(0xFFFF4D67),
+                color = MaterialTheme.colorScheme.primary,
                 shape = RoundedCornerShape(12.dp),
                 onClick = { /* All filter */ }
             ) {
@@ -78,16 +86,38 @@ fun HabitsScreen(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("All", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                    Text(
+                        text = stringResource(R.string.habits_filter_all),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Icon(Icons.Default.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(12.dp))
+                }
+            }
+
+            val headerDateText = remember(selectedDate, locale) {
+                if (selectedDate == today) null
+                else {
+                    val pattern = if (isVietnamese) "dd MMMM" else "MMM dd"
+                    selectedDate.format(DateTimeFormatter.ofPattern(pattern, locale))
                 }
             }
 
             Text(
-                text = if (selectedDate == LocalDate.now()) "Today" else selectedDate.format(DateTimeFormatter.ofPattern("MMM dd")),
-                color = Color.White,
+                text = headerDateText ?: stringResource(R.string.habits_today),
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable {
+                        mainViewModel.onHabitDateSelected(today)
+                        scope.launch {
+                            pagerState.animateScrollToPage(500)
+                        }
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             )
 
             Box(modifier = Modifier.size(26.dp)) {
@@ -104,9 +134,6 @@ fun HabitsScreen(
         }
 
         // Horizontal Date Picker with Weekly Paging
-        val today = LocalDate.now()
-        val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500) // 1000 weeks range
-
         HorizontalPager(
             state = pagerState,
             modifier = Modifier
@@ -129,6 +156,22 @@ fun HabitsScreen(
                     val isSelected = day == selectedDate
                     val isToday = day == today
 
+                    val dayName = remember(day, locale) {
+                        if (isVietnamese) {
+                            when (day.dayOfWeek) {
+                                DayOfWeek.MONDAY -> "T2"
+                                DayOfWeek.TUESDAY -> "T3"
+                                DayOfWeek.WEDNESDAY -> "T4"
+                                DayOfWeek.THURSDAY -> "T5"
+                                DayOfWeek.FRIDAY -> "T6"
+                                DayOfWeek.SATURDAY -> "T7"
+                                DayOfWeek.SUNDAY -> "CN"
+                            }
+                        } else {
+                            day.dayOfWeek.getDisplayName(TextStyle.SHORT, locale).uppercase()
+                        }
+                    }
+
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
@@ -136,8 +179,8 @@ fun HabitsScreen(
                             .clickable { mainViewModel.onHabitDateSelected(day) }
                     ) {
                         Text(
-                            text = day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).uppercase(),
-                            color = if (isSelected) Color.White else Color.Gray,
+                            text = dayName,
+                            color = if (isSelected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -146,13 +189,13 @@ fun HabitsScreen(
                         Surface(
                             modifier = Modifier.size(40.dp),
                             shape = CircleShape,
-                            color = if (isSelected) Color(0xFFFF4D67) else Color.Transparent,
-                            border = if (!isSelected && isToday) BorderStroke(2.dp, Color(0xFFFF4D67)) else null
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            border = if (!isSelected && isToday) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
                                     text = day.dayOfMonth.toString(),
-                                    color = Color.White,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
                                     fontSize = 14.sp,
                                     fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
                                 )
@@ -193,19 +236,19 @@ fun HabitItem(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Xóa thói quen") },
-            text = { Text("Bạn có chắc chắn muốn xóa '${habit.name}'?") },
+            title = { Text(stringResource(R.string.habits_delete_title)) },
+            text = { Text(stringResource(R.string.habits_delete_msg, habit.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     onDelete()
                     showDeleteDialog = false
                 }) {
-                    Text("Xóa", color = Color.Red)
+                    Text(stringResource(R.string.habits_delete_confirm), color = Color.Red)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Hủy")
+                    Text(stringResource(R.string.habits_cancel))
                 }
             }
         )
@@ -236,7 +279,7 @@ fun HabitItem(
                     .size(32.dp)
                     .clickable { showDeleteDialog = true }, // Nhấn vào icon để xóa
                 shape = RoundedCornerShape(8.dp),
-                color = Color.White.copy(alpha = 0.1f)
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(habit.icon, fontSize = 16.sp)
@@ -249,7 +292,7 @@ fun HabitItem(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = habit.name,
-                        color = Color.White,
+                        color = if (habit.isCompleted) Color.White else MaterialTheme.colorScheme.onSurface,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -262,8 +305,8 @@ fun HabitItem(
                             modifier = Modifier.size(12.dp)
                         )
                         Text(
-                            "${habit.streak} Day",
-                            color = Color.Gray,
+                            "${habit.streak} " + stringResource(R.string.habits_streak_day),
+                            color = if (habit.isCompleted) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -271,7 +314,7 @@ fun HabitItem(
                 }
                 Text(
                     text = "${habit.progress}/${habit.goal}",
-                    color = Color.Gray.copy(alpha = 0.7f),
+                    color = if (habit.isCompleted) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     fontSize = 11.sp
                 )
             }
@@ -282,25 +325,15 @@ fun HabitItem(
                 modifier = Modifier
                     .size(24.dp)
                     .clip(CircleShape)
-                    .background(if (habit.isCompleted) Color.Black.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f))
+                    .background(if (habit.isCompleted) Color.Black.copy(alpha = 0.2f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
             ) {
                 Icon(
                     imageVector = if (habit.isCompleted) Icons.Default.Check else Icons.Default.Add,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = if (habit.isCompleted) Color.White else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(14.dp)
                 )
             }
         }
     }
 }
-
-/*
-@Preview(showBackground = true)
-@Composable
-fun HabitsScreenPreview() {
-    NewStartTheme {
-        HabitsScreen()
-    }
-}
-*/
