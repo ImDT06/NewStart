@@ -162,7 +162,7 @@ fun JournalEntryPanel(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 8.dp)
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(32.dp))
                 .background(if (isTextOnlyMode) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f) else Color.Black),

@@ -34,8 +34,15 @@ class MainViewModel @Inject constructor(
     private val _selectedHabitDate = MutableStateFlow(LocalDate.now())
     val selectedHabitDate: StateFlow<LocalDate> = _selectedHabitDate.asStateFlow()
 
+    private val _editingHabit = MutableStateFlow<Habit?>(null)
+    val editingHabit: StateFlow<Habit?> = _editingHabit.asStateFlow()
+
     fun onHabitDateSelected(date: LocalDate) {
         _selectedHabitDate.value = date
+    }
+
+    fun startEditingHabit(habit: Habit?) {
+        _editingHabit.value = habit
     }
 
     private val _isUploading = MutableStateFlow(false)
@@ -119,6 +126,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun saveHabit(
+        id: String = "",
         name: String, 
         icon: String, 
         goal: String, 
@@ -131,6 +139,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             val finalDate = date ?: _selectedHabitDate.value
             val newHabit = Habit(
+                id = id,
                 name = name,
                 icon = icon,
                 goal = goal,

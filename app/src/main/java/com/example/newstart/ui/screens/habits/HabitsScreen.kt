@@ -270,7 +270,11 @@ fun HabitsScreen(
                         content = {
                             HabitItem(
                                 habit = habit,
-                                onToggle = { viewModel.toggleHabit(habit, !habit.isCompleted) }
+                                onToggle = { viewModel.toggleHabit(habit, !habit.isCompleted) },
+                                onEdit = {
+                                    mainViewModel.startEditingHabit(habit)
+                                    // Trigger bottom sheet in MainActivity
+                                }
                             )
                         }
                     )
@@ -308,7 +312,8 @@ fun HabitsScreen(
 @Composable
 fun HabitItem(
     habit: Habit,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    onEdit: () -> Unit
 ) {
     val color = remember(habit.colorHex) {
         try {
@@ -319,7 +324,9 @@ fun HabitItem(
     }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEdit() },
         shape = RoundedCornerShape(16.dp),
         color = color.copy(alpha = if (habit.isCompleted) 1f else 0.12f)
     ) {

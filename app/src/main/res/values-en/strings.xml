@@ -94,6 +94,8 @@
     <string name="journal_greeting_evening">Good Evening!</string>
     <string name="journal_subtitle">Today is a wonderful day to record memorable moments</string>
     <string name="journal_entry_placeholder">What\'s on your mind?</string>
+    <string name="journal_memories_title">Memories</string>
+    <string name="journal_close_button">Close</string>
 
     <!-- Habits Screen -->
     <string name="habits_filter_all">All</string>

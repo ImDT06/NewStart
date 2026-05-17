@@ -1,11 +1,15 @@
 package com.example.newstart
 
 import android.Manifest
+import android.app.AlarmManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Rect
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.MotionEvent
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -59,13 +63,15 @@ class MainActivity : AppCompatActivity() {
             
             NewStartTheme(themeMode = themeMode) {
                 val context = LocalContext.current
+                
+                // Launcher để xin quyền báo thức chính xác
+                val alarmPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartActivityForResult()
+                ) { _ -> }
+
                 val notificationPermissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission()
-                ) { isGranted ->
-                    if (!isGranted) {
-                        // Thông báo cho người dùng rằng họ sẽ không nhận được nhắc nhở
-                    }
-                }
+                ) { _ -> }
 
                 if (authState == AuthState.Loading) {
                     Box(
@@ -89,6 +95,15 @@ class MainActivity : AppCompatActivity() {
                     var showBottomSheet by remember { mutableStateOf(false) }
                     var sheetContentType by remember { mutableStateOf(SheetContent.None) }
 
+                    val editingHabit by mainViewModel.editingHabit.collectAsState()
+                    
+                    LaunchedEffect(editingHabit) {
+                        if (editingHabit != null) {
+                            sheetContentType = SheetContent.HabitSelection
+                            showBottomSheet = true
+                        }
+                    }
+
                     val isAuthRoute = listOf(Screen.Welcome.route, Screen.Login.route, Screen.Register.route).contains(currentRoute)
                     val showShell = authState == AuthState.Authenticated && !isAuthRoute
 
@@ -99,11 +114,7 @@ class MainActivity : AppCompatActivity() {
                         bottomBar = {
                             if (showShell) {
                                 MainBottomBar(
-                                    navController = navController,
-                                    onHabitClickAgain = {
-                                        sheetContentType = SheetContent.HabitSelection
-                                        showBottomSheet = true
-                                    }
+                                    navController = navController
                                 )
                             }
                         },
@@ -112,7 +123,19 @@ class MainActivity : AppCompatActivity() {
                             if (showShell) {
                                 FloatingActionButton(
                                     onClick = {
-                                        // Yêu cầu quyền thông báo nếu cần (Android 13+)
+                                        // 1. Kiểm tra quyền báo thức chính xác (Android 12+)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                                            if (!alarmManager.canScheduleExactAlarms()) {
+                                                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                                    data = Uri.fromParts("package", packageName, null)
+                                                }
+                                                alarmPermissionLauncher.launch(intent)
+                                                return@FloatingActionButton
+                                            }
+                                        }
+
+                                        // 2. Yêu cầu quyền thông báo nếu cần (Android 13+)
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                             if (ContextCompat.checkSelfPermission(
                                                     context,
@@ -120,6 +143,7 @@ class MainActivity : AppCompatActivity() {
                                                 ) != PackageManager.PERMISSION_GRANTED
                                             ) {
                                                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                return@FloatingActionButton
                                             }
                                         }
 
@@ -167,6 +191,7 @@ class MainActivity : AppCompatActivity() {
                                     onDismissRequest = { 
                                         showBottomSheet = false
                                         sheetContentType = SheetContent.None
+                                        mainViewModel.startEditingHabit(null)
                                     },
                                     sheetState = sheetState,
                                     dragHandle = { BottomSheetDefaults.DragHandle() },
@@ -188,9 +213,14 @@ class MainActivity : AppCompatActivity() {
                                         }
                                         SheetContent.HabitSelection -> {
                                             val selectedHabitDate by mainViewModel.selectedHabitDate.collectAsState()
+                                            val editingHabit by mainViewModel.editingHabit.collectAsState()
                                             NewHabitSheet(
                                                 initialDate = selectedHabitDate,
-                                                onDismiss = { showBottomSheet = false },
+                                                editingHabit = editingHabit,
+                                                onDismiss = { 
+                                                    showBottomSheet = false
+                                                    mainViewModel.startEditingHabit(null)
+                                                },
                                                 onHabitSelected = { name, icon, time, mins, color, date ->
                                                     val colorInt = (color.red * 255).toInt() shl 16 or
                                                                   (color.green * 255).toInt() shl 8 or
@@ -198,6 +228,7 @@ class MainActivity : AppCompatActivity() {
                                                     val colorHex = String.format("#%06X", colorInt)
 
                                                     mainViewModel.saveHabit(
+                                                        id = editingHabit?.id ?: "",
                                                         name = name,
                                                         icon = icon,
                                                         goal = "1",
@@ -207,6 +238,7 @@ class MainActivity : AppCompatActivity() {
                                                         date = date
                                                     ) {
                                                         showBottomSheet = false
+                                                        mainViewModel.startEditingHabit(null)
                                                     }
                                                 }
                                             )

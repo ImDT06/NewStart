@@ -94,6 +94,8 @@
     <string name="journal_greeting_evening">Chào buổi tối!</string>
     <string name="journal_subtitle">Hôm nay là một ngày tuyệt vời để ghi lại những khoảnh khắc đáng nhớ</string>
     <string name="journal_entry_placeholder">Bạn đang nghĩ gì?</string>
+    <string name="journal_memories_title">Kỷ niệm</string>
+    <string name="journal_close_button">Đóng</string>
 
     <!-- Habits Screen -->
     <string name="habits_filter_all">Tất cả</string>

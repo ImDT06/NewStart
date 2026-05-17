@@ -23,6 +23,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.newstart.R
+import com.example.newstart.domain.model.Habit
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -39,12 +40,60 @@ data class HabitPreset(
 @Composable
 fun NewHabitSheet(
     initialDate: LocalDate,
+    editingHabit: Habit? = null,
     onDismiss: () -> Unit,
     onHabitSelected: (String, String, String?, Int, Color, LocalDate) -> Unit
 ) {
     var selectedPreset by remember { mutableStateOf<HabitPreset?>(null) }
     var showConfigDialog by remember { mutableStateOf(false) }
     
+    // Nếu đang sửa, hiện thẳng UI chỉnh sửa
+    if (editingHabit != null) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 32.dp)
+        ) {
+            // Handle
+            Box(
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .width(40.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                    .align(Alignment.CenterHorizontally)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, null)
+                }
+                Text(
+                    text = stringResource(R.string.habits_custom_dialog_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.size(48.dp))
+            }
+
+            HabitConfigContent(
+                initialDate = initialDate,
+                habit = editingHabit,
+                onConfirm = { n, i, t, m, c, d -> onHabitSelected(n, i, t, m, c, d) },
+                onCancel = onDismiss
+            )
+        }
+        return
+    }
+
+    // Chế độ tạo mới - Hiện danh sách mẫu
     val categories = listOf(
         stringResource(R.string.habits_cat_popular),
         stringResource(R.string.habits_cat_health),
@@ -95,8 +144,8 @@ fun NewHabitSheet(
                 showConfigDialog = false
                 selectedPreset = null
             },
-            onConfirm = { name, icon, time, mins, date ->
-                onHabitSelected(name, icon, time, mins, Color(0xFF1D1D1F), date)
+            onConfirm = { name, icon, time, mins, color, date ->
+                onHabitSelected(name, icon, time, mins, color, date)
                 showConfigDialog = false
                 selectedPreset = null
             }
@@ -201,21 +250,30 @@ fun NewHabitSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HabitConfigDialog(
+fun HabitConfigContent(
     initialDate: LocalDate,
     preset: HabitPreset? = null,
-    onDismiss: () -> Unit,
-    onConfirm: (String, String, String?, Int, LocalDate) -> Unit
+    habit: Habit? = null,
+    onConfirm: (String, String, String?, Int, Color, LocalDate) -> Unit,
+    onCancel: () -> Unit
 ) {
-    var name by remember { mutableStateOf(preset?.name ?: "") }
-    var icon by remember { mutableStateOf(preset?.icon ?: "✨") }
+    var name by remember { mutableStateOf(habit?.name ?: preset?.name ?: "") }
+    var icon by remember { mutableStateOf(habit?.icon ?: preset?.icon ?: "✨") }
     var showTimePicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
-    var selectedTime by remember { mutableStateOf<String?>(null) }
-    var selectedDate by remember { mutableStateOf(initialDate) }
-    var minsBefore by remember { mutableStateOf(0) }
+    var selectedTime by remember { mutableStateOf(habit?.reminderTime ?: preset?.time) }
+    var selectedDate by remember { 
+        mutableStateOf(
+            if (habit != null) LocalDate.parse(habit.date) else initialDate
+        ) 
+    }
+    var minsBefore by remember { mutableStateOf(habit?.reminderMinutesBefore ?: preset?.minsBefore ?: 0) }
 
-    val timePickerState = rememberTimePickerState()
+    val timePickerState = rememberTimePickerState(
+        initialHour = selectedTime?.split(":")?.get(0)?.toInt() ?: 0,
+        initialMinute = selectedTime?.split(":")?.get(1)?.toInt() ?: 0
+    )
+    
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
     )
@@ -253,142 +311,140 @@ fun HabitConfigDialog(
         }
     }
 
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text(stringResource(R.string.habits_custom_name_label)) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+        
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = icon,
+                onValueChange = { icon = it },
+                label = { Text(stringResource(R.string.habits_custom_icon_label)) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                TextButton(
+                    onClick = { showDatePicker = true },
+                ) {
+                    Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(selectedDate.format(DateTimeFormatter.ofPattern("dd/MM")), fontSize = 14.sp)
+                }
+                Button(
+                    onClick = { showTimePicker = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(36.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.AccessTime, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(selectedTime ?: "Giờ", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+        }
+
+        if (selectedTime != null) {
+            Text(stringResource(R.string.habits_reminder_label), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+            
+            var isCustomMins by remember { mutableStateOf(false) }
+            var customMinsText by remember { mutableStateOf("") }
+
+            @OptIn(ExperimentalLayoutApi::class)
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(0, 5, 10, 15, 30).forEach { mins ->
+                    FilterChip(
+                        selected = !isCustomMins && minsBefore == mins,
+                        onClick = { 
+                            minsBefore = mins
+                            isCustomMins = false
+                        },
+                        label = { Text("$mins", fontSize = 12.sp) }
+                    )
+                }
+                
+                FilterChip(
+                    selected = isCustomMins,
+                    onClick = { isCustomMins = true },
+                    label = { Text(stringResource(R.string.habits_custom_mins), fontSize = 12.sp) }
+                )
+            }
+
+            if (isCustomMins) {
+                OutlinedTextField(
+                    value = customMinsText,
+                    onValueChange = { 
+                        if (it.all { char -> char.isDigit() } && it.length <= 3) {
+                            customMinsText = it
+                            minsBefore = it.toIntOrNull() ?: 0
+                        }
+                    },
+                    label = { Text(stringResource(R.string.habits_custom_mins_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = { if (name.isNotBlank()) onConfirm(name, icon, selectedTime, minsBefore, Color(0xFF1D1D1F), selectedDate) },
+            enabled = name.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(vertical = 12.dp)
+        ) {
+            Text(stringResource(R.string.habits_btn_create), fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HabitConfigDialog(
+    initialDate: LocalDate,
+    preset: HabitPreset? = null,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String?, Int, Color, LocalDate) -> Unit
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { 
             Text(
-                if (preset == null) stringResource(R.string.habits_custom_dialog_new) 
-                else stringResource(R.string.habits_custom_dialog_title), 
+                text = stringResource(R.string.habits_custom_dialog_title), 
                 color = MaterialTheme.colorScheme.onSurface
             ) 
         },
         containerColor = MaterialTheme.colorScheme.surface,
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.habits_custom_name_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = icon,
-                        onValueChange = { icon = it },
-                        label = { Text(stringResource(R.string.habits_custom_icon_label)) },
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column(horizontalAlignment = Alignment.End) {
-                        TextButton(
-                            onClick = { showDatePicker = true },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
-                        ) {
-                            Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(selectedDate.format(DateTimeFormatter.ofPattern("dd/MM")), fontSize = 12.sp)
-                        }
-                        Button(
-                            onClick = { showTimePicker = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Icon(Icons.Default.AccessTime, null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(selectedTime ?: "Giờ", fontSize = 12.sp)
-                        }
-                    }
-                }
-
-                if (selectedTime != null) {
-                    Text(stringResource(R.string.habits_reminder_label), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                    
-                    var isCustomMins by remember { mutableStateOf(false) }
-                    var customMinsText by remember { mutableStateOf("") }
-
-                    @OptIn(ExperimentalLayoutApi::class)
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf(0, 5, 10, 15, 30).forEach { mins ->
-                            FilterChip(
-                                selected = !isCustomMins && minsBefore == mins,
-                                onClick = { 
-                                    minsBefore = mins
-                                    isCustomMins = false
-                                },
-                                label = { Text("$mins", fontSize = 10.sp) },
-                                modifier = Modifier.height(28.dp),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                )
-                            )
-                        }
-                        
-                        FilterChip(
-                            selected = isCustomMins,
-                            onClick = { isCustomMins = true },
-                            label = { Text(stringResource(R.string.habits_custom_mins), fontSize = 10.sp) },
-                            modifier = Modifier.height(28.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                            )
-                        )
-                    }
-
-                    if (isCustomMins) {
-                        OutlinedTextField(
-                            value = customMinsText,
-                            onValueChange = { 
-                                if (it.all { char -> char.isDigit() } && it.length <= 3) {
-                                    customMinsText = it
-                                    minsBefore = it.toIntOrNull() ?: 0
-                                }
-                            },
-                            label = { Text(stringResource(R.string.habits_custom_mins_label), fontSize = 12.sp) },
-                            modifier = Modifier.fillMaxWidth().height(56.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                            )
-                        )
-                    }
-                }
-            }
+            HabitConfigContent(
+                initialDate = initialDate,
+                preset = preset,
+                onConfirm = { n, i, t, m, c, d -> onConfirm(n, i, t, m, c, d) },
+                onCancel = onDismiss
+            )
         },
-        confirmButton = {
-            Button(
-                onClick = { if (name.isNotBlank()) onConfirm(name, icon, selectedTime, minsBefore, selectedDate) },
-                enabled = name.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                )
-            ) {
-                Text(stringResource(R.string.habits_btn_create))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.habits_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
+        confirmButton = {},
+        dismissButton = {}
     )
 }
 

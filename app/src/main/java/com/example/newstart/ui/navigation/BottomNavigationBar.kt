@@ -3,9 +3,11 @@ package com.example.newstart.ui.navigation
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -29,8 +32,7 @@ data class BottomNavItem(
 
 @Composable
 fun MainBottomBar(
-    navController: NavController,
-    onHabitClickAgain: () -> Unit = {}
+    navController: NavController
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -46,6 +48,7 @@ fun MainBottomBar(
     val showBottomBar = items.any { it.screen.route == currentRoute } || currentRoute == Screen.Scan.route
 
     if (showBottomBar) {
+        val isDark = isSystemInDarkTheme()
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -57,8 +60,10 @@ fun MainBottomBar(
                     .fillMaxWidth()
                     .height(64.dp),
                 color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(24.dp), // Bo góc đều 2 bên hiện đại
-                shadowElevation = 8.dp
+                shape = RoundedCornerShape(24.dp),
+                shadowElevation = if (isDark) 0.dp else 8.dp,
+                tonalElevation = if (isDark) 8.dp else 0.dp, // Material 3: Tonal tint for dark mode
+                border = if (isDark) BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f)) else null
             ) {
                 Row(
                     modifier = Modifier.fillMaxSize(),
@@ -76,9 +81,7 @@ fun MainBottomBar(
                                 item = item,
                                 isSelected = isSelected,
                                 onClick = {
-                                    if (isSelected && item.screen == Screen.Habits) {
-                                        onHabitClickAgain()
-                                    } else if (!isSelected) {
+                                    if (!isSelected) {
                                         navController.navigate(item.screen.route) {
                                             popUpTo(Screen.Home.route) { saveState = true }
                                             launchSingleTop = true
