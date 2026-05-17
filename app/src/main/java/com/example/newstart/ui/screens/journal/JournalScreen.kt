@@ -102,8 +102,15 @@ fun JournalContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
+                    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+                    val greetingRes = when (hour) {
+                        in 5..10 -> R.string.journal_greeting_morning
+                        in 11..13 -> R.string.journal_greeting_noon
+                        in 14..17 -> R.string.journal_greeting_afternoon
+                        else -> R.string.journal_greeting_evening
+                    }
                     Text(
-                        text = stringResource(id = R.string.journal_greeting).split("!").first() + "!",
+                        text = stringResource(id = greetingRes),
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer

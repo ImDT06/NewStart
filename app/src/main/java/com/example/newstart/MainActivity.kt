@@ -1,14 +1,19 @@
 package com.example.newstart
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Rect
+import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
 import android.view.inputmethod.InputMethodManager
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,7 +21,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
@@ -24,23 +28,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.AuthState
+import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.navigation.MainBottomBar
 import com.example.newstart.ui.navigation.NavGraph
 import com.example.newstart.ui.navigation.Screen
-import com.example.newstart.ui.theme.NewStartTheme
-import com.example.newstart.ui.theme.ThemeMode
-import com.example.newstart.ui.util.SheetContent
-import com.example.newstart.ui.screens.journal.JournalEntryPanel
 import com.example.newstart.ui.screens.habits.NewHabitSheet
+import com.example.newstart.ui.screens.journal.JournalEntryPanel
+import com.example.newstart.ui.theme.NewStartTheme
+import com.example.newstart.ui.util.SheetContent
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.compose.ui.draw.shadow
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -55,6 +58,15 @@ class MainActivity : AppCompatActivity() {
             val authState by mainViewModel.authState.collectAsState()
             
             NewStartTheme(themeMode = themeMode) {
+                val context = LocalContext.current
+                val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { isGranted ->
+                    if (!isGranted) {
+                        // Thông báo cho người dùng rằng họ sẽ không nhận được nhắc nhở
+                    }
+                }
+
                 if (authState == AuthState.Loading) {
                     Box(
                         modifier = Modifier
@@ -100,6 +112,17 @@ class MainActivity : AppCompatActivity() {
                             if (showShell) {
                                 FloatingActionButton(
                                     onClick = {
+                                        // Yêu cầu quyền thông báo nếu cần (Android 13+)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            if (ContextCompat.checkSelfPermission(
+                                                    context,
+                                                    Manifest.permission.POST_NOTIFICATIONS
+                                                ) != PackageManager.PERMISSION_GRANTED
+                                            ) {
+                                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                            }
+                                        }
+
                                         when (currentRoute) {
                                             Screen.Habits.route -> {
                                                 sheetContentType = SheetContent.HabitSelection
@@ -164,19 +187,24 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                         SheetContent.HabitSelection -> {
+                                            val selectedHabitDate by mainViewModel.selectedHabitDate.collectAsState()
                                             NewHabitSheet(
+                                                initialDate = selectedHabitDate,
                                                 onDismiss = { showBottomSheet = false },
-                                                onHabitSelected = { preset ->
-                                                    val colorInt = (preset.color.red * 255).toInt() shl 16 or
-                                                                  (preset.color.green * 255).toInt() shl 8 or
-                                                                  (preset.color.blue * 255).toInt()
+                                                onHabitSelected = { name, icon, time, mins, color, date ->
+                                                    val colorInt = (color.red * 255).toInt() shl 16 or
+                                                                  (color.green * 255).toInt() shl 8 or
+                                                                  (color.blue * 255).toInt()
                                                     val colorHex = String.format("#%06X", colorInt)
 
                                                     mainViewModel.saveHabit(
-                                                        name = preset.name,
-                                                        icon = preset.icon,
+                                                        name = name,
+                                                        icon = icon,
                                                         goal = "1",
-                                                        colorHex = colorHex
+                                                        colorHex = colorHex,
+                                                        reminderTime = time,
+                                                        reminderMinutesBefore = mins,
+                                                        date = date
                                                     ) {
                                                         showBottomSheet = false
                                                     }

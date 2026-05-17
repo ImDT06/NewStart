@@ -46,11 +46,14 @@
     <string name="home_email">Email: %1$s</string>
     <string name="home_view_details">View Details</string>
     <string name="home_loading">Loading user…</string>
-    <string name="home_hello">Hello %1$s!</string>
+    <string name="home_hello_morning">Good Morning, %1$s!</string>
+    <string name="home_hello_noon">Good Noon, %1$s!</string>
+    <string name="home_hello_afternoon">Good Afternoon, %1$s!</string>
+    <string name="home_hello_evening">Good Evening, %1$s!</string>
     <string name="home_search_placeholder">Search courses, lessons…</string>
     <string name="home_category_courses">Courses</string>
     <string name="home_category_exams">Exams</string>
-    <string name="home_category_library">Library</string>
+    <string name="home_category_library">Thư viện</string>
     <string name="home_category_community">Community</string>
     <string name="home_popular_courses">Popular Courses</string>
     <string name="home_see_all">See All</string>
@@ -85,7 +88,10 @@
     <string name="settings_cancel">Cancel</string>
     <!-- Journal Screen -->
     <string name="journal_title">Journal</string>
-    <string name="journal_greeting">Good Morning! 🌸</string>
+    <string name="journal_greeting_morning">Good Morning!</string>
+    <string name="journal_greeting_noon">Good Noon!</string>
+    <string name="journal_greeting_afternoon">Good Afternoon!</string>
+    <string name="journal_greeting_evening">Good Evening!</string>
     <string name="journal_subtitle">Today is a wonderful day to record memorable moments</string>
     <string name="journal_entry_placeholder">What\'s on your mind?</string>
 
@@ -97,6 +103,7 @@
     <string name="habits_delete_msg">Are you sure you want to delete \'%1$s\'?</string>
     <string name="habits_delete_confirm">Delete</string>
     <string name="habits_cancel">Cancel</string>
+    <string name="habits_empty">No habits for this day.</string>
 
     <!-- New Habit Sheet -->
     <string name="habits_new_title">New Habit</string>
@@ -105,11 +112,15 @@
     <string name="habits_cat_sports">Sports</string>
     <string name="habits_cat_mind">Mind</string>
     <string name="habits_cat_study">Study</string>
-    <string name="habits_btn_custom">Custom Habit</string>
-    <string name="habits_custom_dialog_title">Create New Habit</string>
+    <string name="habits_btn_custom">Custom</string>
+    <string name="habits_custom_dialog_title">Configure Habit</string>
+    <string name="habits_custom_dialog_new">Create New Habit</string>
     <string name="habits_custom_name_label">Habit Name</string>
-    <string name="habits_custom_icon_label">Icon (Emoji)</string>
-    <string name="habits_btn_create">Create</string>
+    <string name="habits_custom_icon_label">Icon</string>
+    <string name="habits_btn_create">Confirm</string>
+    <string name="habits_reminder_label">Remind before (mins):</string>
+    <string name="habits_custom_mins">Custom</string>
+    <string name="habits_custom_mins_label">Reminder minutes</string>
 
     <!-- Errors -->
     <string name="error_email_empty">Email cannot be empty</string>
