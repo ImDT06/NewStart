@@ -86,6 +86,7 @@
     <string name="settings_confirm_logout_title">Đăng xuất</string>
     <string name="settings_confirm_logout_msg">Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này không?</string>
     <string name="settings_cancel">Hủy</string>
+
     <!-- Journal Screen -->
     <string name="journal_title">Nhật ký</string>
     <string name="journal_greeting_morning">Chào buổi sáng!</string>
@@ -96,6 +97,11 @@
     <string name="journal_entry_placeholder">Bạn đang nghĩ gì?</string>
     <string name="journal_memories_title">Kỷ niệm</string>
     <string name="journal_close_button">Đóng</string>
+    <string name="journal_empty_message">Chưa có nhật ký nào.\nHãy bắt đầu ghi lại khoảnh khắc nhé!</string>
+    <string name="journal_delete_confirm_title">Xóa nhật ký?</string>
+    <string name="journal_delete_confirm_message">Hành động này không thể hoàn tác. Bạn có chắc chắn muốn xóa khoảnh khắc này không?</string>
+    <string name="journal_delete_confirm_button">Xóa</string>
+    <string name="journal_cancel_button">Hủy</string>
 
     <!-- Habits Screen -->
     <string name="habits_filter_all">Tất cả</string>

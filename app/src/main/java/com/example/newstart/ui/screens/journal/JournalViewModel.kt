@@ -23,22 +23,41 @@ class JournalViewModel @Inject constructor(
     private val journalRepository: JournalRepository
 ) : ViewModel() {
 
-    private val _selectedDate = MutableStateFlow(LocalDate.now())
-    val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
+    private val _selectedDateRange = MutableStateFlow<Pair<LocalDate, LocalDate?>>(LocalDate.now() to null)
+    val selectedDateRange: StateFlow<Pair<LocalDate, LocalDate?>> = _selectedDateRange.asStateFlow()
+
+    // For backward compatibility or single date access
+    val selectedDate: StateFlow<LocalDate> = _selectedDateRange.map { it.first }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LocalDate.now())
 
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
 
+    // Lấy tất cả nhật ký có ảnh để làm Highlights
+    val allEntriesWithImages: StateFlow<List<JournalEntry>> = journalRepository.getJournalEntries()
+        .map { entries -> entries.filter { it.imageUrl != null }.sortedByDescending { it.timestamp } }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val entries: StateFlow<List<JournalEntry>> = _selectedDate
-        .flatMapLatest { date ->
+    val entries: StateFlow<List<JournalEntry>> = _selectedDateRange
+        .flatMapLatest { range ->
+            val start = range.first
+            val end = range.second ?: start
             journalRepository.getJournalEntries().map { allEntries ->
                 allEntries.filter { entry ->
                     entry.timestamp?.let { timestamp ->
                         val entryDate = timestamp.toInstant()
                             .atZone(ZoneId.systemDefault())
                             .toLocalDate()
-                        entryDate == date
+                        if (range.second == null) {
+                            entryDate == start
+                        } else {
+                            (entryDate == start || entryDate == end || (entryDate.isAfter(start) && entryDate.isBefore(end)))
+                        }
                     } ?: false
                 }.sortedByDescending { it.timestamp }
             }
@@ -50,7 +69,39 @@ class JournalViewModel @Inject constructor(
         )
 
     fun onDateSelected(date: LocalDate) {
-        _selectedDate.value = date
+        _selectedDateRange.value = date to null
+    }
+
+    fun onDateRangeSelected(start: LocalDate, end: LocalDate?) {
+        _selectedDateRange.value = start to end
+    }
+
+    fun setQuickFilter(filter: String) {
+        val today = LocalDate.now()
+        when (filter) {
+            "All" -> {
+                // Đặt một dải ngày cực rộng để lấy tất cả
+                _selectedDateRange.value = LocalDate.of(2000, 1, 1) to LocalDate.of(2100, 12, 31)
+            }
+            "Year" -> {
+                val start = today.withDayOfYear(1)
+                val end = today.withDayOfYear(today.lengthOfYear())
+                _selectedDateRange.value = start to end
+            }
+            "Month" -> {
+                val start = today.withDayOfMonth(1)
+                val end = today.withDayOfMonth(today.lengthOfMonth())
+                _selectedDateRange.value = start to end
+            }
+            "Week" -> {
+                val start = today.with(java.time.DayOfWeek.MONDAY)
+                val end = today.with(java.time.DayOfWeek.SUNDAY)
+                _selectedDateRange.value = start to end
+            }
+            "Today" -> {
+                _selectedDateRange.value = today to null
+            }
+        }
     }
 
     fun addEntry(emoji: String, text: String, imageUri: Uri?, onSuccess: () -> Unit) {

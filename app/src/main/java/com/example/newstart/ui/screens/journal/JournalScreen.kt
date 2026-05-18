@@ -1,20 +1,27 @@
 package com.example.newstart.ui.screens.journal
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -22,14 +29,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,13 +73,14 @@ fun JournalScreen(
     viewModel: JournalViewModel = hiltViewModel()
 ) {
     val entries by viewModel.entries.collectAsState()
-    val selectedDate by viewModel.selectedDate.collectAsState()
+    val selectedDateRange by viewModel.selectedDateRange.collectAsState()
     
     JournalContent(
         modifier = modifier,
         entries = entries,
-        selectedDate = selectedDate,
-        onDateSelected = { viewModel.onDateSelected(it) },
+        selectedDateRange = selectedDateRange,
+        onDateRangeSelected = { start, end -> viewModel.onDateRangeSelected(start, end) },
+        onQuickFilterSelected = { viewModel.setQuickFilter(it) },
         onDeleteEntry = { viewModel.deleteEntry(it) }
     )
 }
@@ -74,24 +90,65 @@ fun JournalScreen(
 fun JournalContent(
     modifier: Modifier = Modifier,
     entries: List<JournalEntry>,
-    selectedDate: LocalDate,
-    onDateSelected: (LocalDate) -> Unit,
+    selectedDateRange: Pair<LocalDate, LocalDate?>,
+    onDateRangeSelected: (LocalDate, LocalDate?) -> Unit,
+    onQuickFilterSelected: (String) -> Unit,
     onDeleteEntry: (String) -> Unit
 ) {
     var selectedImageUrl by remember { mutableStateOf<String?>(null) }
     var entryToDelete by remember { mutableStateOf<JournalEntry?>(null) }
-    var showMonthPicker by remember { mutableStateOf(false) }
-    
-    val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-    val dateFormatter = remember { SimpleDateFormat("dd MMMM, yyyy", Locale("vi")) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchActive by remember { mutableStateOf(false) }
+    var previousDateRange by remember { mutableStateOf<Pair<LocalDate, LocalDate?>?>(null) }
+    val focusManager = LocalFocusManager.current
+    val focusRequester = remember { FocusRequester() }
+    val isInspectionMode = LocalInspectionMode.current
 
-    val isDark = isSystemInDarkTheme()
-    val today = LocalDate.now()
+    // Khi bật/tắt tìm kiếm
+    LaunchedEffect(isSearchActive) {
+        if (isSearchActive) {
+            // Lưu lại filter hiện tại và chuyển sang All
+            previousDateRange = selectedDateRange
+            onQuickFilterSelected("All")
+            // Tự động focus vào ô tìm kiếm (tránh lỗi trong Preview)
+            if (!isInspectionMode) {
+                focusRequester.requestFocus()
+            }
+        } else {
+            // Khi tắt tìm kiếm, chỉ khôi phục nếu người dùng chưa chọn filter khác trong lúc search
+            previousDateRange?.let {
+                // Nếu hiện tại vẫn là "All" (mốc mặ định của search), thì mới khôi phục
+                val isStillAll = selectedDateRange.first == LocalDate.of(2000, 1, 1)
+                if (isStillAll) {
+                    onDateRangeSelected(it.first, it.second)
+                }
+                previousDateRange = null
+            }
+        }
+    }
+    
     val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val locale = context.resources.configuration.locales[0]
+    val locale = remember(context) {
+        val locales = context.resources.configuration.locales
+        if (!locales.isEmpty) locales[0] else Locale.getDefault()
+    }
     val isVietnamese = locale.language == "vi"
+
+    val timeFormatter = remember { SimpleDateFormat("HH:mm", locale) }
+    val dateFormatter = remember(locale) {
+        SimpleDateFormat(if (isVietnamese) "dd MMMM, yyyy" else "MMMM dd, yyyy", locale)
+    }
+
+    val isDark = isSystemInDarkTheme()
+    val today = LocalDate.now()
+
+    val filteredEntries = remember(entries, searchQuery) {
+        if (searchQuery.isEmpty()) entries
+        else entries.filter { it.text.contains(searchQuery, ignoreCase = true) || it.emoji.contains(searchQuery) }
+    }
     
     Box(
         modifier = modifier
@@ -121,137 +178,186 @@ fun JournalContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
-                    val greetingRes = when (hour) {
-                        in 5..10 -> R.string.journal_greeting_morning
-                        in 11..13 -> R.string.journal_greeting_noon
-                        in 14..17 -> R.string.journal_greeting_afternoon
-                        else -> R.string.journal_greeting_evening
-                    }
-                    Text(
-                        text = stringResource(id = greetingRes),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    
-                    val headerDateText = remember(selectedDate, locale) {
-                        if (selectedDate == today) dateFormatter.format(Date())
-                        else {
-                            val pattern = if (isVietnamese) "dd MMMM, yyyy" else "MMMM dd, yyyy"
-                            selectedDate.format(DateTimeFormatter.ofPattern(pattern, locale))
-                        }
-                    }
-                    Text(
-                        text = headerDateText,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.clickable {
-                            onDateSelected(today)
-                            scope.launch {
-                                pagerState.animateScrollToPage(500)
+                AnimatedContent(
+                    targetState = isSearchActive,
+                    transitionSpec = {
+                        (fadeIn() + expandHorizontally()).togetherWith(fadeOut() + shrinkHorizontally())
+                    },
+                    modifier = Modifier.weight(1f),
+                    label = "search_header"
+                ) { searching ->
+                    if (searching) {
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester),
+                            placeholder = { Text(stringResource(R.string.home_search_placeholder), fontSize = 14.sp) },
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                            ),
+                            leadingIcon = {
+                                Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.primary)
+                            },
+                            trailingIcon = {
+                                IconButton(onClick = { 
+                                    isSearchActive = false
+                                    searchQuery = ""
+                                    focusManager.clearFocus()
+                                }) {
+                                    Icon(Icons.Default.Close, null)
+                                }
+                            },
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyLarge,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
+                        )
+                    } else {
+                        Column {
+                            val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+                            val greetingRes = when (hour) {
+                                in 5..10 -> R.string.journal_greeting_morning
+                                in 11..13 -> R.string.journal_greeting_noon
+                                in 14..17 -> R.string.journal_greeting_afternoon
+                                else -> R.string.journal_greeting_evening
                             }
+                            Text(
+                                text = stringResource(id = greetingRes),
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            
+                            val headerDateText = remember(selectedDateRange, locale) {
+                                val start = selectedDateRange.first
+                                val end = selectedDateRange.second
+                                if (end == null) {
+                                    if (start == today) dateFormatter.format(Date())
+                                    else {
+                                        val pattern = if (isVietnamese) "dd MMMM, yyyy" else "MMMM dd, yyyy"
+                                        start.format(DateTimeFormatter.ofPattern(pattern, locale))
+                                    }
+                                } else {
+                                    val pattern = if (isVietnamese) "dd/MM" else "MM/dd"
+                                    "${start.format(DateTimeFormatter.ofPattern(pattern, locale))} - ${end.format(DateTimeFormatter.ofPattern(pattern, locale))}"
+                                }
+                            }
+                            Text(
+                                text = headerDateText,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.clickable {
+                                    showDatePicker = true
+                                }
+                            )
                         }
-                    )
+                    }
                 }
                 
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(36.dp),
-                    onClick = { showMonthPicker = true }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarMonth,
-                            contentDescription = "Month Picker",
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                if (!isSearchActive) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { isSearchActive = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(36.dp),
+                            onClick = { showDatePicker = true }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = "Date Picker",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            // Horizontal Date Picker
-            HorizontalPager(
-                state = pagerState,
+            // Quick Filters Section
+            LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 0.dp, bottom = 4.dp)
-            ) { page ->
-                val weekStart = remember(page) {
-                    today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                        .plusWeeks((page - 500).toLong())
-                }
-                val weekDays = remember(weekStart) { (0..6).map { weekStart.plusDays(it.toLong()) } }
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val filters = listOf(
+                    "All" to R.string.habits_filter_all,
+                    "Year" to null, // Special case for Year/Month/Week if no generic string exists
+                    "Month" to null,
+                    "Week" to null,
+                    "Today" to R.string.habits_today
+                )
+                
+                items(filters) { (key, labelRes) ->
+                    val label = when {
+                        labelRes != null -> stringResource(labelRes)
+                        key == "Year" -> if (isVietnamese) "Năm này" else "This Year"
+                        key == "Month" -> if (isVietnamese) "Tháng này" else "This Month"
+                        key == "Week" -> if (isVietnamese) "Tuần này" else "This Week"
+                        else -> key
+                    }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    weekDays.forEach { day ->
-                        val isSelected = day == selectedDate
-                        val isToday = day == today
-
-                        val dayName = remember(day, locale) {
-                            if (isVietnamese) {
-                                when (day.dayOfWeek) {
-                                    DayOfWeek.MONDAY -> "T2"
-                                    DayOfWeek.TUESDAY -> "T3"
-                                    DayOfWeek.WEDNESDAY -> "T4"
-                                    DayOfWeek.THURSDAY -> "T5"
-                                    DayOfWeek.FRIDAY -> "T6"
-                                    DayOfWeek.SATURDAY -> "T7"
-                                    DayOfWeek.SUNDAY -> "CN"
-                                }
-                            } else {
-                                day.dayOfWeek.getDisplayName(TextStyle.SHORT, locale).uppercase()
-                            }
-                        }
-
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { onDateSelected(day) }
-                        ) {
-                            Text(
-                                text = dayName,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            Surface(
-                                modifier = Modifier.size(32.dp),
-                                shape = CircleShape,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                border = if (!isSelected && isToday) BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary) else null
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = day.dayOfMonth.toString(),
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                }
-                            }
+                    val isSelected = remember(selectedDateRange, key) {
+                        val today = LocalDate.now()
+                        when (key) {
+                            "Today" -> selectedDateRange.first == today && selectedDateRange.second == null
+                            "Week" -> selectedDateRange.first == today.with(DayOfWeek.MONDAY) && selectedDateRange.second == today.with(DayOfWeek.SUNDAY)
+                            "Month" -> selectedDateRange.first == today.withDayOfMonth(1) && selectedDateRange.second == today.withDayOfMonth(today.lengthOfMonth())
+                            "Year" -> selectedDateRange.first == today.withDayOfYear(1) && selectedDateRange.second == today.withDayOfYear(today.lengthOfYear())
+                            "All" -> selectedDateRange.first == LocalDate.of(2000, 1, 1)
+                            else -> false
                         }
                     }
+
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { 
+                            onQuickFilterSelected(key)
+                            // Nếu người dùng chọn filter thủ công trong lúc search, xóa previousDateRange để không bị ghi đè khi thoát search
+                            if (isSearchActive) {
+                                previousDateRange = null
+                            }
+                        },
+                        label = { 
+                            Text(
+                                text = label, 
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            ) 
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        border = null
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Journal List Surface
             Surface(
@@ -260,96 +366,134 @@ fun JournalContent(
                     .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
                 color = MaterialTheme.colorScheme.surface
             ) {
-                if (entries.isEmpty()) {
+                if (filteredEntries.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            "Chưa có nhật ký nào.\nHãy bắt đầu ghi lại khoảnh khắc nhé!",
+                            if (searchQuery.isEmpty()) stringResource(R.string.journal_empty_message)
+                            else if (isVietnamese) "Không tìm thấy nhật ký phù hợp" else "No matching journal found",
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 } else {
+                    val entriesWithHeaders = remember(filteredEntries) {
+                        val result = mutableListOf<Any>()
+                        var lastDate: LocalDate? = null
+                        filteredEntries.forEach { entry ->
+                            val date = entry.timestamp?.let {
+                                java.time.Instant.ofEpochMilli(it.time)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .toLocalDate()
+                            }
+                            if (date != null && date != lastDate) {
+                                result.add(date)
+                                lastDate = date
+                            }
+                            result.add(entry)
+                        }
+                        result
+                    }
+
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp, start = 24.dp, end = 24.dp)
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectTapGestures(onTap = { focusManager.clearFocus() })
+                            },
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp, start = 24.dp, end = 24.dp)
                     ) {
                         items(
-                            items = entries,
-                            key = { it.id }
-                        ) { entry ->
-                            val dismissState = rememberSwipeToDismissBoxState(
-                                confirmValueChange = {
-                                    if (it == SwipeToDismissBoxValue.EndToStart) {
-                                        entryToDelete = entry
-                                        false
-                                    } else false
-                                }
-                            )
+                            items = entriesWithHeaders,
+                            key = { if (it is JournalEntry) it.id else it.toString() }
+                        ) { item ->
+                            if (item is LocalDate) {
+                                val pattern = if (isVietnamese) "dd MMMM, yyyy" else "MMMM dd, yyyy"
+                                Text(
+                                    text = item.format(DateTimeFormatter.ofPattern(pattern, locale)),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 12.dp, bottom = 8.dp, start = 4.dp)
+                                )
+                            } else if (item is JournalEntry) {
+                                val dismissState = rememberSwipeToDismissBoxState(
+                                    confirmValueChange = {
+                                        if (it == SwipeToDismissBoxValue.EndToStart) {
+                                            entryToDelete = item
+                                            false
+                                        } else false
+                                    }
+                                )
 
-                            LaunchedEffect(entryToDelete) {
-                                if (entryToDelete == null) {
-                                    dismissState.reset()
+                                LaunchedEffect(entryToDelete) {
+                                    if (entryToDelete == null) {
+                                        dismissState.reset()
+                                    }
                                 }
+
+                                SwipeToDismissBox(
+                                    state = dismissState,
+                                    enableDismissFromStartToEnd = false,
+                                    backgroundContent = {
+                                        val color = when (dismissState.dismissDirection) {
+                                            SwipeToDismissBoxValue.EndToStart -> Color.Red.copy(alpha = 0.8f)
+                                            else -> Color.Transparent
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(bottom = 32.dp)
+                                                .clip(RoundedCornerShape(16.dp))
+                                                .background(color),
+                                            contentAlignment = Alignment.CenterEnd
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = "Delete",
+                                                tint = Color.White,
+                                                modifier = Modifier.padding(end = 16.dp)
+                                            )
+                                        }
+                                    },
+                                    content = {
+                                        AnimatedVisibility(
+                                            visible = true,
+                                            enter = fadeIn() + slideInVertically(),
+                                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                                        ) {
+                                            TimelineEntryItem(
+                                                entry = item,
+                                                timeFormatted = item.timestamp?.let { timeFormatter.format(it) } ?: "--:--",
+                                                isLast = entries.lastOrNull()?.id == item.id,
+                                                onImageClick = { selectedImageUrl = it }
+                                            )
+                                        }
+                                    }
+                                )
                             }
-
-                            SwipeToDismissBox(
-                                state = dismissState,
-                                enableDismissFromStartToEnd = false,
-                                backgroundContent = {
-                                    val color = when (dismissState.dismissDirection) {
-                                        SwipeToDismissBoxValue.EndToStart -> Color.Red.copy(alpha = 0.8f)
-                                        else -> Color.Transparent
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(bottom = 32.dp)
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .background(color),
-                                        contentAlignment = Alignment.CenterEnd
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Delete,
-                                            contentDescription = "Delete",
-                                            tint = Color.White,
-                                            modifier = Modifier.padding(end = 16.dp)
-                                        )
-                                    }
-                                },
-                                content = {
-                                    AnimatedVisibility(
-                                        visible = true,
-                                        enter = fadeIn() + slideInVertically(),
-                                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                                    ) {
-                                        TimelineEntryItem(
-                                            entry = entry,
-                                            timeFormatted = entry.timestamp?.let { timeFormatter.format(it) } ?: "--:--",
-                                            isLast = entries.lastOrNull()?.id == entry.id,
-                                            onImageClick = { selectedImageUrl = it }
-                                        )
-                                    }
-                                }
-                            )
                         }
                     }
                 }
             }
         }
 
-        // Monthly Calendar Dialog
-        if (showMonthPicker) {
-            MonthPickerDialog(
-                selectedDate = selectedDate,
-                onDateSelected = { date ->
-                    onDateSelected(date)
-                    showMonthPicker = false
-                    val weekDiff = (date.toEpochDay() - today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toEpochDay()) / 7
+        // Custom Date Range Picker Dialog
+        if (showDatePicker) {
+            AdvancedDatePickerDialog(
+                initialStartDate = selectedDateRange.first,
+                initialEndDate = selectedDateRange.second,
+                onDismiss = { showDatePicker = false },
+                onDateRangeSelected = { start, end ->
+                    onDateRangeSelected(start, end)
+                    showDatePicker = false
+                    // Update week pager if it's a single date or just start date
+                    val weekDiff = (start.toEpochDay() - today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toEpochDay()) / 7
                     scope.launch {
                         pagerState.scrollToPage(500 + weekDiff.toInt())
                     }
-                },
-                onDismiss = { showMonthPicker = false }
+                }
             )
         }
 
@@ -357,8 +501,8 @@ fun JournalContent(
         entryToDelete?.let { entry ->
             AlertDialog(
                 onDismissRequest = { entryToDelete = null },
-                title = { Text("Xóa nhật ký?") },
-                text = { Text("Hành động này không thể hoàn tác. Bạn có chắc chắn muốn xóa khoảnh khắc này không?") },
+                title = { Text(stringResource(R.string.journal_delete_confirm_title)) },
+                text = { Text(stringResource(R.string.journal_delete_confirm_message)) },
                 confirmButton = {
                     TextButton(
                         onClick = {
@@ -367,12 +511,12 @@ fun JournalContent(
                         },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) {
-                        Text("Xóa")
+                        Text(stringResource(R.string.journal_delete_confirm_button))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { entryToDelete = null }) {
-                        Text("Hủy")
+                        Text(stringResource(R.string.journal_cancel_button))
                     }
                 }
             )
@@ -406,172 +550,415 @@ fun JournalContent(
     }
 }
 
+enum class PickerViewMode {
+    Day, Month, Year
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MonthPickerDialog(
-    selectedDate: LocalDate,
-    onDateSelected: (LocalDate) -> Unit,
-    onDismiss: () -> Unit
+fun AdvancedDatePickerDialog(
+    initialStartDate: LocalDate,
+    initialEndDate: LocalDate?,
+    onDismiss: () -> Unit,
+    onDateRangeSelected: (LocalDate, LocalDate?) -> Unit
 ) {
-    var stagedMonth by remember { mutableStateOf(YearMonth.from(selectedDate)) }
-    var isYearPickerMode by remember { mutableStateOf(false) }
-    var yearPageStart by remember { mutableStateOf((stagedMonth.year / 12) * 12) }
+    var viewMode by remember { mutableStateOf(PickerViewMode.Day) }
+    var selectedStartDate by remember { mutableStateOf(initialStartDate) }
+    var selectedEndDate by remember { mutableStateOf(initialEndDate) }
+
+    val initialPage = 500
+    val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = initialPage)
+    val scope = rememberCoroutineScope()
     
+    // Derived state for displayMonth to avoid unnecessary recompositions during scroll
+    val displayMonth by remember {
+        derivedStateOf {
+            val monthDiff = pagerState.currentPage - initialPage
+            YearMonth.from(initialStartDate).plusMonths(monthDiff.toLong())
+        }
+    }
+
     val context = LocalContext.current
     val locale = context.resources.configuration.locales[0]
+    val isVietnamese = locale.language == "vi"
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Box(
+        Surface(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.8f))
-                .clickable { onDismiss() },
-            contentAlignment = Alignment.Center
+                .fillMaxWidth(0.9f)
+                .wrapContentHeight()
+                .clip(RoundedCornerShape(24.dp)),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .clickable(enabled = false) {}
-                    .padding(24.dp)
+                modifier = Modifier.padding(16.dp)
             ) {
-                Text(
-                    text = stringResource(R.string.journal_memories_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-                
-                Spacer(modifier = Modifier.height(24.dp))
-
+                // Top Selectors Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = { 
-                            if (isYearPickerMode) yearPageStart -= 12 else stagedMonth = stagedMonth.minusMonths(1)
-                        }
+                    // Month Selector
+                    TextButton(
+                        onClick = { viewMode = if (viewMode == PickerViewMode.Month) PickerViewMode.Day else PickerViewMode.Month },
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Default.ChevronLeft, null, tint = MaterialTheme.colorScheme.primary)
-                    }
-                    
-                    val headerTitle = remember(stagedMonth, locale, isYearPickerMode, yearPageStart) {
-                        if (isYearPickerMode) "$yearPageStart - ${yearPageStart + 11}"
-                        else stagedMonth.format(DateTimeFormatter.ofPattern(if (locale.language == "vi") "'tháng' M yyyy" else "MMMM yyyy", locale))
-                    }
-                    
-                    Surface(
-                        onClick = { 
-                            isYearPickerMode = !isYearPickerMode 
-                            if (isYearPickerMode) yearPageStart = (stagedMonth.year / 12) * 12
-                        },
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text(text = headerTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                            Icon(imageVector = if (isYearPickerMode) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val monthLabel = if (isVietnamese) "Tháng ${displayMonth.monthValue}" else displayMonth.month.getDisplayName(TextStyle.FULL, locale)
+                            Text(
+                                text = monthLabel,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Icon(
+                                imageVector = if (viewMode == PickerViewMode.Month) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
                         }
                     }
 
-                    IconButton(
-                        onClick = { 
-                            if (isYearPickerMode) yearPageStart += 12 else stagedMonth = stagedMonth.plusMonths(1)
-                        }
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Year Selector
+                    TextButton(
+                        onClick = { viewMode = if (viewMode == PickerViewMode.Year) PickerViewMode.Day else PickerViewMode.Year },
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.primary)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = displayMonth.year.toString(),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Icon(
+                                imageVector = if (viewMode == PickerViewMode.Year) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Month Arrows (Only in Day mode)
+                    if (viewMode == PickerViewMode.Day) {
+                        IconButton(onClick = { 
+                            scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+                        }) {
+                            Icon(Icons.Default.ChevronLeft, null)
+                        }
+                        IconButton(onClick = { 
+                            scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                        }) {
+                            Icon(Icons.Default.ChevronRight, null)
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                if (isYearPickerMode) {
-                    val currentYear = remember { LocalDate.now().year }
-                    val years = remember(yearPageStart) { (yearPageStart..(yearPageStart + 11)).toList() }
-                    
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.height(280.dp)
-                    ) {
-                        items(years.size) { index ->
-                            val year = years[index]
-                            val isFocusedYear = year == stagedMonth.year
-                            val isTodayYear = year == currentYear
-                            
-                            Surface(
-                                onClick = {
-                                    stagedMonth = YearMonth.of(year, stagedMonth.month)
-                                    isYearPickerMode = false
-                                },
-                                shape = RoundedCornerShape(16.dp),
-                                color = if (isFocusedYear) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                border = if (isTodayYear && !isFocusedYear) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
-                            ) {
-                                Box(modifier = Modifier.padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
-                                    Text(text = year.toString(), style = MaterialTheme.typography.bodyLarge, fontWeight = if (isFocusedYear || isTodayYear) FontWeight.Bold else FontWeight.Medium, color = if (isFocusedYear) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+                // Static Week Headers (Fixed outside Pager to prevent splitting)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 2.dp)
+                ) {
+                    val weekLabels = if (isVietnamese) listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
+                    else listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
+                    weekLabels.forEach { label ->
+                        Box(
+                            modifier = Modifier.weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                Box(modifier = Modifier.height(240.dp)) {
+                    AnimatedContent(
+                        targetState = viewMode,
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                        },
+                        label = "pickerViewMode"
+                    ) { targetMode ->
+                        when (targetMode) {
+                            PickerViewMode.Day -> {
+                                androidx.compose.foundation.pager.HorizontalPager(
+                                    state = pagerState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    pageSpacing = 16.dp // Add spacing between months
+                                ) { page ->
+                                    val pageMonth = YearMonth.from(initialStartDate).plusMonths((page - initialPage).toLong())
+                                    DayPickerGrid(
+                                        displayMonth = pageMonth,
+                                        startDate = selectedStartDate,
+                                        endDate = selectedEndDate,
+                                        onDateClick = { date ->
+                                            if (selectedEndDate != null) {
+                                                selectedStartDate = date
+                                                selectedEndDate = null
+                                            } else if (date.isBefore(selectedStartDate)) {
+                                                selectedStartDate = date
+                                            } else if (date == selectedStartDate) {
+                                                // Keep as start
+                                            } else {
+                                                selectedEndDate = date
+                                            }
+                                        }
+                                    )
                                 }
+                            }
+                            PickerViewMode.Month -> {
+                                MonthPickerGrid(
+                                    selectedMonth = displayMonth.monthValue,
+                                    onMonthClick = { m ->
+                                        scope.launch {
+                                            val targetMonth = YearMonth.of(displayMonth.year, m)
+                                            val monthDiff = (targetMonth.year - initialStartDate.year) * 12 + (targetMonth.monthValue - initialStartDate.monthValue)
+                                            pagerState.scrollToPage(initialPage + monthDiff)
+                                            viewMode = PickerViewMode.Day
+                                        }
+                                    }
+                                )
+                            }
+                            PickerViewMode.Year -> {
+                                YearPickerGrid(
+                                    selectedYear = displayMonth.year,
+                                    onYearClick = { y ->
+                                        scope.launch {
+                                            val targetMonth = YearMonth.of(y, displayMonth.monthValue)
+                                            val monthDiff = (targetMonth.year - initialStartDate.year) * 12 + (targetMonth.monthValue - initialStartDate.monthValue)
+                                            pagerState.scrollToPage(initialPage + monthDiff)
+                                            viewMode = PickerViewMode.Day
+                                        }
+                                    }
+                                )
                             }
                         }
                     }
-                } else {
-                    val daysInMonth = stagedMonth.lengthOfMonth()
-                    val offset = stagedMonth.atDay(1).dayOfWeek.value - 1
-                    val totalCells = ((daysInMonth + offset + 6) / 7) * 7
+                }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row {
-                            val dayLabels = if (locale.language == "vi") listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
-                                           else listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-                            dayLabels.forEach { label ->
-                                Text(text = label, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                            }
-                        }
+                // Bottom Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("HUỶ", fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    TextButton(
+                        onClick = { onDateRangeSelected(selectedStartDate, selectedEndDate) }
+                    ) {
+                        Text("XÁC NHẬN", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
 
-                        for (row in 0 until totalCells / 7) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                for (col in 0 until 7) {
-                                    val cellIdx = row * 7 + col
-                                    val dayNum = cellIdx - offset + 1
-                                    Box(modifier = Modifier.weight(1f).aspectRatio(1f)) {
-                                        if (dayNum in 1..daysInMonth) {
-                                            val date = stagedMonth.atDay(dayNum)
-                                            val isSelected = date == selectedDate
-                                            val isToday = date == LocalDate.now()
-                                            Surface(
-                                                modifier = Modifier.fillMaxSize(),
-                                                shape = RoundedCornerShape(12.dp),
-                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                                border = if (isToday && !isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
-                                                onClick = { onDateSelected(date) }
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Text(text = dayNum.toString(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
-                                                }
+@Composable
+fun DayPickerGrid(
+    displayMonth: YearMonth,
+    startDate: LocalDate,
+    endDate: LocalDate?,
+    onDateClick: (LocalDate) -> Unit
+) {
+    val today = remember { LocalDate.now() }
+    val daysInMonth = remember(displayMonth) { displayMonth.lengthOfMonth() }
+    val offset = remember(displayMonth) { displayMonth.atDay(1).dayOfWeek.value - 1 }
+    val rangeColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+    
+    Column(modifier = Modifier.fillMaxSize()) {
+        repeat(6) { row ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                repeat(7) { col ->
+                    val cellIndex = row * 7 + col
+                    val dayNum = cellIndex - offset + 1
+                    
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .drawBehind {
+                                if (dayNum in 1..daysInMonth) {
+                                    val date = displayMonth.atDay(dayNum)
+                                    val isStart = date == startDate
+                                    val isEnd = date == endDate
+                                    val isInRange = endDate != null && date.isAfter(startDate) && date.isBefore(endDate)
+
+                                    if (isInRange || (isStart && endDate != null) || isEnd) {
+                                        val verticalPadding = 6.dp.toPx()
+                                        val rectHeight = size.height - (verticalPadding * 2)
+                                        val cornerRadius = rectHeight / 2
+                                        
+                                        when {
+                                            isInRange -> {
+                                                drawRect(
+                                                    color = rangeColor,
+                                                    topLeft = Offset(0f, verticalPadding),
+                                                    size = Size(size.width, rectHeight)
+                                                )
+                                            }
+                                            isStart -> {
+                                                // Draw capsule for start
+                                                drawRoundRect(
+                                                    color = rangeColor,
+                                                    topLeft = Offset(0f, verticalPadding),
+                                                    size = Size(size.width, rectHeight),
+                                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius)
+                                                )
+                                                // Flatten the right side to connect with next day
+                                                drawRect(
+                                                    color = rangeColor,
+                                                    topLeft = Offset(size.width / 2, verticalPadding),
+                                                    size = Size(size.width / 2, rectHeight)
+                                                )
+                                            }
+                                            isEnd -> {
+                                                // Draw capsule for end
+                                                drawRoundRect(
+                                                    color = rangeColor,
+                                                    topLeft = Offset(0f, verticalPadding),
+                                                    size = Size(size.width, rectHeight),
+                                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius)
+                                                )
+                                                // Flatten the left side to connect with previous day
+                                                drawRect(
+                                                    color = rangeColor,
+                                                    topLeft = Offset(0f, verticalPadding),
+                                                    size = Size(size.width / 2, rectHeight)
+                                                )
                                             }
                                         }
                                     }
                                 }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (dayNum in 1..daysInMonth) {
+                            val date = remember(displayMonth, dayNum) { displayMonth.atDay(dayNum) }
+                            val isToday = date == today
+                            val isStart = date == startDate
+                            val isEnd = date == endDate
+
+                            Surface(
+                                modifier = Modifier.size(36.dp),
+                                shape = CircleShape,
+                                color = if (isStart || isEnd) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                border = if (isToday && !isStart && !isEnd) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
+                                onClick = { onDateClick(date) }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = dayNum.toString(),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isStart || isEnd || isToday) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isStart || isEnd) MaterialTheme.colorScheme.onPrimary 
+                                                else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                             }
                         }
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) {
-                    Text(text = stringResource(R.string.journal_close_button), fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+fun MonthPickerGrid(
+    selectedMonth: Int,
+    onMonthClick: (Int) -> Unit
+) {
+    val months = (1..12).toList()
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items(months) { m ->
+            val isSelected = m == selectedMonth
+            Surface(
+                onClick = { onMonthClick(m) },
+                shape = RoundedCornerShape(12.dp),
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ) {
+                Box(modifier = Modifier.padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "Thg $m",
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun YearPickerGrid(
+    selectedYear: Int,
+    onYearClick: (Int) -> Unit
+) {
+    val currentYear = LocalDate.now().year
+    val years = remember { (2020..2050).toList() }
+    val gridState = rememberLazyGridState()
+
+    // Focus to current year or selected year
+    LaunchedEffect(Unit) {
+        val focusYear = if (years.contains(selectedYear)) selectedYear else currentYear
+        val index = years.indexOf(focusYear)
+        if (index != -1) {
+            gridState.scrollToItem(index)
+        }
+    }
+    
+    LazyVerticalGrid(
+        state = gridState,
+        columns = GridCells.Fixed(3),
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(years) { y ->
+            val isSelected = y == selectedYear
+            val isTodayYear = y == currentYear
+            Surface(
+                onClick = { onYearClick(y) },
+                shape = RoundedCornerShape(12.dp),
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                border = if (isTodayYear && !isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+            ) {
+                Box(modifier = Modifier.padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = y.toString(),
+                        fontWeight = if (isSelected || isTodayYear) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
         }
@@ -674,7 +1061,7 @@ fun TimelineEntryItem(
                 }
 
                 if (entry.imageUrl != null) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -706,8 +1093,9 @@ fun JournalScreenPreview() {
                 JournalEntry(id = "1", emoji = "😊", text = "Một ngày tuyệt vời tại UIT!", timestamp = Date()),
                 JournalEntry(id = "2", emoji = "🥰", text = "Học Compose thú vị quá", timestamp = Date())
             ),
-            selectedDate = LocalDate.now(),
-            onDateSelected = {},
+            selectedDateRange = LocalDate.now() to null,
+            onDateRangeSelected = { _, _ -> },
+            onQuickFilterSelected = {},
             onDeleteEntry = {}
         )
     }

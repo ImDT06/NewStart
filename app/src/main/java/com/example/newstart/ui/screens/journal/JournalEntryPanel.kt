@@ -308,116 +308,115 @@ fun JournalEntryPanel(
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Main Controls
-        Column(
+        // Capture / Send Button Section
+        Box(
             modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            contentAlignment = Alignment.Center
         ) {
-            // Capture Button / Send Button Logic
             val hasContent = capturedImageUri != null || text.isNotBlank()
             val showSendButton = capturedImageUri != null || isTextOnlyMode
             
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                if (showSendButton) {
-                    // Send Button - Enabled only when there's text or an image
-                    FilledIconButton(
-                        onClick = { 
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onPost(selectedEmoji, text, capturedImageUri) 
-                        },
-                        enabled = hasContent && !isUploading,
-                        modifier = Modifier.size(80.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                            disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+            if (showSendButton) {
+                FilledIconButton(
+                    onClick = { 
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onPost(selectedEmoji, text, capturedImageUri) 
+                    },
+                    enabled = hasContent && !isUploading,
+                    modifier = Modifier.size(88.dp), // Kích thước bằng với nút chụp
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                ) {
+                    if (isUploading) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(32.dp),
+                            strokeWidth = 3.dp
                         )
-                    ) {
-                        if (isUploading) {
-                            CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(32.dp),
-                                strokeWidth = 3.dp
-                            )
-                        } else {
-                            Icon(
-                                Icons.AutoMirrored.Filled.Send, 
-                                contentDescription = "Send",
-                                modifier = Modifier.size(36.dp)
+                    } else {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send, 
+                            contentDescription = "Send",
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+                }
+            } else {
+                val gradientBrush = Brush.linearGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary,
+                        MaterialTheme.colorScheme.secondary
+                    )
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .size(88.dp)
+                        .clip(CircleShape)
+                        .border(width = 5.dp, brush = gradientBrush, shape = CircleShape)
+                        .padding(8.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    try {
+                                        mediaActionSound.play(MediaActionSound.SHUTTER_CLICK)
+                                    } catch (e: Exception) {
+                                        Log.e("Camera", "Shutter sound failed", e)
+                                    }
+                                    takePhoto(
+                                        context = context,
+                                        imageCapture = imageCapture,
+                                        executor = executor,
+                                        onImageCaptured = { 
+                                            capturedImageUri = it 
+                                            isTextOnlyMode = false
+                                        },
+                                        onError = { Log.e("Camera", "Capture failed", it) }
+                                    )
+                                }
                             )
                         }
-                    }
-                } else {
-                    // Gradient Capture Button (Only in Camera Mode with no image)
-                    val gradientBrush = Brush.linearGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.secondary
-                        )
-                    )
-                    
-                    Box(
-                        modifier = Modifier
-                            .size(88.dp)
-                            .clip(CircleShape)
-                            .border(width = 5.dp, brush = gradientBrush, shape = CircleShape)
-                            .padding(8.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onPress = {
-                                        try {
-                                            mediaActionSound.play(MediaActionSound.SHUTTER_CLICK)
-                                        } catch (e: Exception) {
-                                            Log.e("Camera", "Shutter sound failed", e)
-                                        }
-                                        takePhoto(
-                                            context = context,
-                                            imageCapture = imageCapture,
-                                            executor = executor,
-                                            onImageCaptured = { 
-                                                capturedImageUri = it 
-                                                isTextOnlyMode = false
-                                            },
-                                            onError = { Log.e("Camera", "Capture failed", it) }
-                                        )
-                                    }
-                                )
-                            }
-                    )
-                }
-
-                // Retake / Back to Camera Button
-                if (capturedImageUri != null || isTextOnlyMode) {
-                    IconButton(
-                        onClick = { 
-                            capturedImageUri = null
-                            isTextOnlyMode = false
-                        },
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = 48.dp)
-                            .size(48.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = if (capturedImageUri != null) Icons.Default.Refresh else Icons.Default.PhotoCamera,
-                            contentDescription = "Camera"
-                        )
-                    }
-                }
+                )
             }
 
-            // Gallery Button
-            if (capturedImageUri == null && !isTextOnlyMode) {
+            // Retake / Back to Camera Button
+            if (capturedImageUri != null || isTextOnlyMode) {
+                IconButton(
+                    onClick = { 
+                        capturedImageUri = null
+                        isTextOnlyMode = false
+                    },
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 48.dp)
+                        .size(48.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = if (capturedImageUri != null) Icons.Default.Refresh else Icons.Default.PhotoCamera,
+                        contentDescription = "Camera"
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Gallery & Skip Buttons (Dưới cùng, gần emojis)
+        if (capturedImageUri == null && !isTextOnlyMode) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Button(
                     onClick = { galleryLauncher.launch("image/*") },
                     colors = ButtonDefaults.buttonColors(
@@ -431,10 +430,7 @@ fun JournalEntryPanel(
                     Spacer(modifier = Modifier.width(10.dp))
                     Text("Chọn từ thư viện", fontWeight = FontWeight.Bold)
                 }
-            }
 
-            // Skip Photo Text
-            if (capturedImageUri == null && !isTextOnlyMode) {
                 TextButton(onClick = { isTextOnlyMode = true }) {
                     Text(
                         "Bỏ qua ảnh",
@@ -443,9 +439,8 @@ fun JournalEntryPanel(
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(16.dp))
         }
-
-        Spacer(modifier = Modifier.weight(1f))
 
         // Emoji Selection
         LazyRow(

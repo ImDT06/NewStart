@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.newstart.ui.AuthState
@@ -55,7 +56,14 @@ class MainActivity : AppCompatActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        
+        // Giữ màn hình Splash cho đến khi authState không còn Loading
+        splashScreen.setKeepOnScreenCondition {
+            mainViewModel.authState.value == AuthState.Loading
+        }
+        
         enableEdgeToEdge()
         setContent {
             val themeMode by mainViewModel.themeMode.collectAsState()
@@ -73,178 +81,162 @@ class MainActivity : AppCompatActivity() {
                     contract = ActivityResultContracts.RequestPermission()
                 ) { _ -> }
 
-                if (authState == AuthState.Loading) {
+                val navController = rememberNavController()
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
+
+                var showBottomSheet by remember { mutableStateOf(false) }
+                var sheetContentType by remember { mutableStateOf(SheetContent.None) }
+
+                val editingHabit by mainViewModel.editingHabit.collectAsState()
+                
+                LaunchedEffect(editingHabit) {
+                    if (editingHabit != null) {
+                        sheetContentType = SheetContent.HabitSelection
+                        showBottomSheet = true
+                    }
+                }
+
+                val isAuthRoute = listOf(Screen.Welcome.route, Screen.Login.route, Screen.Register.route).contains(currentRoute)
+                val showShell = authState == AuthState.Authenticated && !isAuthRoute
+
+                val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    bottomBar = {
+                        if (showShell) {
+                            MainBottomBar(
+                                navController = navController
+                            )
+                        }
+                    },
+                    floatingActionButtonPosition = FabPosition.Center,
+                    floatingActionButton = {
+                        if (showShell) {
+                            FloatingActionButton(
+                                onClick = {
+                                    // 1. Kiểm tra quyền báo thức chính xác (Android 12+)
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                                        if (!alarmManager.canScheduleExactAlarms()) {
+                                            val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                                data = Uri.fromParts("package", packageName, null)
+                                            }
+                                            alarmPermissionLauncher.launch(intent)
+                                            return@FloatingActionButton
+                                        }
+                                    }
+
+                                    // 2. Yêu cầu quyền thông báo nếu cần (Android 13+)
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        if (ContextCompat.checkSelfPermission(
+                                                context,
+                                                Manifest.permission.POST_NOTIFICATIONS
+                                            ) != PackageManager.PERMISSION_GRANTED
+                                        ) {
+                                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                            return@FloatingActionButton
+                                        }
+                                    }
+
+                                    when (currentRoute) {
+                                        Screen.Habits.route -> {
+                                            sheetContentType = SheetContent.HabitSelection
+                                            showBottomSheet = true
+                                        }
+                                        else -> {
+                                            sheetContentType = SheetContent.JournalEntry
+                                            showBottomSheet = true
+                                        }
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .offset(y = 52.dp),
+                                shape = CircleShape,
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = Color.White,
+                                elevation = FloatingActionButtonDefaults.elevation(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Add",
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        }
+                    }
+                ) { innerPadding ->
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center
+                            .padding(bottom = if (showShell) innerPadding.calculateBottomPadding() else 0.dp)
                     ) {
-                        Text(
-                            text = "NewStart",
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontWeight = FontWeight.Bold
+                        NavGraph(
+                            navController = navController,
+                            startDestination = Screen.Home.route,
+                            mainViewModel = mainViewModel
                         )
-                    }
-                } else {
-                    val navController = rememberNavController()
-                    val navBackStackEntry by navController.currentBackStackEntryAsState()
-                    val currentRoute = navBackStackEntry?.destination?.route
 
-                    var showBottomSheet by remember { mutableStateOf(false) }
-                    var sheetContentType by remember { mutableStateOf(SheetContent.None) }
-
-                    val editingHabit by mainViewModel.editingHabit.collectAsState()
-                    
-                    LaunchedEffect(editingHabit) {
-                        if (editingHabit != null) {
-                            sheetContentType = SheetContent.HabitSelection
-                            showBottomSheet = true
-                        }
-                    }
-
-                    val isAuthRoute = listOf(Screen.Welcome.route, Screen.Login.route, Screen.Register.route).contains(currentRoute)
-                    val showShell = authState == AuthState.Authenticated && !isAuthRoute
-
-                    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-                    Scaffold(
-                        modifier = Modifier.fillMaxSize(),
-                        bottomBar = {
-                            if (showShell) {
-                                MainBottomBar(
-                                    navController = navController
-                                )
-                            }
-                        },
-                        floatingActionButtonPosition = FabPosition.Center,
-                        floatingActionButton = {
-                            if (showShell) {
-                                FloatingActionButton(
-                                    onClick = {
-                                        // 1. Kiểm tra quyền báo thức chính xác (Android 12+)
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                                            if (!alarmManager.canScheduleExactAlarms()) {
-                                                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                                    data = Uri.fromParts("package", packageName, null)
+                        if (showBottomSheet) {
+                            ModalBottomSheet(
+                                onDismissRequest = { 
+                                    showBottomSheet = false
+                                    sheetContentType = SheetContent.None
+                                    mainViewModel.startEditingHabit(null)
+                                },
+                                sheetState = sheetState,
+                                dragHandle = { BottomSheetDefaults.DragHandle() },
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+                            ) {
+                                when (sheetContentType) {
+                                    SheetContent.JournalEntry -> {
+                                        val isUploading by mainViewModel.isUploading.collectAsState()
+                                        JournalEntryPanel(
+                                            onDismiss = { showBottomSheet = false },
+                                            onPost = { emoji, text, uri ->
+                                                mainViewModel.saveJournalEntry(emoji, text, uri) {
+                                                    showBottomSheet = false
                                                 }
-                                                alarmPermissionLauncher.launch(intent)
-                                                return@FloatingActionButton
-                                            }
-                                        }
+                                            },
+                                            isUploading = isUploading
+                                        )
+                                    }
+                                    SheetContent.HabitSelection -> {
+                                        val selectedHabitDate by mainViewModel.selectedHabitDate.collectAsState()
+                                        val editingHabitData by mainViewModel.editingHabit.collectAsState()
+                                        NewHabitSheet(
+                                            initialDate = selectedHabitDate,
+                                            editingHabit = editingHabitData,
+                                            onDismiss = { 
+                                                showBottomSheet = false
+                                                mainViewModel.startEditingHabit(null)
+                                            },
+                                            onHabitSelected = { name, icon, time, mins, color, date ->
+                                                val colorInt = (color.red * 255).toInt() shl 16 or
+                                                              (color.green * 255).toInt() shl 8 or
+                                                              (color.blue * 255).toInt()
+                                                val colorHex = String.format("#%06X", colorInt)
 
-                                        // 2. Yêu cầu quyền thông báo nếu cần (Android 13+)
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                            if (ContextCompat.checkSelfPermission(
-                                                    context,
-                                                    Manifest.permission.POST_NOTIFICATIONS
-                                                ) != PackageManager.PERMISSION_GRANTED
-                                            ) {
-                                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                                return@FloatingActionButton
-                                            }
-                                        }
-
-                                        when (currentRoute) {
-                                            Screen.Habits.route -> {
-                                                sheetContentType = SheetContent.HabitSelection
-                                                showBottomSheet = true
-                                            }
-                                            else -> {
-                                                sheetContentType = SheetContent.JournalEntry
-                                                showBottomSheet = true
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .offset(y = 52.dp),
-                                    shape = CircleShape,
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = Color.White,
-                                    elevation = FloatingActionButtonDefaults.elevation(12.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add,
-                                        contentDescription = "Add",
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                }
-                            }
-                        }
-                    ) { innerPadding ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(bottom = if (showShell) innerPadding.calculateBottomPadding() else 0.dp)
-                        ) {
-                            NavGraph(
-                                navController = navController,
-                                startDestination = if (authState == AuthState.Authenticated) Screen.Home.route else Screen.Welcome.route,
-                                mainViewModel = mainViewModel
-                            )
-
-                            if (showBottomSheet) {
-                                ModalBottomSheet(
-                                    onDismissRequest = { 
-                                        showBottomSheet = false
-                                        sheetContentType = SheetContent.None
-                                        mainViewModel.startEditingHabit(null)
-                                    },
-                                    sheetState = sheetState,
-                                    dragHandle = { BottomSheetDefaults.DragHandle() },
-                                    containerColor = MaterialTheme.colorScheme.surface,
-                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
-                                ) {
-                                    when (sheetContentType) {
-                                        SheetContent.JournalEntry -> {
-                                            val isUploading by mainViewModel.isUploading.collectAsState()
-                                            JournalEntryPanel(
-                                                onDismiss = { showBottomSheet = false },
-                                                onPost = { emoji, text, uri ->
-                                                    mainViewModel.saveJournalEntry(emoji, text, uri) {
-                                                        showBottomSheet = false
-                                                    }
-                                                },
-                                                isUploading = isUploading
-                                            )
-                                        }
-                                        SheetContent.HabitSelection -> {
-                                            val selectedHabitDate by mainViewModel.selectedHabitDate.collectAsState()
-                                            val editingHabit by mainViewModel.editingHabit.collectAsState()
-                                            NewHabitSheet(
-                                                initialDate = selectedHabitDate,
-                                                editingHabit = editingHabit,
-                                                onDismiss = { 
+                                                mainViewModel.saveHabit(
+                                                    id = editingHabitData?.id ?: "",
+                                                    name = name,
+                                                    icon = icon,
+                                                    goal = "1",
+                                                    colorHex = colorHex,
+                                                    reminderTime = time,
+                                                    reminderMinutesBefore = mins,
+                                                    date = date
+                                                ) {
                                                     showBottomSheet = false
                                                     mainViewModel.startEditingHabit(null)
-                                                },
-                                                onHabitSelected = { name, icon, time, mins, color, date ->
-                                                    val colorInt = (color.red * 255).toInt() shl 16 or
-                                                                  (color.green * 255).toInt() shl 8 or
-                                                                  (color.blue * 255).toInt()
-                                                    val colorHex = String.format("#%06X", colorInt)
-
-                                                    mainViewModel.saveHabit(
-                                                        id = editingHabit?.id ?: "",
-                                                        name = name,
-                                                        icon = icon,
-                                                        goal = "1",
-                                                        colorHex = colorHex,
-                                                        reminderTime = time,
-                                                        reminderMinutesBefore = mins,
-                                                        date = date
-                                                    ) {
-                                                        showBottomSheet = false
-                                                        mainViewModel.startEditingHabit(null)
-                                                    }
                                                 }
-                                            )
-                                        }
-                                        else -> Box(Modifier.size(1.dp))
+                                            }
+                                        )
                                     }
+                                    else -> Box(Modifier.size(1.dp))
                                 }
                             }
                         }
