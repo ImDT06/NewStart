@@ -12,6 +12,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -31,6 +32,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.newstart.R
 import com.example.newstart.domain.model.Habit
 import com.example.newstart.ui.MainViewModel
+import com.example.newstart.ui.screens.journal.MonthPickerDialog
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -49,6 +51,7 @@ fun HabitsScreen(
     val selectedDate by mainViewModel.selectedHabitDate.collectAsState()
     val scope = rememberCoroutineScope()
     var habitToDelete by remember { mutableStateOf<Habit?>(null) }
+    var showMonthPicker by remember { mutableStateOf(false) }
     
     val today = LocalDate.now()
     val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500)
@@ -117,15 +120,19 @@ fun HabitsScreen(
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             )
 
-            Box(modifier = Modifier.size(26.dp)) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color.Yellow,
-                    modifier = Modifier.size(22.dp).align(Alignment.Center)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("😊", fontSize = 12.sp)
-                    }
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(36.dp),
+                onClick = { showMonthPicker = true }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarMonth,
+                        contentDescription = "Month Picker",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }
@@ -304,6 +311,22 @@ fun HabitsScreen(
                         Text(stringResource(R.string.habits_cancel))
                     }
                 }
+            )
+        }
+
+        // Monthly Calendar Dialog
+        if (showMonthPicker) {
+            MonthPickerDialog(
+                selectedDate = selectedDate,
+                onDateSelected = { date ->
+                    mainViewModel.onHabitDateSelected(date)
+                    showMonthPicker = false
+                    val weekDiff = (date.toEpochDay() - today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toEpochDay()) / 7
+                    scope.launch {
+                        pagerState.scrollToPage(500 + weekDiff.toInt())
+                    }
+                },
+                onDismiss = { showMonthPicker = false }
             )
         }
     }

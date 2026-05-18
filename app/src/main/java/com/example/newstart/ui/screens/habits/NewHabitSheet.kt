@@ -407,8 +407,8 @@ fun HabitConfigContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = { if (name.isNotBlank()) onConfirm(name, icon, selectedTime, minsBefore, Color(0xFF1D1D1F), selectedDate) },
-            enabled = name.isNotBlank(),
+            onClick = { if (name.isNotBlank() && selectedTime != null) onConfirm(name, icon, selectedTime, minsBefore, Color(0xFF1D1D1F), selectedDate) },
+            enabled = name.isNotBlank() && selectedTime != null,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             contentPadding = PaddingValues(vertical = 12.dp)
