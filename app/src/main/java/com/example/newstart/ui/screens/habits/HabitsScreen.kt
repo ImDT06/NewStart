@@ -12,16 +12,20 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -33,7 +37,6 @@ import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -122,8 +125,16 @@ fun HabitsScreen(
 
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.tertiaryContainer,
-                modifier = Modifier.size(36.dp),
+                color = Color.Transparent,
+                modifier = Modifier
+                    .size(40.dp)
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(Color(0xFF4285F4), Color(0xFF9B72CB), Color(0xFFD96570))
+                        ),
+                        shape = CircleShape
+                    ),
                 onClick = { showAiDialog = true }
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -131,7 +142,7 @@ fun HabitsScreen(
                         imageVector = Icons.Default.AutoAwesome,
                         contentDescription = "AI Assistant",
                         modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.tertiary
+                        tint = Color(0xFF9B72CB)
                     )
                 }
             }
@@ -188,7 +199,7 @@ fun HabitsScreen(
                                 DayOfWeek.SUNDAY -> "CN"
                             }
                         } else {
-                            day.dayOfWeek.getDisplayName(TextStyle.SHORT, locale).uppercase()
+                            day.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, locale).uppercase()
                         }
                     }
 
@@ -346,115 +357,228 @@ fun HabitsScreen(
             )
         }
 
-    // AI Assistant Dialog
+    // AI Assistant Bottom Sheet (Modern Input)
     if (showAiDialog) {
-        AlertDialog(
+        val aiGradient = Brush.linearGradient(
+            colors = listOf(Color(0xFF4285F4), Color(0xFF9B72CB), Color(0xFFD96570))
+        )
+
+        ModalBottomSheet(
             onDismissRequest = { 
                 showAiDialog = false
                 aiCommand = ""
                 viewModel.clearAiState()
             },
-            title = { 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.tertiary)
-                    Spacer(Modifier.width(8.dp))
-                    Text("AI Trợ lý thói quen")
-                }
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        Icons.Default.AutoAwesome, 
+                        null, 
+                        tint = Color(0xFF9B72CB),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
                     Text(
-                        "Bạn có thể nói: \"Thêm thói quen uống nước lúc 8h sáng và tập gym lúc 5h chiều\"",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        "NewStart AI",
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            brush = aiGradient
+                        )
                     )
-                    OutlinedTextField(
-                        value = aiCommand,
-                        onValueChange = { aiCommand = it },
-                        placeholder = { Text("Nhập yêu cầu của bạn...") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        enabled = aiState !is AiState.Loading
-                    )
-                    
-                    if (aiState is AiState.Loading) {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-                    } else if (aiState is AiState.Error) {
-                        Text((aiState as AiState.Error).message, color = MaterialTheme.colorScheme.error)
-                    } else if (aiState is AiState.Success) {
-                        Text((aiState as AiState.Success).message, color = Color(0xFF4CAF50))
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Tôi có thể giúp bạn lên lịch thói quen chỉ bằng một câu nói.",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                // Suggestion Chips
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Ăn sáng 7h", "Gym 17h", "Đọc sách 22h").forEach { suggestion ->
+                        AssistChip(
+                            onClick = { aiCommand = "Thêm thói quen $suggestion" },
+                            label = { Text(suggestion, fontSize = 12.sp) },
+                            shape = RoundedCornerShape(12.dp)
+                        )
                     }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.processAiCommand(aiCommand) },
-                    enabled = aiCommand.isNotBlank() && aiState !is AiState.Loading,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                ) {
-                    Text("Gửi")
+
+                Spacer(Modifier.height(16.dp))
+
+                // Styled Input Field
+                OutlinedTextField(
+                    value = aiCommand,
+                    onValueChange = { aiCommand = it },
+                    placeholder = { Text("Bạn đang muốn làm gì?") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            brush = if (aiCommand.isNotBlank()) aiGradient else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
+                            shape = RoundedCornerShape(16.dp)
+                        ),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    trailingIcon = {
+                        IconButton(
+                            onClick = { 
+                                if (aiCommand.isNotBlank()) {
+                                    viewModel.processAiCommand(aiCommand) 
+                                }
+                            },
+                            enabled = aiCommand.isNotBlank() && aiState !is AiState.Loading
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send, 
+                                contentDescription = "Send",
+                                tint = if (aiCommand.isNotBlank()) Color(0xFF9B72CB) else Color.Gray
+                            )
+                        }
+                    },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Send
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onSend = { viewModel.processAiCommand(aiCommand) }
+                    )
+                )
+
+                if (aiState is AiState.Loading) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp)
+                            .height(2.dp)
+                            .clip(CircleShape),
+                        color = Color(0xFF9B72CB),
+                        trackColor = Color(0xFF9B72CB).copy(alpha = 0.1f)
+                    )
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { 
-                    showAiDialog = false
-                    viewModel.clearAiState()
-                }) {
-                    Text("Đóng")
+
+                if (aiState is AiState.Error) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        (aiState as AiState.Error).message, 
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                if (aiState is AiState.Success) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        (aiState as AiState.Success).message, 
+                        color = Color(0xFF4CAF50),
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
-        )
+        }
     }
 
-    // AI Draft Confirmation Sheet
+    // AI Draft Confirmation Sheet (Modern Cards)
     if (aiState is AiState.Drafting) {
         val drafts = (aiState as AiState.Drafting).habits
         ModalBottomSheet(
             onDismissRequest = { viewModel.clearAiState() },
             containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp)
-                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "AI đã phát hiện ${drafts.size} thói quen:",
-                    style = MaterialTheme.typography.titleMedium,
+                    "Xác nhận thói quen",
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "AI đã đề xuất ${drafts.size} mục mới cho bạn",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
                 
                 LazyColumn(
                     modifier = Modifier.weight(1f, fill = false),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(drafts) { habit ->
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.fillMaxWidth()
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            ),
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Row(
-                                modifier = Modifier.padding(12.dp),
+                                modifier = Modifier.padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(habit.icon, fontSize = 24.sp)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(habit.name, fontWeight = FontWeight.Bold)
-                                    if (habit.reminderTime != null) {
-                                        Text("⏰ ${habit.reminderTime}", style = MaterialTheme.typography.bodySmall)
+                                Surface(
+                                    modifier = Modifier.size(48.dp),
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(habit.icon, fontSize = 24.sp)
                                     }
                                 }
+                                
+                                Spacer(modifier = Modifier.width(16.dp))
+                                
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(habit.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    if (habit.reminderTime != null) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.NotificationsActive, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                                            Spacer(Modifier.width(4.dp))
+                                            Text(habit.reminderTime!!, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+                                }
+                                
+                                Icon(Icons.Default.Edit, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(32.dp))
                 
                 Button(
                     onClick = { 
@@ -462,17 +586,22 @@ fun HabitsScreen(
                         showAiDialog = false
                         aiCommand = ""
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
                 ) {
-                    Text("Thêm tất cả vào lịch trình")
+                    Text("Thêm tất cả vào lịch trình", fontWeight = FontWeight.Bold)
                 }
                 
                 TextButton(
                     onClick = { viewModel.clearAiState() },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 ) {
-                    Text("Hủy bỏ")
+                    Text("Hủy bỏ", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
