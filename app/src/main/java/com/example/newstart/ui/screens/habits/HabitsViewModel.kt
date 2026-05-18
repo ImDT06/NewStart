@@ -16,6 +16,7 @@ import javax.inject.Inject
 sealed class AiState {
     object Idle : AiState()
     object Loading : AiState()
+    data class Drafting(val habits: List<Habit>) : AiState()
     data class Success(val message: String) : AiState()
     data class Error(val message: String) : AiState()
 }
@@ -33,45 +34,55 @@ class HabitsViewModel @Inject constructor(
         viewModelScope.launch {
             _aiState.value = AiState.Loading
             try {
-                val result = aiService.processCommand(command)
-                handleAiResult(result)
-                _aiState.value = AiState.Success("Đã thực hiện xong!")
+                val currentTime = java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, yyyy-MM-dd HH:mm"))
+                val result = aiService.processCommand(command, currentTime)
+                val drafts = parseAiResults(result)
+                if (drafts.isEmpty()) {
+                    _aiState.value = AiState.Error("Không tìm thấy thói quen nào trong câu lệnh.")
+                } else {
+                    _aiState.value = AiState.Drafting(drafts)
+                }
             } catch (e: Exception) {
                 val errorMsg = e.localizedMessage ?: "Lỗi không xác định"
-                android.util.Log.e("HabitsViewModel", "AI Error: $errorMsg")
                 _aiState.value = AiState.Error(errorMsg)
             }
         }
     }
 
-    private suspend fun handleAiResult(json: JSONObject) {
-        val action = json.optString("action")
-        val data = json.optJSONObject("data") ?: return
+    private fun parseAiResults(json: JSONObject): List<Habit> {
+        val results = json.optJSONArray("results") ?: return emptyList()
+        val drafts = mutableListOf<Habit>()
+        val dateStr = _selectedDate.value.format(DateTimeFormatter.ISO_LOCAL_DATE)
         
-        when (action) {
-            "ADD" -> {
-                val name = data.optString("name")
-                val icon = data.optString("icon", "✨")
-                val time = data.optString("time")
-                val mins = data.optInt("minsBefore", 0)
-                if (name.isNotEmpty()) {
-                    val newHabit = Habit(
-                        name = name,
-                        icon = icon,
-                        reminderTime = if (time.isNotEmpty()) time else null,
-                        reminderMinutesBefore = mins,
-                        date = _selectedDate.value.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                    )
-                    repository.saveHabit(newHabit)
-                }
+        for (i in 0 until results.length()) {
+            val item = results.getJSONObject(i)
+            val action = item.optString("action")
+            if (action == "ADD") {
+                drafts.add(Habit(
+                    name = item.optString("name"),
+                    icon = item.optString("icon", "✨"),
+                    reminderTime = item.optString("time").ifEmpty { null },
+                    reminderMinutesBefore = item.optInt("minsBefore", 5),
+                    date = dateStr
+                ))
             }
-            "DELETE" -> {
-                val nameToDelete = data.optString("name")
-                habits.value.find { it.name.contains(nameToDelete, ignoreCase = true) }?.let {
-                    repository.deleteHabit(it.id)
-                }
-            }
+            // For DELETE, we might want to handle it differently in the draft flow or just execute it.
+            // Professional apps usually ask to confirm additions, deletions are often direct or separate.
+            // For now, let's focus on ADD for the draft UI.
         }
+        return drafts
+    }
+
+    fun confirmAiHabits(habits: List<Habit>) {
+        viewModelScope.launch {
+            habits.forEach { repository.saveHabit(it) }
+            _aiState.value = AiState.Success("Đã thêm ${habits.size} thói quen!")
+        }
+    }
+
+    fun clearAiState() {
+        _aiState.value = AiState.Idle
     }
 
     private val _selectedDate = MutableStateFlow(LocalDate.now())

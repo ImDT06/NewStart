@@ -12,12 +12,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +36,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitsScreen(
     mainViewModel: MainViewModel,
@@ -350,60 +346,137 @@ fun HabitsScreen(
             )
         }
 
-        // AI Assistant Dialog
-        if (showAiDialog) {
-            AlertDialog(
-                onDismissRequest = { 
-                    showAiDialog = false
-                    aiCommand = ""
-                },
-                title = { 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.tertiary)
-                        Spacer(Modifier.width(8.dp))
-                        Text("AI Trợ lý thói quen")
-                    }
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            "Bạn có thể nói: \"Thêm thói quen uống nước lúc 8h sáng\" hoặc \"Xóa thói quen chạy bộ\"",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        OutlinedTextField(
-                            value = aiCommand,
-                            onValueChange = { aiCommand = it },
-                            placeholder = { Text("Nhập yêu cầu của bạn...") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            enabled = aiState !is AiState.Loading
-                        )
-                        
-                        when (aiState) {
-                            is AiState.Loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-                            is AiState.Success -> Text((aiState as AiState.Success).message, color = Color(0xFF4CAF50))
-                            is AiState.Error -> Text((aiState as AiState.Error).message, color = MaterialTheme.colorScheme.error)
-                            else -> {}
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { viewModel.processAiCommand(aiCommand) },
-                        enabled = aiCommand.isNotBlank() && aiState !is AiState.Loading,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                    ) {
-                        Text("Gửi")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showAiDialog = false }) {
-                        Text("Đóng")
+    // AI Assistant Dialog
+    if (showAiDialog) {
+        AlertDialog(
+            onDismissRequest = { 
+                showAiDialog = false
+                aiCommand = ""
+                viewModel.clearAiState()
+            },
+            title = { 
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.tertiary)
+                    Spacer(Modifier.width(8.dp))
+                    Text("AI Trợ lý thói quen")
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Bạn có thể nói: \"Thêm thói quen uống nước lúc 8h sáng và tập gym lúc 5h chiều\"",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = aiCommand,
+                        onValueChange = { aiCommand = it },
+                        placeholder = { Text("Nhập yêu cầu của bạn...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = aiState !is AiState.Loading
+                    )
+                    
+                    if (aiState is AiState.Loading) {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                    } else if (aiState is AiState.Error) {
+                        Text((aiState as AiState.Error).message, color = MaterialTheme.colorScheme.error)
+                    } else if (aiState is AiState.Success) {
+                        Text((aiState as AiState.Success).message, color = Color(0xFF4CAF50))
                     }
                 }
-            )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.processAiCommand(aiCommand) },
+                    enabled = aiCommand.isNotBlank() && aiState !is AiState.Loading,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                ) {
+                    Text("Gửi")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    showAiDialog = false
+                    viewModel.clearAiState()
+                }) {
+                    Text("Đóng")
+                }
+            }
+        )
+    }
+
+    // AI Draft Confirmation Sheet
+    if (aiState is AiState.Drafting) {
+        val drafts = (aiState as AiState.Drafting).habits
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.clearAiState() },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+                    .navigationBarsPadding()
+            ) {
+                Text(
+                    "AI đã phát hiện ${drafts.size} thói quen:",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                LazyColumn(
+                    modifier = Modifier.weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(drafts) { habit ->
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(habit.icon, fontSize = 24.sp)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(habit.name, fontWeight = FontWeight.Bold)
+                                    if (habit.reminderTime != null) {
+                                        Text("⏰ ${habit.reminderTime}", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Button(
+                    onClick = { 
+                        viewModel.confirmAiHabits(drafts)
+                        showAiDialog = false
+                        aiCommand = ""
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Thêm tất cả vào lịch trình")
+                }
+                
+                TextButton(
+                    onClick = { viewModel.clearAiState() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Hủy bỏ")
+                }
+            }
         }
+    }
     }
 }
 

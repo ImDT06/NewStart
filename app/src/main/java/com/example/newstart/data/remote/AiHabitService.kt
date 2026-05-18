@@ -25,32 +25,38 @@ class AiHabitService @Inject constructor() {
     )
 
     private val systemPrompt = """
-        Bạn là trợ lý AI cho ứng dụng quản lý thói quen NewStart. 
-        Nhiệm vụ của bạn là phân tích câu nói của người dùng và trả về kết quả định dạng JSON duy nhất.
+        Bạn là trợ lý AI chuyên nghiệp cho ứng dụng quản lý thói quen NewStart. 
+        Nhiệm vụ của bạn là phân tích câu nói của người dùng và trích xuất danh sách các thói quen dưới dạng JSON.
         
-        Các hành động hỗ trợ:
-        1. "ADD": Thêm thói quen. Cần: name (tên), icon (emoji phù hợp), time (HH:mm), minsBefore (số phút nhắc trước).
-        2. "DELETE": Xóa thói quen. Cần: name (tên thói quen muốn xóa).
+        NGỮ CẢNH THỜI GIAN HIỆN TẠI: {{CURRENT_TIME}}
+        
+        CÁC QUY TẮC QUAN TRỌNG:
+        1. LUÔN trả về một MẢNG (Array) các đối tượng JSON, ngay cả khi chỉ có 1 thói quen.
+        2. Tự động suy luận AM/PM (sáng/tối) dựa trên tên thói quen và logic thông thường:
+           - "ăn tối", "đi ngủ", "xem phim" -> Thường vào buổi tối (18h-23h).
+           - "chạy bộ", "ăn sáng", "uống cafe" -> Thường vào buổi sáng (5h-9h).
+        3. Logic 12h/0h: Nếu người dùng nói "12h" cho thói quen "đi ngủ" hoặc "kết thúc ngày", hãy hiểu là 00:00 của ngày hôm sau so với mốc hiện tại.
+        4. Trả về đúng định dạng ISO 8601 cho thời gian nếu có thể, hoặc chỉ HH:mm.
+        5. Nếu không hiểu hành động, trả về mảng trống [].
 
         Định dạng trả về:
-        {
-          "action": "ADD" | "DELETE" | "UNKNOWN",
-          "data": {
-             "name": "tên thói quen",
-             "icon": "emoji",
-             "time": "HH:mm",
-             "minsBefore": 0
+        [
+          {
+            "action": "ADD" | "DELETE",
+            "name": "tên thói quen",
+            "icon": "emoji phù hợp",
+            "time": "HH:mm",
+            "minsBefore": 5
           }
-        }
-        Nếu không hiểu hành động, trả về action "UNKNOWN".
+        ]
         Chỉ trả về JSON, không giải thích gì thêm.
     """.trimIndent()
 
-    suspend fun processCommand(input: String): JSONObject {
+    suspend fun processCommand(input: String, currentTime: String): JSONObject {
         return try {
             val response = model.generateContent(
                 content {
-                    text(systemPrompt)
+                    text(systemPrompt.replace("{{CURRENT_TIME}}", currentTime))
                     text("Câu lệnh của người dùng: $input")
                 }
             )
@@ -61,27 +67,22 @@ class AiHabitService @Inject constructor() {
                 throw Exception("AI không trả về văn bản. Lý do: $reason")
             }
             
-            // Làm sạch chuỗi JSON để loại bỏ markdown
+            // Làm sạch chuỗi JSON
             val cleanJson = jsonStr.removeSurrounding("```json", "```").removeSurrounding("```").trim()
             
-            val finalJson = if (cleanJson.contains("{")) {
-                cleanJson.substring(cleanJson.indexOf("{"), cleanJson.lastIndexOf("}") + 1)
+            val finalJson = if (cleanJson.contains("[")) {
+                cleanJson.substring(cleanJson.indexOf("["), cleanJson.lastIndexOf("]") + 1)
             } else {
-                cleanJson
+                "[]"
             }
             
-            JSONObject(finalJson)
+            // Trả về một JSONObject bọc mảng kết quả để tương thích với code hiện tại (hoặc sửa code nhận)
+            // Để chuyên nghiệp hơn, ta nên sửa code nhận để nhận JSONArray trực tiếp, 
+            // nhưng để an toàn ta bọc lại:
+            JSONObject().put("results", org.json.JSONArray(finalJson))
         } catch (e: Exception) {
-            // Log lỗi chi tiết để debug
             android.util.Log.e("AiHabitService", "Lỗi xử lý AI: ${e.message}", e)
-            
-            // Xử lý lỗi đặc thù của thư viện Google khi gặp lỗi 404/400
-            val message = when {
-                e.message?.contains("404") == true -> "Không tìm thấy Model AI. Vui lòng kiểm tra lại vùng hỗ trợ hoặc cập nhật SDK."
-                e.message?.contains("MissingFieldException") == true -> "Lỗi phản hồi từ Google AI. Thư viện gặp trục trặc khi đọc dữ liệu lỗi."
-                else -> e.localizedMessage ?: "Lỗi kết nối AI"
-            }
-            throw Exception(message)
+            throw Exception(e.localizedMessage ?: "Lỗi kết nối AI")
         }
     }
 }
