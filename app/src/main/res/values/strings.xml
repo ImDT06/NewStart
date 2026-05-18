@@ -130,6 +130,12 @@
     <string name="habits_custom_mins">Tùy chỉnh</string>
     <string name="habits_custom_mins_label">Số phút nhắc trước</string>
 
+    <!-- Journal Entry Panel -->
+    <string name="journal_panel_title">Tạo khoảnh khắc</string>
+    <string name="journal_panel_placeholder">Bạn đang nghĩ gì?</string>
+    <string name="journal_panel_gallery">Chọn từ thư viện</string>
+    <string name="journal_panel_skip">Bỏ qua ảnh</string>
+
     <!-- Errors -->
     <string name="error_email_empty">Email không được để trống</string>
     <string name="error_email_invalid">Email không hợp lệ</string>

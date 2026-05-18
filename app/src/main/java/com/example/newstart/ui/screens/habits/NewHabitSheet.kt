@@ -52,6 +52,7 @@ fun NewHabitSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .imePadding()
                 .padding(bottom = 32.dp)
         ) {
             // Handle
@@ -156,6 +157,7 @@ fun NewHabitSheet(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
+            .imePadding()
             .padding(top = 8.dp)
     ) {
         Box(
@@ -314,6 +316,7 @@ fun HabitConfigContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .imePadding()
             .padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {

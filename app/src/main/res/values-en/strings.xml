@@ -130,6 +130,12 @@
     <string name="habits_custom_mins">Custom</string>
     <string name="habits_custom_mins_label">Reminder minutes</string>
 
+    <!-- Journal Entry Panel -->
+    <string name="journal_panel_title">Create Moment</string>
+    <string name="journal_panel_placeholder">What\'s on your mind?</string>
+    <string name="journal_panel_gallery">Choose from gallery</string>
+    <string name="journal_panel_skip">Skip photo</string>
+
     <!-- Errors -->
     <string name="error_email_empty">Email cannot be empty</string>
     <string name="error_email_invalid">Invalid email</string>

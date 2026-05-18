@@ -559,6 +559,7 @@ enum class PickerViewMode {
 fun AdvancedDatePickerDialog(
     initialStartDate: LocalDate,
     initialEndDate: LocalDate?,
+    isRange: Boolean = true,
     onDismiss: () -> Unit,
     onDateRangeSelected: (LocalDate, LocalDate?) -> Unit
 ) {
@@ -709,15 +710,20 @@ fun AdvancedDatePickerDialog(
                                         startDate = selectedStartDate,
                                         endDate = selectedEndDate,
                                         onDateClick = { date ->
-                                            if (selectedEndDate != null) {
+                                            if (!isRange) {
                                                 selectedStartDate = date
                                                 selectedEndDate = null
-                                            } else if (date.isBefore(selectedStartDate)) {
-                                                selectedStartDate = date
-                                            } else if (date == selectedStartDate) {
-                                                // Keep as start
                                             } else {
-                                                selectedEndDate = date
+                                                if (selectedEndDate != null) {
+                                                    selectedStartDate = date
+                                                    selectedEndDate = null
+                                                } else if (date.isBefore(selectedStartDate)) {
+                                                    selectedStartDate = date
+                                                } else if (date == selectedStartDate) {
+                                                    // Keep as start
+                                                } else {
+                                                    selectedEndDate = date
+                                                }
                                             }
                                         }
                                     )
@@ -1071,7 +1077,11 @@ fun TimelineEntryItem(
                         color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         AsyncImage(
-                            model = entry.imageUrl,
+                            model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                .data(entry.imageUrl)
+                                .crossfade(true)
+                                .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                                .build(),
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
@@ -1093,6 +1103,7 @@ fun MonthPickerDialog(
     AdvancedDatePickerDialog(
         initialStartDate = selectedDate,
         initialEndDate = null,
+        isRange = false,
         onDismiss = onDismiss,
         onDateRangeSelected = { start, _ ->
             onDateSelected(start)

@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
+import android.view.ScaleGestureDetector
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
@@ -52,6 +53,7 @@ import coil.compose.AsyncImage
 import com.example.newstart.R
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.util.AppCombinedPreviews
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -85,7 +87,13 @@ fun JournalEntryPanel(
     
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var flashMode by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
-    var zoomRatio by remember { mutableFloatStateOf(1f) }
+    
+    // Trạng thái Camera được chia sẻ từ CameraPreview
+    var currentCameraInfo by remember { mutableStateOf<CameraInfo?>(null) }
+    var currentCameraControl by remember { mutableStateOf<CameraControl?>(null) }
+    var currentZoomRatio by remember { mutableFloatStateOf(1f) }
+    
+    val scope = rememberCoroutineScope()
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -150,7 +158,7 @@ fun JournalEntryPanel(
             }
             
             Text(
-                text = "Tạo khoảnh khắc",
+                text = stringResource(R.string.journal_panel_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -170,7 +178,11 @@ fun JournalEntryPanel(
         ) {
             if (capturedImageUri != null) {
                 AsyncImage(
-                    model = capturedImageUri,
+                    model = coil.request.ImageRequest.Builder(LocalContext.current)
+                        .data(capturedImageUri)
+                        .crossfade(true)
+                        .size(coil.size.Size.ORIGINAL) 
+                        .build(),
                     contentDescription = "Captured Image",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
@@ -189,7 +201,11 @@ fun JournalEntryPanel(
                     imageCapture = imageCapture,
                     lensFacing = lensFacing,
                     flashMode = flashMode,
-                    zoomRatio = zoomRatio
+                    onCameraReady = { info, control ->
+                        currentCameraInfo = info
+                        currentCameraControl = control
+                    },
+                    onZoomRatioChanged = { currentZoomRatio = it }
                 )
                 
                 // Camera Controls Overlays
@@ -238,7 +254,7 @@ fun JournalEntryPanel(
                         }
                     }
 
-                    // Zoom Controls
+                    // Zoom Controls - Animated Buttons
                     Row(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -247,8 +263,28 @@ fun JournalEntryPanel(
                             .padding(horizontal = 4.dp, vertical = 2.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        ZoomOption(label = "1x", isSelected = zoomRatio == 1f) { zoomRatio = 1f }
-                        ZoomOption(label = "2x", isSelected = zoomRatio == 2f) { zoomRatio = 2f }
+                        // Nút 1x
+                        ZoomOption(label = "1x", isSelected = currentZoomRatio < 1.5f) { 
+                            scope.launch {
+                                val anim = Animatable(currentZoomRatio)
+                                anim.animateTo(1.0f, tween(400, easing = FastOutSlowInEasing)) {
+                                    currentCameraControl?.setZoomRatio(value)
+                                }
+                            }
+                        }
+                        // Nút 3x - Chính xác tuyệt đối
+                        ZoomOption(label = "3x", isSelected = currentZoomRatio >= 2.8f && currentZoomRatio <= 3.2f) { 
+                            scope.launch {
+                                val minZ = currentCameraInfo?.zoomState?.value?.minZoomRatio ?: 1f
+                                val maxZ = currentCameraInfo?.zoomState?.value?.maxZoomRatio ?: 10f
+                                val target = 3.0f.coerceIn(minZ, maxZ)
+                                
+                                val anim = Animatable(currentZoomRatio)
+                                anim.animateTo(target, tween(400, easing = FastOutSlowInEasing)) {
+                                    currentCameraControl?.setZoomRatio(value)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -270,8 +306,9 @@ fun JournalEntryPanel(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
+                            val placeholder = stringResource(R.string.journal_panel_placeholder)
                             Text(
-                                text = text.ifEmpty { "Bạn đang nghĩ gì?" },
+                                text = text.ifEmpty { placeholder },
                                 color = Color.Transparent, 
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium,
@@ -293,7 +330,7 @@ fun JournalEntryPanel(
                                 decorationBox = { innerTextField ->
                                     if (text.isEmpty()) {
                                         Text(
-                                            "Bạn đang nghĩ gì?", 
+                                            placeholder, 
                                             color = Color.White.copy(alpha = 0.6f), 
                                             fontSize = 16.sp,
                                             textAlign = TextAlign.Center
@@ -325,7 +362,7 @@ fun JournalEntryPanel(
                         onPost(selectedEmoji, text, capturedImageUri) 
                     },
                     enabled = hasContent && !isUploading,
-                    modifier = Modifier.size(88.dp), // Kích thước bằng với nút chụp
+                    modifier = Modifier.size(88.dp), 
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -410,7 +447,7 @@ fun JournalEntryPanel(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Gallery & Skip Buttons (Dưới cùng, gần emojis)
+        // Gallery & Skip Buttons
         if (capturedImageUri == null && !isTextOnlyMode) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -428,12 +465,12 @@ fun JournalEntryPanel(
                 ) {
                     Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Chọn từ thư viện", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.journal_panel_gallery), fontWeight = FontWeight.Bold)
                 }
 
                 TextButton(onClick = { isTextOnlyMode = true }) {
                     Text(
-                        "Bỏ qua ảnh",
+                        stringResource(R.string.journal_panel_skip),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp
                     )
@@ -503,7 +540,8 @@ fun CameraPreview(
     imageCapture: ImageCapture,
     lensFacing: Int = CameraSelector.LENS_FACING_BACK,
     flashMode: Int = ImageCapture.FLASH_MODE_OFF,
-    zoomRatio: Float = 1f
+    onCameraReady: (CameraInfo, CameraControl) -> Unit = { _, _ -> },
+    onZoomRatioChanged: (Float) -> Unit = {}
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -511,8 +549,53 @@ fun CameraPreview(
     val mediaActionSound = remember { MediaActionSound() }
     
     var focusTapOffset by remember { mutableStateOf<Offset?>(null) }
+    var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
+    var cameraInfo by remember { mutableStateOf<CameraInfo?>(null) }
     
-    // Tự động xóa vòng tròn lấy nét sau 1 giây
+    // Trạng thái Zoom phản hồi (Reactive State)
+    var currentZoomState by remember { mutableStateOf<ZoomState?>(null) }
+
+    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    val previewUseCase = remember { Preview.Builder().build() }
+
+    LaunchedEffect(cameraProviderFuture) {
+        cameraProvider = cameraProviderFuture.await()
+    }
+    
+    // Bind Camera
+    LaunchedEffect(cameraProvider, lensFacing) {
+        val safeProvider = cameraProvider ?: return@LaunchedEffect
+        val cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+        try {
+            safeProvider.unbindAll()
+            val camera = safeProvider.bindToLifecycle(lifecycleOwner, cameraSelector, previewUseCase, imageCapture)
+            cameraControl = camera.cameraControl
+            cameraInfo = camera.cameraInfo
+            onCameraReady(camera.cameraInfo, camera.cameraControl)
+        } catch (e: Exception) {
+            Log.e("CameraPreview", "Binding failed", e)
+        }
+    }
+
+    // Lắng nghe ZoomState từ phần cứng và cập nhật Compose State liên tục
+    DisposableEffect(cameraInfo) {
+        val observer = androidx.lifecycle.Observer<ZoomState> { state ->
+            currentZoomState = state
+            onZoomRatioChanged(state.zoomRatio)
+        }
+        cameraInfo?.zoomState?.observe(lifecycleOwner, observer)
+        onDispose {
+            cameraInfo?.zoomState?.removeObserver(observer)
+        }
+    }
+
+    // Flash update
+    LaunchedEffect(flashMode) {
+        imageCapture.flashMode = flashMode
+    }
+
+    // Auto-hide focus circle
     LaunchedEffect(focusTapOffset) {
         if (focusTapOffset != null) {
             kotlinx.coroutines.delay(1000)
@@ -521,86 +604,71 @@ fun CameraPreview(
     }
     
     if (isPreview) {
-        Box(
-            modifier = modifier.background(Color.DarkGray),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = modifier.background(Color.DarkGray), contentAlignment = Alignment.Center) {
             Text("Camera Preview", color = Color.White)
         }
         return
     }
 
-    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
-    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
-
-    LaunchedEffect(cameraProviderFuture) {
-        cameraProvider = cameraProviderFuture.await()
-    }
-    
     Box(modifier = modifier) {
+        // ScaleGestureDetector handles zoom internally
+        val scaleGestureDetector = remember(context, cameraInfo) {
+            ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                override fun onScale(detector: ScaleGestureDetector): Boolean {
+                    val currentLinear = cameraInfo?.zoomState?.value?.linearZoom ?: 0f
+                    val sensitivity = if (detector.scaleFactor < 1f) 2.5f else 2.0f
+                    val delta = (detector.scaleFactor - 1f) * sensitivity
+                    cameraControl?.setLinearZoom((currentLinear + delta).coerceIn(0f, 1f))
+                    return true
+                }
+            })
+        }
+
         AndroidView(
             factory = { ctx ->
                 PreviewView(ctx).apply {
                     scaleType = PreviewView.ScaleType.FILL_CENTER
                     implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                    previewUseCase.setSurfaceProvider(this.surfaceProvider)
                 }
             },
             update = { previewView ->
-                val safeCameraProvider = cameraProvider ?: return@AndroidView
-                
-                val preview = Preview.Builder().build().also {
-                    it.surfaceProvider = previewView.surfaceProvider
-                }
-
-                val cameraSelector = CameraSelector.Builder()
-                    .requireLensFacing(lensFacing)
-                    .build()
-
-                imageCapture.flashMode = flashMode
-
-                try {
-                    safeCameraProvider.unbindAll()
-                    val cameraInstance = safeCameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        cameraSelector,
-                        preview,
-                        imageCapture
-                    )
-                    cameraInstance.cameraControl.setZoomRatio(zoomRatio)
-
-                    // Thiết lập chạm để lấy nét - Cải tiến: Thêm Log để kiểm tra
-                    previewView.setOnTouchListener { v, event ->
-                        if (event.action == android.view.MotionEvent.ACTION_UP) {
-                            val factory = previewView.meteringPointFactory
-                            val point = factory.createPoint(event.x, event.y)
-                            val action = FocusMeteringAction.Builder(point).build()
-                            
-                            cameraInstance.cameraControl.startFocusAndMetering(action)
-                            
-                            // Hiển thị vòng tròn và phát âm thanh
-                            focusTapOffset = Offset(event.x, event.y)
-                            try {
-                                mediaActionSound.play(MediaActionSound.FOCUS_COMPLETE)
-                            } catch (e: Exception) {
-                                Log.e("Camera", "Sound play failed", e)
-                            }
-                            v.performClick()
-                            true
-                        } else {
-                            true // Trả về true để nhận các sự kiện tiếp theo
-                        }
+                previewView.setOnTouchListener { v, event ->
+                    scaleGestureDetector.onTouchEvent(event)
+                    if (event.action == android.view.MotionEvent.ACTION_UP && event.pointerCount == 1) {
+                        val factory = previewView.meteringPointFactory
+                        val point = factory.createPoint(event.x, event.y)
+                        val action = FocusMeteringAction.Builder(point).build()
+                        cameraControl?.startFocusAndMetering(action)
+                        focusTapOffset = Offset(event.x, event.y)
+                        try { mediaActionSound.play(MediaActionSound.FOCUS_COMPLETE) } catch (e: Exception) {}
+                        v.performClick()
                     }
-                } catch (e: Exception) {
-                    Log.e("CameraPreview", "Use case binding failed", e)
+                    true
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
 
-        // Vòng tròn lấy nét Overlay - Đảm bảo vẽ đè lên AndroidView
-        focusTapOffset?.let { offset ->
-            Box(Modifier.fillMaxSize()) {
-                FocusCircle(offset)
+        // Overlay UI
+        focusTapOffset?.let { offset -> FocusCircle(offset) }
+        
+        // HUD Zoom Ratio - Sử dụng currentZoomState để cập nhật liên tục
+        val zoomRatio = currentZoomState?.zoomRatio ?: 1.0f
+        if (zoomRatio > 1.01f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 80.dp) 
+                    .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = String.format("%.1fx", zoomRatio),
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
@@ -626,10 +694,10 @@ fun FocusCircle(offset: Offset) {
                 y = (offset.y / LocalContext.current.resources.displayMetrics.density).dp - 35.dp
             )
             .size(70.dp)
-            .border(2.dp, Color(0xFFFFCC00).copy(alpha = 0.8f), CircleShape)
+            .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
             .padding(10.dp)
             .graphicsLayer(scaleX = scale, scaleY = scale)
-            .border(1.dp, Color(0xFFFFCC00).copy(alpha = 0.5f), CircleShape)
+            .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
     )
 }
 

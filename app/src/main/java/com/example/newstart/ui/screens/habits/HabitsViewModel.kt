@@ -44,8 +44,17 @@ class HabitsViewModel @Inject constructor(
                     _aiState.value = AiState.Drafting(drafts)
                 }
             } catch (e: Exception) {
-                val errorMsg = e.localizedMessage ?: "Lỗi không xác định"
-                _aiState.value = AiState.Error(errorMsg)
+                val errorMsg = e.localizedMessage ?: ""
+                val friendlyMessage = when {
+                    errorMsg.contains("quota", ignoreCase = true) || errorMsg.contains("429") -> 
+                        "AI đang bận một chút vì xử lý quá nhiều yêu cầu. Bạn vui lòng đợi khoảng 1 phút rồi thử lại nhé! ✨"
+                    errorMsg.contains("API_KEY_INVALID", ignoreCase = true) ->
+                        "Cấu hình AI chưa chính xác. Vui lòng kiểm tra lại mã API."
+                    errorMsg.contains("limit", ignoreCase = true) ->
+                        "Hệ thống đang quá tải. Bạn hãy thử lại sau vài giây nhé!"
+                    else -> "Không thể kết nối với AI. Bạn vui lòng kiểm tra kết nối mạng và thử lại nhé!"
+                }
+                _aiState.value = AiState.Error(friendlyMessage)
             }
         }
     }
@@ -53,18 +62,21 @@ class HabitsViewModel @Inject constructor(
     private fun parseAiResults(json: JSONObject): List<Habit> {
         val results = json.optJSONArray("results") ?: return emptyList()
         val drafts = mutableListOf<Habit>()
-        val dateStr = _selectedDate.value.format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val defaultDateStr = _selectedDate.value.format(DateTimeFormatter.ISO_LOCAL_DATE)
         
         for (i in 0 until results.length()) {
             val item = results.getJSONObject(i)
             val action = item.optString("action")
             if (action == "ADD") {
+                // Ưu tiên ngày từ AI, nếu không có mới dùng ngày đang chọn trên UI
+                val habitDate = item.optString("date", defaultDateStr)
+                
                 drafts.add(Habit(
                     name = item.optString("name"),
                     icon = item.optString("icon", "✨"),
                     reminderTime = item.optString("time").ifEmpty { null },
                     reminderMinutesBefore = item.optInt("minsBefore", 5),
-                    date = dateStr
+                    date = habitDate
                 ))
             }
             // For DELETE, we might want to handle it differently in the draft flow or just execute it.

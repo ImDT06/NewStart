@@ -35,9 +35,13 @@ class AiHabitService @Inject constructor() {
         2. Tự động suy luận AM/PM (sáng/tối) dựa trên tên thói quen và logic thông thường:
            - "ăn tối", "đi ngủ", "xem phim" -> Thường vào buổi tối (18h-23h).
            - "chạy bộ", "ăn sáng", "uống cafe" -> Thường vào buổi sáng (5h-9h).
-        3. Logic 12h/0h: Nếu người dùng nói "12h" cho thói quen "đi ngủ" hoặc "kết thúc ngày", hãy hiểu là 00:00 của ngày hôm sau so với mốc hiện tại.
-        4. Trả về đúng định dạng ISO 8601 cho thời gian nếu có thể, hoặc chỉ HH:mm.
-        5. Nếu không hiểu hành động, trả về mảng trống [].
+        3. Xác định NGÀY (date): 
+           - Nếu người dùng nói "ngày mai", "sáng mai" -> Trả về ngày tiếp theo của mốc thời gian hiện tại.
+           - Nếu người dùng nói "thứ hai tới", "cuối tuần" -> Tính toán ngày tương ứng dựa trên mốc hiện tại.
+           - Định dạng ngày là: "yyyy-MM-dd". Nếu không nhắc đến ngày, mặc định là ngày của mốc hiện tại.
+        4. Logic 12h/0h: Nếu người dùng nói "12h" cho thói quen "đi ngủ" hoặc "kết thúc ngày", hãy hiểu là 00:00 của ngày hôm sau so với mốc hiện tại.
+        5. Trả về đúng định dạng ISO 8601 cho thời gian nếu có thể, hoặc chỉ HH:mm.
+        6. Nếu không hiểu hành động, trả về mảng trống [].
 
         Định dạng trả về:
         [
@@ -45,6 +49,7 @@ class AiHabitService @Inject constructor() {
             "action": "ADD" | "DELETE",
             "name": "tên thói quen",
             "icon": "emoji phù hợp",
+            "date": "yyyy-MM-dd",
             "time": "HH:mm",
             "minsBefore": 5
           }

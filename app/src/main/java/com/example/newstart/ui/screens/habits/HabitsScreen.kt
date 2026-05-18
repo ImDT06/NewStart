@@ -1,10 +1,7 @@
 package com.example.newstart.ui.screens.habits
 
 import androidx.compose.animation.*
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -55,6 +52,7 @@ fun HabitsScreen(
     var showMonthPicker by remember { mutableStateOf(false) }
     var showAiDialog by remember { mutableStateOf(false) }
     var aiCommand by remember { mutableStateOf("") }
+    val aiSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     
     val today = LocalDate.now()
     val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500)
@@ -305,7 +303,7 @@ fun HabitsScreen(
                 .border(
                     width = 2.dp,
                     brush = Brush.linearGradient(
-                        colors = listOf(Color(0xFF4285F4), Color(0xFF9B72CB), Color(0xFFD96570))
+                        colors = listOf(Color(0xFF4285F4), Color(0xFF9B72CB))
                     ),
                     shape = CircleShape
                 ),
@@ -324,7 +322,7 @@ fun HabitsScreen(
         // AI Interaction Flow (Modal Bottom Sheet)
         if (showAiDialog || aiState is AiState.Drafting) {
             val aiGradient = Brush.linearGradient(
-                colors = listOf(Color(0xFF4285F4), Color(0xFF9B72CB), Color(0xFFD96570))
+                colors = listOf(Color(0xFF4285F4), Color(0xFF9B72CB))
             )
 
             ModalBottomSheet(
@@ -333,6 +331,7 @@ fun HabitsScreen(
                     aiCommand = ""
                     viewModel.clearAiState()
                 },
+                sheetState = aiSheetState,
                 containerColor = MaterialTheme.colorScheme.surface,
                 dragHandle = { BottomSheetDefaults.DragHandle() },
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
@@ -442,6 +441,8 @@ fun HabitsScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                                    .imePadding()
                                     .padding(horizontal = 24.dp)
                                     .padding(bottom = 32.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
