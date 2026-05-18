@@ -12,6 +12,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
@@ -39,7 +40,6 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
-import java.util.*
 
 @Composable
 fun HabitsScreen(
@@ -49,9 +49,13 @@ fun HabitsScreen(
 ) {
     val habits by viewModel.habits.collectAsState()
     val selectedDate by mainViewModel.selectedHabitDate.collectAsState()
+    val aiState by viewModel.aiState.collectAsState()
+    
     val scope = rememberCoroutineScope()
     var habitToDelete by remember { mutableStateOf<Habit?>(null) }
     var showMonthPicker by remember { mutableStateOf(false) }
+    var showAiDialog by remember { mutableStateOf(false) }
+    var aiCommand by remember { mutableStateOf("") }
     
     val today = LocalDate.now()
     val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500)
@@ -119,6 +123,22 @@ fun HabitsScreen(
                     }
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             )
+
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                modifier = Modifier.size(36.dp),
+                onClick = { showAiDialog = true }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "AI Assistant",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+            }
 
             Surface(
                 shape = CircleShape,
@@ -329,6 +349,61 @@ fun HabitsScreen(
                 onDismiss = { showMonthPicker = false }
             )
         }
+
+        // AI Assistant Dialog
+        if (showAiDialog) {
+            AlertDialog(
+                onDismissRequest = { 
+                    showAiDialog = false
+                    aiCommand = ""
+                },
+                title = { 
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.tertiary)
+                        Spacer(Modifier.width(8.dp))
+                        Text("AI Trợ lý thói quen")
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            "Bạn có thể nói: \"Thêm thói quen uống nước lúc 8h sáng\" hoặc \"Xóa thói quen chạy bộ\"",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedTextField(
+                            value = aiCommand,
+                            onValueChange = { aiCommand = it },
+                            placeholder = { Text("Nhập yêu cầu của bạn...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = aiState !is AiState.Loading
+                        )
+                        
+                        when (aiState) {
+                            is AiState.Loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                            is AiState.Success -> Text((aiState as AiState.Success).message, color = Color(0xFF4CAF50))
+                            is AiState.Error -> Text((aiState as AiState.Error).message, color = MaterialTheme.colorScheme.error)
+                            else -> {}
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { viewModel.processAiCommand(aiCommand) },
+                        enabled = aiCommand.isNotBlank() && aiState !is AiState.Loading,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                    ) {
+                        Text("Gửi")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAiDialog = false }) {
+                        Text("Đóng")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -412,7 +487,7 @@ fun HabitItem(
                     .clip(CircleShape)
                     .border(
                         width = 1.2.dp,
-                        color = if (habit.isCompleted) Color.Transparent else (if (habit.isCompleted) Color.White else MaterialTheme.colorScheme.onSurface).copy(alpha = 0.4f),
+                        color = if (habit.isCompleted) Color.Transparent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                         shape = CircleShape
                     )
                     .background(if (habit.isCompleted) Color.White.copy(alpha = 0.2f) else Color.Transparent)

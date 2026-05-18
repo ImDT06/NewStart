@@ -70,6 +70,9 @@ dependencies {
     // OkHttp
     implementation(libs.okhttp)
 
+    // Gemini AI
+    implementation(libs.generativeai)
+
     // Navigation
     implementation(libs.androidx.navigation.compose)
     implementation(libs.firebase.auth)

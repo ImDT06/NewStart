@@ -100,11 +100,8 @@ class MainViewModel @Inject constructor(
         
         viewModelScope.launch {
             _isUploading.value = true
-            val result = userRepository.updateAvatar(userId, uri)
+            userRepository.updateAvatar(userId, uri)
             _isUploading.value = false
-            if (result.isSuccess) {
-                // Tự động cập nhật thông qua flow authRepository.currentUser
-            }
         }
     }
     
