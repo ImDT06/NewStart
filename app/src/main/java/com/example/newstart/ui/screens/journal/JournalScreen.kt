@@ -1084,6 +1084,22 @@ fun TimelineEntryItem(
     }
 }
 
+@Composable
+fun MonthPickerDialog(
+    selectedDate: LocalDate,
+    onDateSelected: (LocalDate) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AdvancedDatePickerDialog(
+        initialStartDate = selectedDate,
+        initialEndDate = null,
+        onDismiss = onDismiss,
+        onDateRangeSelected = { start, _ ->
+            onDateSelected(start)
+        }
+    )
+}
+
 @AppCombinedPreviews
 @Composable
 fun JournalScreenPreview() {
