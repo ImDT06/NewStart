@@ -178,7 +178,7 @@ fun JournalContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -297,7 +297,7 @@ fun JournalContent(
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val filters = listOf(
@@ -357,7 +357,7 @@ fun JournalContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             // Journal List Surface
             Surface(
@@ -400,7 +400,7 @@ fun JournalContent(
                             .pointerInput(Unit) {
                                 detectTapGestures(onTap = { focusManager.clearFocus() })
                             },
-                        contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp, start = 24.dp, end = 24.dp)
+                        contentPadding = PaddingValues(top = 4.dp, bottom = 80.dp, start = 24.dp, end = 24.dp)
                     ) {
                         items(
                             items = entriesWithHeaders,
@@ -415,7 +415,7 @@ fun JournalContent(
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(top = 12.dp, bottom = 8.dp, start = 4.dp)
+                                        .padding(top = 8.dp, bottom = 4.dp, start = 4.dp)
                                 )
                             } else if (item is JournalEntry) {
                                 val dismissState = rememberSwipeToDismissBoxState(
@@ -978,7 +978,7 @@ fun TimelineEntryItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 2.dp)
             .height(IntrinsicSize.Min) 
     ) {
         Column(
@@ -1022,7 +1022,7 @@ fun TimelineEntryItem(
         Card(
             modifier = Modifier
                 .weight(1f)
-                .padding(bottom = 16.dp, end = 4.dp),
+                .padding(bottom = 12.dp, end = 4.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f) 
