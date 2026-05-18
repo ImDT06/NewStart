@@ -35,7 +35,7 @@ class HabitsViewModel @Inject constructor(
             _aiState.value = AiState.Loading
             try {
                 val currentTime = java.time.LocalDateTime.now()
-                    .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, yyyy-MM-dd HH:mm"))
+                    .format(DateTimeFormatter.ofPattern("EEEE, yyyy-MM-dd HH:mm"))
                 val result = aiService.processCommand(command, currentTime)
                 val drafts = parseAiResults(result)
                 if (drafts.isEmpty()) {
