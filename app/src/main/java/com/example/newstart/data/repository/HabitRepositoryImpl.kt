@@ -1,9 +1,11 @@
 package com.example.newstart.data.repository
 
 import android.content.Context
+import androidx.glance.appwidget.updateAll
 import com.example.newstart.domain.model.Habit
 import com.example.newstart.domain.repository.HabitRepository
 import com.example.newstart.util.HabitReminderManager
+import com.example.newstart.widget.HabitWidget
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -36,6 +38,9 @@ class HabitRepositoryImpl @Inject constructor(
             // Đặt báo thức nhắc nhở
             HabitReminderManager.scheduleReminder(context, habitWithUserId)
             
+            // Cập nhật Widget ngay lập tức
+            HabitWidget().updateAll(context)
+            
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -46,6 +51,10 @@ class HabitRepositoryImpl @Inject constructor(
         return try {
             firestore.collection("habits").document(habitId).delete().await()
             HabitReminderManager.cancelReminder(context, habitId)
+            
+            // Cập nhật Widget khi xóa
+            HabitWidget().updateAll(context)
+            
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -64,6 +73,9 @@ class HabitRepositoryImpl @Inject constructor(
                 // Nếu bỏ chọn hoàn thành -> Đặt lại nhắc nhở nếu có cài giờ
                 HabitReminderManager.scheduleReminder(context, habit.copy(isCompleted = false))
             }
+
+            // Cập nhật Widget khi thay đổi trạng thái
+            HabitWidget().updateAll(context)
 
             Result.success(Unit)
         } catch (e: Exception) {

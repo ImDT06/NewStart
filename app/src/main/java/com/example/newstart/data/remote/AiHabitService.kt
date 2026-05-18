@@ -14,7 +14,7 @@ import javax.inject.Singleton
 @Singleton
 class AiHabitService @Inject constructor() {
     private val model = GenerativeModel(
-        modelName = "gemini-2.5-flash", 
+        modelName = "gemini-2.5-flash",
         apiKey = AppConstants.GEMINI_API_KEY,
         safetySettings = listOf(
             SafetySetting(HarmCategory.HARASSMENT, BlockThreshold.NONE),

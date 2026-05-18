@@ -74,6 +74,10 @@ dependencies {
     // Gemini AI
     implementation(libs.generativeai)
 
+    // Glance Widgets
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
+
     // Navigation
     implementation(libs.androidx.navigation.compose)
     implementation(libs.firebase.auth)

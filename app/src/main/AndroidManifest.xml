@@ -35,6 +35,18 @@
 
         <receiver android:name=".receiver.HabitReminderReceiver" android:exported="false" />
 
+        <receiver
+            android:name=".widget.HabitWidgetReceiver"
+            android:exported="true"
+            android:label="NewStart Thói quen">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/habit_widget_info" />
+        </receiver>
+
         <!-- Service to enable backward compatibility for Per-App Language -->
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
