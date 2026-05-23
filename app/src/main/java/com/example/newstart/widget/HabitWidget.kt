@@ -36,7 +36,7 @@ class HabitWidget : GlanceAppWidget() {
         }
     }
 
-    private suspend fun fetchHabitsForToday(): List<Pair<String, String>> {
+    private suspend fun fetchHabitsForToday(): List<com.example.newstart.domain.model.Habit> {
         return try {
             val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return emptyList()
             val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
@@ -48,18 +48,18 @@ class HabitWidget : GlanceAppWidget() {
                 .get()
                 .await()
             
-            snapshot.documents.map { 
-                val name = it.getString("name") ?: ""
-                val icon = it.getString("icon") ?: "✨"
-                icon to name 
-            }
+            snapshot.toObjects(com.example.newstart.domain.model.Habit::class.java)
         } catch (e: Exception) {
             emptyList()
         }
     }
 
     @Composable
-    private fun HabitWidgetContent(habits: List<Pair<String, String>>) {
+    private fun HabitWidgetContent(habits: List<com.example.newstart.domain.model.Habit>) {
+        val today = LocalDate.now()
+        val dateFormatter = DateTimeFormatter.ofPattern("EEEE, dd/MM", java.util.Locale("vi"))
+        val dateString = today.format(dateFormatter)
+
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -67,40 +67,80 @@ class HabitWidget : GlanceAppWidget() {
                 .padding(12.dp)
                 .clickable(actionStartActivity<MainActivity>()),
         ) {
-            Text(
-                text = "Thói quen hôm nay",
-                style = TextStyle(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = ColorProvider(Color(0xFF1D5FE2))
-                )
-            )
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = dateString,
+                        style = TextStyle(
+                            fontSize = 12.sp,
+                            color = ColorProvider(Color.Gray)
+                        )
+                    )
+                    Text(
+                        text = "Thói quen hôm nay",
+                        style = TextStyle(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = ColorProvider(Color(0xFF1D5FE2))
+                        )
+                    )
+                }
+            }
             
-            Spacer(modifier = GlanceModifier.height(8.dp))
+            Spacer(modifier = GlanceModifier.height(12.dp))
 
             if (habits.isEmpty()) {
                 Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
                         text = "Chưa có thói quen nào",
-                        style = TextStyle(fontSize = 12.sp, color = ColorProvider(Color.Gray))
+                        style = TextStyle(fontSize = 14.sp, color = ColorProvider(Color.Gray))
                     )
                 }
             } else {
                 LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                    items(habits) { habit ->
+                    items(habits.sortedBy { it.reminderTime ?: "23:59" }) { habit ->
                         Row(
                             modifier = GlanceModifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
+                                .padding(vertical = 6.dp)
+                                .background(if (habit.isCompleted) Color(0xFFF0F7FF) else Color.Transparent),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = habit.first, style = TextStyle(fontSize = 14.sp))
-                            Spacer(modifier = GlanceModifier.width(8.dp))
                             Text(
-                                text = habit.second,
-                                style = TextStyle(fontSize = 14.sp, color = ColorProvider(Color.Black)),
-                                maxLines = 1
+                                text = habit.icon,
+                                style = TextStyle(fontSize = 18.sp)
                             )
+                            Spacer(modifier = GlanceModifier.width(8.dp))
+                            Column(modifier = GlanceModifier.defaultWeight()) {
+                                Text(
+                                    text = habit.name,
+                                    style = TextStyle(
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = ColorProvider(if (habit.isCompleted) Color.Gray else Color.Black)
+                                    ),
+                                    maxLines = 1
+                                )
+                                if (habit.reminderTime != null) {
+                                    Text(
+                                        text = "⏰ ${habit.reminderTime}",
+                                        style = TextStyle(
+                                            fontSize = 11.sp,
+                                            color = ColorProvider(Color(0xFF1D5FE2))
+                                        )
+                                    )
+                                }
+                            }
+                            if (habit.isCompleted) {
+                                Text(
+                                    text = "✅",
+                                    style = TextStyle(fontSize = 14.sp)
+                                )
+                            }
                         }
                     }
                 }
