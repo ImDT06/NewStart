@@ -1,5 +1,13 @@
 package com.example.newstart.ui.screens.habits
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -29,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.newstart.R
 import com.example.newstart.domain.model.Habit
@@ -58,6 +67,64 @@ fun HabitsScreen(
     var showAiDialog by remember { mutableStateOf(false) }
     var aiCommand by remember { mutableStateOf("") }
     val aiSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val context = LocalContext.current
+    var isListening by remember { mutableStateOf(false) }
+    
+    val speechRecognizer = remember { SpeechRecognizer.createSpeechRecognizer(context) }
+    
+    val speechRecognizerIntent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN")
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            isListening = true
+            speechRecognizer.startListening(speechRecognizerIntent)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val listener = object : RecognitionListener {
+            override fun onReadyForSpeech(params: android.os.Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {
+                isListening = false
+            }
+            override fun onError(error: Int) {
+                isListening = false
+            }
+            override fun onResults(results: android.os.Bundle?) {
+                val data = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!data.isNullOrEmpty()) {
+                    val command = data[0]
+                    aiCommand = command
+                    // Tự động gửi lệnh AI
+                    viewModel.processAiCommand(command)
+                }
+                isListening = false
+            }
+            override fun onPartialResults(partialResults: android.os.Bundle?) {
+                val data = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!data.isNullOrEmpty()) {
+                    aiCommand = data[0]
+                }
+            }
+            override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
+        }
+        speechRecognizer.setRecognitionListener(listener)
+        onDispose {
+            speechRecognizer.destroy()
+        }
+    }
 
     // State for draggable AI button
     var aiButtonOffset by remember { mutableStateOf(Offset.Zero) }
@@ -515,10 +582,34 @@ fun HabitsScreen(
                                         .fillMaxWidth()
                                         .border(
                                             width = 1.dp,
-                                            brush = if (aiCommand.isNotBlank()) aiGradient else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
+                                            brush = if (aiCommand.isNotBlank() || isListening) aiGradient else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
                                             shape = RoundedCornerShape(16.dp)
                                         ),
                                     shape = RoundedCornerShape(16.dp),
+                                    leadingIcon = {
+                                        IconButton(
+                                            onClick = {
+                                                if (isListening) {
+                                                    speechRecognizer.stopListening()
+                                                    isListening = false
+                                                } else {
+                                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                                                        isListening = true
+                                                        speechRecognizer.startListening(speechRecognizerIntent)
+                                                    } else {
+                                                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                                    }
+                                                }
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicNone,
+                                                contentDescription = "Voice Input",
+                                                tint = if (isListening) Color.Red else Color(0xFF9B72CB),
+                                                modifier = if (isListening) Modifier.size(28.dp) else Modifier.size(24.dp)
+                                            )
+                                        }
+                                    },
                                     colors = TextFieldDefaults.colors(
                                         focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
