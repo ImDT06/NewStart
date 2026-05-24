@@ -2,9 +2,11 @@ package com.example.newstart.data.repository
 
 import android.content.Context
 import androidx.glance.appwidget.updateAll
+import androidx.work.*
 import com.example.newstart.data.local.dao.HabitDao
 import com.example.newstart.data.local.toDomain
 import com.example.newstart.data.local.toEntity
+import com.example.newstart.data.worker.SyncWorker
 import com.example.newstart.domain.model.Habit
 import com.example.newstart.domain.repository.HabitRepository
 import com.example.newstart.util.HabitReminderManager
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,6 +33,24 @@ class HabitRepositoryImpl @Inject constructor(
 ) : HabitRepository {
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
+    private val workManager = WorkManager.getInstance(context)
+
+    private fun scheduleSync() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
+            .build()
+
+        workManager.enqueueUniqueWork(
+            "habit_sync_work",
+            ExistingWorkPolicy.REPLACE,
+            syncRequest
+        )
+    }
 
     override suspend fun saveHabit(habit: Habit): Result<Unit> {
         return try {
@@ -45,12 +66,13 @@ class HabitRepositoryImpl @Inject constructor(
             // 1. Lưu vào Room trước (Offline-first)
             habitDao.insertHabit(habitWithUserId.toEntity(isSynced = false))
 
-            // 2. Lưu vào Firestore
+            // 2. Thử lưu vào Firestore
             try {
                 docRef.set(habitWithUserId).await()
                 habitDao.insertHabit(habitWithUserId.toEntity(isSynced = true))
             } catch (e: Exception) {
-                // Không sao, sẽ sync lại sau
+                // Thất bại thì để SyncWorker lo
+                scheduleSync()
             }
             
             // Đặt báo thức nhắc nhở
@@ -74,7 +96,7 @@ class HabitRepositoryImpl @Inject constructor(
             try {
                 firestore.collection("habits").document(habitId).delete().await()
             } catch (e: Exception) {
-                // Sẽ xử lý sync xóa sau
+                // Sync xóa có thể phức tạp hơn, tạm thời chỉ xử lý thêm/sửa
             }
 
             HabitReminderManager.cancelReminder(context, habitId)
@@ -97,7 +119,7 @@ class HabitRepositoryImpl @Inject constructor(
                     .update("isCompleted", isCompleted).await()
                 habitDao.updateCompletion(habit.id, isCompleted, isSynced = true)
             } catch (e: Exception) {
-                // Sync sau
+                scheduleSync()
             }
             
             if (isCompleted) {

@@ -210,12 +210,13 @@ fun LoginContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp) // Increased height to fit subtitle
+                    .height(200.dp)
                     .background(
-                        brush = Brush.verticalGradient(
+                        brush = Brush.linearGradient(
                             colors = listOf(
+                                Color(0xFF0D47A1), // Deep Dark Blue
                                 MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                Color(0xFF1565C0)  // Solid Medium Blue
                             )
                         )
                     )
@@ -264,13 +265,8 @@ fun LoginContent(
                         text = stringResource(id = R.string.login_title),
                         color = MaterialTheme.colorScheme.onPrimary,
                         fontSize = 30.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = stringResource(id = R.string.login_subtitle),
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                        fontSize = 14.sp,
-                        lineHeight = 18.sp
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
                     )
                 }
             }

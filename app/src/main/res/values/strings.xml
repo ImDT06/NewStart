@@ -2,16 +2,16 @@
     <string name="app_name">NewStart</string>
 
     <!-- Welcome Screen -->
-    <string name="welcome_simple">Simple</string>
-    <string name="welcome_edu">edu</string>
-    <string name="welcome_slogan">Tận hưởng việc học ngay trong tầm tay!</string>
+    <string name="welcome_simple">New</string>
+    <string name="welcome_edu">Start</string>
+    <string name="welcome_slogan">Khởi đầu hành trình thay đổi bản thân ngay hôm nay!</string>
     <string name="welcome_get_started">Bắt đầu ngay</string>
-    <string name="welcome_new_here">Bạn mới? </string>
+    <string name="welcome_new_here">"Bạn mới? "</string>
     <string name="welcome_sign_up">Đăng ký</string>
 
     <!-- Login Screen -->
     <string name="login_title">Đăng nhập</string>
-    <string name="login_subtitle">Trải nghiệm môi trường học tập tốt hơn</string>
+    <string name="login_subtitle">Đã đến lúc tiếp tục hành trình xây dựng thói quen tốt</string>
     <string name="login_label_email">Địa chỉ Email</string>
     <string name="login_placeholder_email">Địa chỉ Email</string>
     <string name="login_label_password">Mật khẩu</string>
@@ -24,7 +24,7 @@
 
     <!-- Register Screen -->
     <string name="register_title">Đăng ký</string>
-    <string name="register_subtitle">Đăng ký để bắt đầu quá trình học tập của bạn</string>
+    <string name="register_subtitle">Đăng ký để cùng NewStart tạo nên những thay đổi tích cực</string>
     <string name="register_label_name">Họ và tên</string>
     <string name="register_placeholder_name">Họ và tên</string>
     <string name="register_label_mobile">Số điện thoại</string>
@@ -33,12 +33,12 @@
     <string name="register_placeholder_password">Nhập mật khẩu</string>
     <string name="register_label_confirm">Xác nhận mật khẩu</string>
     <string name="register_placeholder_confirm">Nhập lại mật khẩu</string>
-    <string name="register_terms_prefix">Bằng cách đăng ký, bạn chấp nhận </string>
+    <string name="register_terms_prefix">"Bằng cách đăng ký, bạn chấp nhận "</string>
     <string name="register_terms_service">Điều khoản dịch vụ</string>
     <string name="register_terms_and"> &amp; </string>
     <string name="register_terms_privacy">Chính sách bảo mật</string>
     <string name="register_btn_now">Đăng ký</string>
-    <string name="register_already_member">Đã là thành viên? </string>
+    <string name="register_already_member">"Đã là thành viên? "</string>
     <string name="register_login_now">Đăng nhập ngay</string>
 
     <!-- Home Screen -->

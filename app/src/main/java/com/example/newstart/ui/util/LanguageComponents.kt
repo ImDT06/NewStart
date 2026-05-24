@@ -30,8 +30,8 @@ fun SmallLanguageSwitcher(
     tintColor: Color = MaterialTheme.colorScheme.primary,
     backgroundColor: Color = MaterialTheme.colorScheme.surface
 ) {
-    val currentLocale = AppCompatDelegate.getApplicationLocales().toLanguageTags()
-    val isVietnamese = currentLocale.contains("vi") || currentLocale.isEmpty()
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isVietnamese = configuration.locales[0].language == "vi"
 
     Surface(
         onClick = onClick,
@@ -74,8 +74,8 @@ fun TransparentLanguageSwitcher(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val currentLocale = AppCompatDelegate.getApplicationLocales().toLanguageTags()
-    val isVietnamese = currentLocale.contains("vi") || currentLocale.isEmpty()
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isVietnamese = configuration.locales[0].language == "vi"
 
     Surface(
         onClick = onClick,
@@ -98,7 +98,7 @@ fun TransparentLanguageSwitcher(
                     painter = painterResource(id = if (isVietnamese) R.drawable.ic_flag_vn else R.drawable.ic_flag_en),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop // Đảm bảo ảnh luôn lấp đầy hình tròn
+                    contentScale = ContentScale.Crop
                 )
             }
 

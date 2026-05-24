@@ -28,7 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -325,6 +327,7 @@ fun HabitsScreen(
 
                         SwipeToDismissBox(
                             state = dismissState,
+                            modifier = Modifier.animateItem(), // Smooth animation when adding/removing
                             enableDismissFromStartToEnd = false,
                             backgroundContent = {
                                 val isSwiping = dismissState.targetValue != SwipeToDismissBoxValue.Settled
@@ -735,10 +738,23 @@ fun HabitItem(
         }
     }
 
+    // Interaction scale animation
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        label = "scale"
+    )
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onEdit() },
+            .graphicsLayer(scaleX = scale, scaleY = scale) // Apply scale effect
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null, // Disable default ripple to emphasize custom scale
+                onClick = onEdit
+            ),
         shape = RoundedCornerShape(16.dp),
         color = color.copy(alpha = if (habit.isCompleted) 1f else 0.12f)
     ) {
