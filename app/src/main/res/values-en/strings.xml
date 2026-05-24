@@ -2,16 +2,16 @@
     <string name="app_name">NewStart</string>
 
     <!-- Welcome Screen -->
-    <string name="welcome_simple">Simple</string>
-    <string name="welcome_edu">edu</string>
-    <string name="welcome_slogan">Enjoy Your Education at Your Fingertips!</string>
+    <string name="welcome_simple">New</string>
+    <string name="welcome_edu">Start</string>
+    <string name="welcome_slogan">Start your journey to self-transformation today!</string>
     <string name="welcome_get_started">Get Started</string>
-    <string name="welcome_new_here">New Here? </string>
+    <string name="welcome_new_here">"New Here? "</string>
     <string name="welcome_sign_up">Sign Up</string>
 
     <!-- Login Screen -->
     <string name="login_title">Log In</string>
-    <string name="login_subtitle">Experience a better learning environment</string>
+    <string name="login_subtitle">Time to continue your habit-building journey</string>
     <string name="login_label_email">Email address</string>
     <string name="login_placeholder_email">Email address</string>
     <string name="login_label_password">Password</string>
@@ -24,7 +24,7 @@
 
     <!-- Register Screen -->
     <string name="register_title">Sign Up</string>
-    <string name="register_subtitle">Register to Start Your Learning Process</string>
+    <string name="register_subtitle">Sign up to create positive changes with NewStart</string>
     <string name="register_label_name">Full Name</string>
     <string name="register_placeholder_name">Full Name</string>
     <string name="register_label_mobile">Mobile number</string>
@@ -33,12 +33,12 @@
     <string name="register_placeholder_password">Enter a Password</string>
     <string name="register_label_confirm">Confirm Password</string>
     <string name="register_placeholder_confirm">Retype Password</string>
-    <string name="register_terms_prefix">By Signing up you accept our </string>
+    <string name="register_terms_prefix">"By Signing up you accept our "</string>
     <string name="register_terms_service">Terms of Service</string>
     <string name="register_terms_and"> &amp; </string>
     <string name="register_terms_privacy">Privacy Policy</string>
     <string name="register_btn_now">Sign Up</string>
-    <string name="register_already_member">Already a Member? </string>
+    <string name="register_already_member">"Already a Member? "</string>
     <string name="register_login_now">Login Now</string>
 
     <!-- Home Screen -->
@@ -46,11 +46,14 @@
     <string name="home_email">Email: %1$s</string>
     <string name="home_view_details">View Details</string>
     <string name="home_loading">Loading user…</string>
-    <string name="home_hello">Hello %1$s!</string>
+    <string name="home_hello_morning">Good Morning, %1$s!</string>
+    <string name="home_hello_noon">Good Noon, %1$s!</string>
+    <string name="home_hello_afternoon">Good Afternoon, %1$s!</string>
+    <string name="home_hello_evening">Good Evening, %1$s!</string>
     <string name="home_search_placeholder">Search courses, lessons…</string>
     <string name="home_category_courses">Courses</string>
     <string name="home_category_exams">Exams</string>
-    <string name="home_category_library">Library</string>
+    <string name="home_category_library">Thư viện</string>
     <string name="home_category_community">Community</string>
     <string name="home_popular_courses">Popular Courses</string>
     <string name="home_see_all">See All</string>
@@ -83,11 +86,55 @@
     <string name="settings_confirm_logout_title">Logout</string>
     <string name="settings_confirm_logout_msg">Are you sure you want to log out of this account?</string>
     <string name="settings_cancel">Cancel</string>
+
     <!-- Journal Screen -->
     <string name="journal_title">Journal</string>
-    <string name="journal_greeting">Good Morning! 🌸</string>
+    <string name="journal_greeting_morning">Good Morning!</string>
+    <string name="journal_greeting_noon">Good Noon!</string>
+    <string name="journal_greeting_afternoon">Good Afternoon!</string>
+    <string name="journal_greeting_evening">Good Evening!</string>
     <string name="journal_subtitle">Today is a wonderful day to record memorable moments</string>
     <string name="journal_entry_placeholder">What\'s on your mind?</string>
+    <string name="journal_memories_title">Memories</string>
+    <string name="journal_close_button">Close</string>
+    <string name="journal_empty_message">No journal entries yet.\nLet\'s start recording moments!</string>
+    <string name="journal_delete_confirm_title">Delete journal?</string>
+    <string name="journal_delete_confirm_message">This action cannot be undone. Are you sure you want to delete this moment?</string>
+    <string name="journal_delete_confirm_button">Delete</string>
+    <string name="journal_cancel_button">Cancel</string>
+
+    <!-- Habits Screen -->
+    <string name="habits_filter_all">All</string>
+    <string name="habits_today">Today</string>
+    <string name="habits_streak_day">Day</string>
+    <string name="habits_delete_title">Delete habit</string>
+    <string name="habits_delete_msg">Are you sure you want to delete \'%1$s\'?</string>
+    <string name="habits_delete_confirm">Delete</string>
+    <string name="habits_cancel">Cancel</string>
+    <string name="habits_empty">No habits for this day.</string>
+
+    <!-- New Habit Sheet -->
+    <string name="habits_new_title">New Habit</string>
+    <string name="habits_cat_popular">Popular</string>
+    <string name="habits_cat_health">Health</string>
+    <string name="habits_cat_sports">Sports</string>
+    <string name="habits_cat_mind">Mind</string>
+    <string name="habits_cat_study">Study</string>
+    <string name="habits_btn_custom">Custom</string>
+    <string name="habits_custom_dialog_title">Configure Habit</string>
+    <string name="habits_custom_dialog_new">Create New Habit</string>
+    <string name="habits_custom_name_label">Habit Name</string>
+    <string name="habits_custom_icon_label">Icon</string>
+    <string name="habits_btn_create">Confirm</string>
+    <string name="habits_reminder_label">Remind before (mins):</string>
+    <string name="habits_custom_mins">Custom</string>
+    <string name="habits_custom_mins_label">Reminder minutes</string>
+
+    <!-- Journal Entry Panel -->
+    <string name="journal_panel_title">Create Moment</string>
+    <string name="journal_panel_placeholder">What\'s on your mind?</string>
+    <string name="journal_panel_gallery">Choose from gallery</string>
+    <string name="journal_panel_skip">Skip photo</string>
 
     <!-- Errors -->
     <string name="error_email_empty">Email cannot be empty</string>

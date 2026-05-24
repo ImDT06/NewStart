@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.newstart.R
 import com.example.newstart.domain.model.User
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.util.AppCombinedPreviews
@@ -70,7 +72,11 @@ fun HomeContent(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 100.dp)
@@ -131,16 +137,18 @@ fun HomeHeaderSection(userName: String) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
+                val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+                val greetingRes = when (hour) {
+                    in 5..10 -> R.string.home_hello_morning
+                    in 11..13 -> R.string.home_hello_noon
+                    in 14..17 -> R.string.home_hello_afternoon
+                    else -> R.string.home_hello_evening
+                }
                 Text(
-                    text = "Chào ngày mới,",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                )
-                Text(
-                    text = userName,
-                    fontSize = 24.sp,
+                    text = stringResource(id = greetingRes, userName),
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
         }
@@ -283,18 +291,30 @@ fun TodoItem(todo: Todo) {
 
 @Composable
 fun AIInsightCard() {
+    val aiGradient = Brush.linearGradient(
+        colors = listOf(Color(0xFF4285F4), Color(0xFF9B72CB))
+    )
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(20.dp),
+            .padding(20.dp)
+            .border(1.dp, aiGradient, RoundedCornerShape(24.dp)),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome, 
+                    contentDescription = null, 
+                    tint = Color(0xFF9B72CB)
+                )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("AI Gợi ý", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
+                Text(
+                    text = "AI Gợi ý", 
+                    fontWeight = FontWeight.Bold, 
+                    style = MaterialTheme.typography.titleMedium.copy(brush = aiGradient)
+                )
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text(

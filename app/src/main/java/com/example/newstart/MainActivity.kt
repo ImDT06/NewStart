@@ -1,14 +1,23 @@
 package com.example.newstart
 
+import android.Manifest
+import android.app.AlarmManager
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Rect
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.MotionEvent
 import android.view.inputmethod.InputMethodManager
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,22 +32,23 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.AuthState
+import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.navigation.MainBottomBar
 import com.example.newstart.ui.navigation.NavGraph
 import com.example.newstart.ui.navigation.Screen
-import com.example.newstart.ui.theme.NewStartTheme
-import com.example.newstart.ui.theme.ThemeMode
-import com.example.newstart.ui.util.SheetContent
-import com.example.newstart.ui.screens.journal.JournalEntryPanel
 import com.example.newstart.ui.screens.habits.NewHabitSheet
+import com.example.newstart.ui.screens.journal.JournalEntryPanel
+import com.example.newstart.ui.theme.NewStartTheme
+import com.example.newstart.ui.util.SheetContent
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.appcompat.app.AppCompatDelegate
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -46,86 +56,153 @@ class MainActivity : AppCompatActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        
+        // Giữ màn hình Splash cho đến khi authState không còn Loading
+        splashScreen.setKeepOnScreenCondition {
+            mainViewModel.authState.value == AuthState.Loading
+        }
+        
         enableEdgeToEdge()
         setContent {
             val themeMode by mainViewModel.themeMode.collectAsState()
             val authState by mainViewModel.authState.collectAsState()
             
             NewStartTheme(themeMode = themeMode) {
-                if (authState == AuthState.Loading) {
-                    // Màn hình chờ thương hiệu (Splash) cực gọn
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Bạn có thể đặt Logo app ở đây
-                        Text(
-                            text = "NewStart",
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
+                val context = LocalContext.current
+                
+                // Launcher để xin quyền báo thức chính xác
+                val alarmPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartActivityForResult()
+                ) { _ -> }
+
+                val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { _ -> }
+
+                val navController = rememberNavController()
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
+
+                var showBottomSheet by remember { mutableStateOf(false) }
+                var sheetContentType by remember { mutableStateOf(SheetContent.None) }
+
+                val editingHabit by mainViewModel.editingHabit.collectAsState()
+                
+                LaunchedEffect(editingHabit) {
+                    if (editingHabit != null) {
+                        sheetContentType = SheetContent.HabitSelection
+                        showBottomSheet = true
                     }
-                } else {
-                    val navController = rememberNavController()
-                    val navBackStackEntry by navController.currentBackStackEntryAsState()
-                    val currentRoute = navBackStackEntry?.destination?.route
+                }
 
-                    var showBottomSheet by remember { mutableStateOf(false) }
-                    var sheetContentType by remember { mutableStateOf(SheetContent.None) }
+                val isAuthRoute = listOf(Screen.Welcome.route, Screen.Login.route, Screen.Register.route).contains(currentRoute)
+                val showShell = authState == AuthState.Authenticated && !isAuthRoute
 
-                    // FAB và BottomBar chỉ hiện khi đã đăng nhập và không nằm ở các trang Auth
-                    val isAuthRoute = listOf(Screen.Welcome.route, Screen.Login.route, Screen.Register.route).contains(currentRoute)
-                    val showShell = authState == AuthState.Authenticated && !isAuthRoute
+                // Determine start destination based on Auth State
+                // We use a constant start destination to avoid NavHost recreation issues
+                // and handle routing logic via LaunchedEffect
+                val startDestination = Screen.Welcome.route
 
-                    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                // Handle navigation based on Auth State
+                LaunchedEffect(authState, currentRoute) {
+                    when (authState) {
+                        AuthState.Authenticated -> {
+                            // Navigate to Home if we are on Welcome/Login/Register
+                            val onAuthRoute = currentRoute == null || 
+                                            currentRoute == Screen.Welcome.route || 
+                                            currentRoute == Screen.Login.route || 
+                                            currentRoute == Screen.Register.route
+                            
+                            if (onAuthRoute) {
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        }
+                        AuthState.Unauthenticated -> {
+                            // Navigate to Welcome if we are not already on an auth route
+                            val onAppRoute = currentRoute != null && 
+                                           currentRoute != Screen.Welcome.route && 
+                                           currentRoute != Screen.Login.route && 
+                                           currentRoute != Screen.Register.route
+                            
+                            if (onAppRoute) {
+                                navController.navigate(Screen.Welcome.route) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        }
+                        else -> {}
+                    }
+                }
 
+                val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+                if (authState != AuthState.Loading) {
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         bottomBar = {
                             if (showShell) {
                                 MainBottomBar(
-                                    navController = navController,
-                                    onHabitClickAgain = {
-                                        sheetContentType = SheetContent.HabitSelection
-                                        showBottomSheet = true
-                                    }
+                                    navController = navController
                                 )
                             }
                         },
                         floatingActionButtonPosition = FabPosition.Center,
                         floatingActionButton = {
                             if (showShell) {
-                                Box(modifier = Modifier.offset(y = 60.dp)) {
-                                    FloatingActionButton(
-                                        onClick = {
-                                            // Logic linh hoạt
-                                            when (currentRoute) {
-                                                Screen.Habits.route -> {
-                                                    sheetContentType = SheetContent.HabitSelection
-                                                    showBottomSheet = true
+                                FloatingActionButton(
+                                    onClick = {
+                                        // 1. Kiểm tra quyền báo thức chính xác (Android 12+)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                                            if (!alarmManager.canScheduleExactAlarms()) {
+                                                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                                    data = Uri.fromParts("package", packageName, null)
                                                 }
-                                                else -> {
-                                                    sheetContentType = SheetContent.JournalEntry
-                                                    showBottomSheet = true
-                                                }
+                                                alarmPermissionLauncher.launch(intent)
+                                                return@FloatingActionButton
                                             }
-                                        },
-                                        modifier = Modifier.size(64.dp),
-                                        shape = CircleShape,
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                                        elevation = FloatingActionButtonDefaults.elevation(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Add,
-                                            contentDescription = "Add",
-                                            modifier = Modifier.size(32.dp)
-                                        )
-                                    }
+                                        }
+
+                                        // 2. Yêu cầu quyền thông báo nếu cần (Android 13+)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            if (ContextCompat.checkSelfPermission(
+                                                    context,
+                                                    Manifest.permission.POST_NOTIFICATIONS
+                                                ) != PackageManager.PERMISSION_GRANTED
+                                            ) {
+                                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                return@FloatingActionButton
+                                            }
+                                        }
+
+                                        when (currentRoute) {
+                                            Screen.Habits.route -> {
+                                                sheetContentType = SheetContent.HabitSelection
+                                                showBottomSheet = true
+                                            }
+                                            else -> {
+                                                sheetContentType = SheetContent.JournalEntry
+                                                showBottomSheet = true
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .offset(y = 56.dp), // Pushed down further to align with the bottom bar center
+                                    shape = CircleShape,
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = Color.White,
+                                    elevation = FloatingActionButtonDefaults.elevation(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Add",
+                                        modifier = Modifier.size(28.dp)
+                                    )
                                 }
                             }
                         }
@@ -133,48 +210,72 @@ class MainActivity : AppCompatActivity() {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(bottom = if (showShell) innerPadding.calculateBottomPadding() else 0.dp)
                         ) {
                             NavGraph(
                                 navController = navController,
-                                startDestination = if (authState == AuthState.Authenticated) Screen.Home.route else Screen.Welcome.route
+                                startDestination = startDestination,
+                                mainViewModel = mainViewModel,
+                                modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
                             )
 
-                            if (showBottomSheet) {
-                                ModalBottomSheet(
-                                    onDismissRequest = { 
-                                        showBottomSheet = false
-                                        sheetContentType = SheetContent.None
-                                    },
-                                    sheetState = sheetState,
-                                    dragHandle = { BottomSheetDefaults.DragHandle() },
-                                    containerColor = MaterialTheme.colorScheme.surface,
-                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
-                                ) {
-                                    when (sheetContentType) {
-                                        SheetContent.JournalEntry -> {
-                                            val isUploading by mainViewModel.isUploading.collectAsState()
-                                            JournalEntryPanel(
-                                                onDismiss = { showBottomSheet = false },
-                                                onPost = { emoji, text, uri ->
-                                                    mainViewModel.saveJournalEntry(emoji, text, uri) {
-                                                        showBottomSheet = false
-                                                    }
-                                                },
-                                                isUploading = isUploading
-                                            )
-                                        }
-                                        SheetContent.HabitSelection -> {
-                                            NewHabitSheet(
-                                                onDismiss = { showBottomSheet = false },
-                                                onHabitSelected = { preset ->
-                                                    // Logic lưu thói quen mới
+                        if (showBottomSheet) {
+                            ModalBottomSheet(
+                                onDismissRequest = { 
+                                    showBottomSheet = false
+                                    sheetContentType = SheetContent.None
+                                    mainViewModel.startEditingHabit(null)
+                                },
+                                sheetState = sheetState,
+                                dragHandle = { BottomSheetDefaults.DragHandle() },
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+                            ) {
+                                when (sheetContentType) {
+                                    SheetContent.JournalEntry -> {
+                                        val isUploading by mainViewModel.isUploading.collectAsState()
+                                        JournalEntryPanel(
+                                            onDismiss = { showBottomSheet = false },
+                                            onPost = { emoji, text, uri ->
+                                                mainViewModel.saveJournalEntry(emoji, text, uri) {
                                                     showBottomSheet = false
                                                 }
-                                            )
-                                        }
-                                        else -> Box(Modifier.size(1.dp))
+                                            },
+                                            isUploading = isUploading
+                                        )
                                     }
+                                    SheetContent.HabitSelection -> {
+                                        val selectedHabitDate by mainViewModel.selectedHabitDate.collectAsState()
+                                        val editingHabitData by mainViewModel.editingHabit.collectAsState()
+                                        NewHabitSheet(
+                                            initialDate = selectedHabitDate,
+                                            editingHabit = editingHabitData,
+                                            onDismiss = { 
+                                                showBottomSheet = false
+                                                mainViewModel.startEditingHabit(null)
+                                            },
+                                            onHabitSelected = { name, icon, time, mins, color, date ->
+                                                val colorInt = (color.red * 255).toInt() shl 16 or
+                                                              (color.green * 255).toInt() shl 8 or
+                                                              (color.blue * 255).toInt()
+                                                val colorHex = String.format("#%06X", colorInt)
+
+                                                mainViewModel.saveHabit(
+                                                    id = editingHabitData?.id ?: "",
+                                                    name = name,
+                                                    icon = icon,
+                                                    goal = "1",
+                                                    colorHex = colorHex,
+                                                    reminderTime = time,
+                                                    reminderMinutesBefore = mins,
+                                                    date = date
+                                                ) {
+                                                    showBottomSheet = false
+                                                    mainViewModel.startEditingHabit(null)
+                                                }
+                                            }
+                                        )
+                                    }
+                                    else -> Box(Modifier.size(1.dp))
                                 }
                             }
                         }
@@ -183,7 +284,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
+}
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_DOWN) {
             val v = currentFocus

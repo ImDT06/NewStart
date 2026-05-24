@@ -5,6 +5,7 @@ import com.example.newstart.domain.repository.AuthRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -14,7 +15,8 @@ import javax.inject.Singleton
 
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val firestore: FirebaseFirestore
 ) : AuthRepository {
 
     override val currentUser: Flow<User?> = callbackFlow {
@@ -24,7 +26,8 @@ class AuthRepositoryImpl @Inject constructor(
                 User(
                     id = it.uid,
                     name = it.displayName ?: "",
-                    email = it.email ?: ""
+                    email = it.email ?: "",
+                    avatarUrl = it.photoUrl?.toString()
                 )
             }
             trySend(user)
@@ -48,7 +51,8 @@ class AuthRepositoryImpl @Inject constructor(
                 User(
                     id = firebaseUser.uid,
                     name = firebaseUser.displayName ?: "",
-                    email = firebaseUser.email ?: ""
+                    email = firebaseUser.email ?: "",
+                    avatarUrl = firebaseUser.photoUrl?.toString()
                 )
             )
         } catch (e: Exception) {
@@ -67,13 +71,16 @@ class AuthRepositoryImpl @Inject constructor(
                 .build()
             firebaseUser.updateProfile(profileUpdates).await()
 
-            Result.success(
-                User(
-                    id = firebaseUser.uid,
-                    name = name,
-                    email = email
-                )
+            // LƯU VÀO FIRESTORE NGAY KHI ĐĂNG KÝ
+            val newUser = User(
+                id = firebaseUser.uid,
+                name = name,
+                email = email,
+                avatarUrl = null
             )
+            firestore.collection("users").document(firebaseUser.uid).set(newUser).await()
+
+            Result.success(newUser)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -106,7 +113,8 @@ class AuthRepositoryImpl @Inject constructor(
                 User(
                     id = firebaseUser.uid,
                     name = firebaseUser.displayName ?: "",
-                    email = firebaseUser.email ?: ""
+                    email = firebaseUser.email ?: "",
+                    avatarUrl = firebaseUser.photoUrl?.toString()
                 )
             )
         } catch (e: Exception) {

@@ -27,17 +27,19 @@ import com.example.newstart.R
 fun SmallLanguageSwitcher(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tintColor: Color = MaterialTheme.colorScheme.primary
+    tintColor: Color = MaterialTheme.colorScheme.primary,
+    backgroundColor: Color = MaterialTheme.colorScheme.surface
 ) {
-    val currentLocale = AppCompatDelegate.getApplicationLocales().toLanguageTags()
-    val isVietnamese = currentLocale.contains("vi") || currentLocale.isEmpty()
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isVietnamese = configuration.locales[0].language == "vi"
 
     Surface(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp
+        color = backgroundColor,
+        shadowElevation = if (backgroundColor == Color.Transparent) 0.dp else 2.dp,
+        border = if (backgroundColor == Color.Transparent) BorderStroke(1.dp, tintColor.copy(alpha = 0.5f)) else null
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -53,7 +55,7 @@ fun SmallLanguageSwitcher(
                     painter = painterResource(id = if (isVietnamese) R.drawable.ic_flag_vn else R.drawable.ic_flag_en),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop // Đảm bảo ảnh luôn lấp đầy hình tròn
+                    contentScale = ContentScale.Crop
                 )
             }
 
@@ -72,8 +74,8 @@ fun TransparentLanguageSwitcher(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val currentLocale = AppCompatDelegate.getApplicationLocales().toLanguageTags()
-    val isVietnamese = currentLocale.contains("vi") || currentLocale.isEmpty()
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isVietnamese = configuration.locales[0].language == "vi"
 
     Surface(
         onClick = onClick,
@@ -96,7 +98,7 @@ fun TransparentLanguageSwitcher(
                     painter = painterResource(id = if (isVietnamese) R.drawable.ic_flag_vn else R.drawable.ic_flag_en),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop // Đảm bảo ảnh luôn lấp đầy hình tròn
+                    contentScale = ContentScale.Crop
                 )
             }
 

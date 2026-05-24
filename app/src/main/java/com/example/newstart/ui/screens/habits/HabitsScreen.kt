@@ -1,168 +1,762 @@
 package com.example.newstart.ui.screens.habits
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.newstart.R
-import com.example.newstart.ui.theme.NewStartTheme
+import com.example.newstart.domain.model.Habit
+import com.example.newstart.ui.MainViewModel
+import com.example.newstart.ui.screens.journal.MonthPickerDialog
+import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.format.TextStyle
-import java.util.*
+import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAdjusters
+import kotlin.math.roundToInt
 
-data class Habit(
-    val id: String,
-    val name: String,
-    val icon: String,
-    val progress: String,
-    val goal: String,
-    val streak: Int? = null,
-    val color: Color,
-    val isCompleted: Boolean = false
-)
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HabitsScreen(modifier: Modifier = Modifier) {
-    val habits = listOf(
-        Habit("1", "Zhongwen", "🇨🇳", "47m 44s", "1h", null, Color(0xFFFF3B30), true),
-        Habit("2", "Read a book", "📚", "0", "1h", 1, Color(0xFF1D1D1F)),
-        Habit("3", "Drink water", "💧", "0", "3000 ml", null, Color(0xFF1D1D1F))
-    )
+fun HabitsScreen(
+    mainViewModel: MainViewModel,
+    modifier: Modifier = Modifier,
+    viewModel: HabitsViewModel = hiltViewModel()
+) {
+    val habits by viewModel.habits.collectAsState()
+    val selectedDate by mainViewModel.selectedHabitDate.collectAsState()
+    val aiState by viewModel.aiState.collectAsState()
+    
+    val scope = rememberCoroutineScope()
+    var habitToDelete by remember { mutableStateOf<Habit?>(null) }
+    var showMonthPicker by remember { mutableStateOf(false) }
+    var showAiDialog by remember { mutableStateOf(false) }
+    var aiCommand by remember { mutableStateOf("") }
+    val aiSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.Black) // Luôn để nền đen theo mẫu
-            .statusBarsPadding()
-    ) {
-        // Top Bar
-        Row(
+    val context = LocalContext.current
+    var isListening by remember { mutableStateOf(false) }
+    
+    val speechRecognizer = remember { SpeechRecognizer.createSpeechRecognizer(context) }
+    
+    val speechRecognizerIntent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN")
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            isListening = true
+            speechRecognizer.startListening(speechRecognizerIntent)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val listener = object : RecognitionListener {
+            override fun onReadyForSpeech(params: android.os.Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {
+                isListening = false
+            }
+            override fun onError(error: Int) {
+                isListening = false
+            }
+            override fun onResults(results: android.os.Bundle?) {
+                val data = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!data.isNullOrEmpty()) {
+                    val command = data[0]
+                    aiCommand = command
+                    // Tự động gửi lệnh AI
+                    viewModel.processAiCommand(command)
+                }
+                isListening = false
+            }
+            override fun onPartialResults(partialResults: android.os.Bundle?) {
+                val data = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!data.isNullOrEmpty()) {
+                    aiCommand = data[0]
+                }
+            }
+            override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
+        }
+        speechRecognizer.setRecognitionListener(listener)
+        onDispose {
+            speechRecognizer.destroy()
+        }
+    }
+
+    // State for draggable AI button
+    var aiButtonOffset by remember { mutableStateOf(Offset.Zero) }
+    
+    val today = LocalDate.now()
+    val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500)
+
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    val isVietnamese = locale.language == "vi"
+
+    LaunchedEffect(selectedDate) {
+        viewModel.onDateSelected(selectedDate)
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .statusBarsPadding()
         ) {
-            Surface(
-                color = Color(0xFFFF4D67),
-                shape = RoundedCornerShape(12.dp),
-                onClick = { /* All filter */ }
+            // Top Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    color = MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(12.dp),
+                    onClick = { /* All filter */ }
                 ) {
-                    Text("All", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.habits_filter_all),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Icon(Icons.Default.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(12.dp))
+                    }
+                }
+
+                val headerDateText = remember(selectedDate, locale) {
+                    if (selectedDate == today) null
+                    else {
+                        val pattern = if (isVietnamese) "dd MMMM" else "MMM dd"
+                        selectedDate.format(DateTimeFormatter.ofPattern(pattern, locale))
+                    }
+                }
+
+                Text(
+                    text = headerDateText ?: stringResource(R.string.habits_today),
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            mainViewModel.onHabitDateSelected(today)
+                            scope.launch {
+                                pagerState.animateScrollToPage(500)
+                            }
+                        }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(36.dp),
+                    onClick = { showMonthPicker = true }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarMonth,
+                            contentDescription = "Month Picker",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
 
-            Text(
-                text = "Today",
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
+            // Horizontal Date Picker
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) { page ->
+                val weekStart = remember(page) {
+                    today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                        .plusWeeks((page - 500).toLong())
+                }
+                val weekDays = remember(weekStart) { (0..6).map { weekStart.plusDays(it.toLong()) } }
 
-            Box(modifier = Modifier.size(26.dp)) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color.Yellow,
-                    modifier = Modifier.size(22.dp).align(Alignment.Center)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("😊", fontSize = 12.sp)
+                    weekDays.forEach { day ->
+                        val isSelected = day == selectedDate
+                        val isToday = day == today
+
+                        val dayName = remember(day, locale) {
+                            if (isVietnamese) {
+                                when (day.dayOfWeek) {
+                                    DayOfWeek.MONDAY -> "T2"
+                                    DayOfWeek.TUESDAY -> "T3"
+                                    DayOfWeek.WEDNESDAY -> "T4"
+                                    DayOfWeek.THURSDAY -> "T5"
+                                    DayOfWeek.FRIDAY -> "T6"
+                                    DayOfWeek.SATURDAY -> "T7"
+                                    DayOfWeek.SUNDAY -> "CN"
+                                }
+                            } else {
+                                day.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, locale).uppercase()
+                            }
+                        }
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { mainViewModel.onHabitDateSelected(day) }
+                        ) {
+                            Text(
+                                text = dayName,
+                                color = if (isSelected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Surface(
+                                modifier = Modifier.size(40.dp),
+                                shape = CircleShape,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                border = if (!isSelected && isToday) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = day.dayOfMonth.toString(),
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Habit List
+            if (habits.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = stringResource(R.string.habits_empty),
+                        color = Color.Gray,
+                        fontSize = 14.sp
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 100.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(
+                        items = habits,
+                        key = { it.id }
+                    ) { habit ->
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = {
+                                if (it == SwipeToDismissBoxValue.EndToStart) {
+                                    habitToDelete = habit
+                                    false
+                                } else false
+                            }
+                        )
+
+                        LaunchedEffect(habitToDelete) {
+                            if (habitToDelete == null) {
+                                dismissState.reset()
+                            }
+                        }
+
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            modifier = Modifier.animateItem(), // Smooth animation when adding/removing
+                            enableDismissFromStartToEnd = false,
+                            backgroundContent = {
+                                val isSwiping = dismissState.targetValue != SwipeToDismissBoxValue.Settled
+                                val backgroundColor = if (isSwiping && dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                                    Color.Red.copy(alpha = 0.8f)
+                                } else {
+                                    Color.Transparent
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(backgroundColor),
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    if (isSwiping && dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete",
+                                            tint = Color.White,
+                                            modifier = Modifier.padding(end = 16.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            content = {
+                                HabitItem(
+                                    habit = habit,
+                                    onToggle = { viewModel.toggleHabit(habit, !habit.isCompleted) },
+                                    onEdit = {
+                                        mainViewModel.startEditingHabit(habit)
+                                    }
+                                )
+                            }
+                        )
                     }
                 }
             }
         }
 
-        // Horizontal Date Picker
-        val today = LocalDate.now()
-        val days = (0..6).map { today.plusDays(it.toLong() - 3) }
-        
-        LazyRow(
+        // Floating Draggable Modern AI Button
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            contentPadding = PaddingValues(horizontal = 16.dp)
+                .align(Alignment.BottomEnd)
+                .offset { IntOffset(aiButtonOffset.x.roundToInt(), aiButtonOffset.y.roundToInt()) }
+                .pointerInput(Unit) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        aiButtonOffset += dragAmount
+                    }
+                }
+                .padding(end = 20.dp, bottom = 100.dp)
+                .size(56.dp)
+                .border(
+                    width = 2.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(Color(0xFF4285F4), Color(0xFF9B72CB))
+                    ),
+                    shape = CircleShape
+                ),
+            onClick = { showAiDialog = true }
         ) {
-            items(days) { day ->
-                val isSelected = day == today
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(horizontal = 6.dp)
-                ) {
-                    Text(
-                        text = day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH),
-                        color = Color.Gray,
-                        fontSize = 9.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Surface(
-                        modifier = Modifier.size(32.dp),
-                        shape = CircleShape,
-                        color = Color.Transparent,
-                        border = if (isSelected) BorderStroke(1.5.dp, Color(0xFFFF4D67)) else null,
-                        onClick = { /* Select date */ }
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = day.dayOfMonth.toString(),
-                                color = if (isSelected) Color.White else Color.Gray,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = "AI Assistant",
+                    modifier = Modifier.size(28.dp),
+                    tint = Color(0xFF9B72CB)
+                )
+            }
+        }
+
+        // AI Interaction Flow (Modal Bottom Sheet)
+        if (showAiDialog || aiState is AiState.Drafting) {
+            val aiGradient = Brush.linearGradient(
+                colors = listOf(Color(0xFF4285F4), Color(0xFF9B72CB))
+            )
+
+            ModalBottomSheet(
+                onDismissRequest = { 
+                    showAiDialog = false
+                    aiCommand = ""
+                    viewModel.clearAiState()
+                },
+                sheetState = aiSheetState,
+                containerColor = MaterialTheme.colorScheme.surface,
+                dragHandle = { BottomSheetDefaults.DragHandle() },
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+            ) {
+                AnimatedContent(
+                    targetState = aiState,
+                    transitionSpec = { fadeIn().togetherWith(fadeOut()) },
+                    label = "ai_content_anim"
+                ) { targetState ->
+                    when (targetState) {
+                        is AiState.Drafting -> {
+                            val drafts = targetState.habits
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp)
+                                    .padding(bottom = 40.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    "Xác nhận thói quen",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "AI đã đề xuất ${drafts.size} mục mới cho bạn",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                
+                                Spacer(modifier = Modifier.height(24.dp))
+                                
+                                LazyColumn(
+                                    modifier = Modifier.weight(1f, fill = false),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    items(drafts) { habit ->
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(20.dp),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                            ),
+                                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(16.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Surface(
+                                                    modifier = Modifier.size(48.dp),
+                                                    shape = CircleShape,
+                                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Text(habit.icon, fontSize = 24.sp)
+                                                    }
+                                                }
+                                                
+                                                Spacer(modifier = Modifier.width(16.dp))
+                                                
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(habit.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                                    if (habit.reminderTime != null) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Icon(Icons.Default.NotificationsActive, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                                                            Spacer(Modifier.width(4.dp))
+                                                            Text(habit.reminderTime!!, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                Icon(Icons.Default.Edit, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(32.dp))
+                                
+                                Button(
+                                    onClick = { 
+                                        viewModel.confirmAiHabits(drafts)
+                                        showAiDialog = false
+                                        aiCommand = ""
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(56.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary
+                                    )
+                                ) {
+                                    Text("Thêm tất cả vào lịch trình", fontWeight = FontWeight.Bold)
+                                }
+                                
+                                TextButton(
+                                    onClick = { viewModel.clearAiState() },
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                                ) {
+                                    Text("Hủy bỏ", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                        else -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                                    .imePadding()
+                                    .padding(horizontal = 24.dp)
+                                    .padding(bottom = 32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.AutoAwesome, 
+                                        null, 
+                                        tint = Color(0xFF9B72CB),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(
+                                        "NewStart AI",
+                                        style = MaterialTheme.typography.headlineSmall.copy(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            brush = aiGradient
+                                        )
+                                    )
+                                }
+
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Tôi có thể giúp bạn lên lịch thói quen chỉ bằng một câu nói.",
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(Modifier.height(24.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    listOf("Ăn sáng 7h", "Gym 17h", "Đọc sách 22h").forEach { suggestion ->
+                                        AssistChip(
+                                            onClick = { aiCommand = "Thêm thói quen $suggestion" },
+                                            label = { Text(suggestion, fontSize = 12.sp) },
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(Modifier.height(16.dp))
+
+                                OutlinedTextField(
+                                    value = aiCommand,
+                                    onValueChange = { aiCommand = it },
+                                    placeholder = { Text("Bạn đang muốn làm gì?") },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .border(
+                                            width = 1.dp,
+                                            brush = if (aiCommand.isNotBlank() || isListening) aiGradient else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
+                                            shape = RoundedCornerShape(16.dp)
+                                        ),
+                                    shape = RoundedCornerShape(16.dp),
+                                    leadingIcon = {
+                                        IconButton(
+                                            onClick = {
+                                                if (isListening) {
+                                                    speechRecognizer.stopListening()
+                                                    isListening = false
+                                                } else {
+                                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                                                        isListening = true
+                                                        speechRecognizer.startListening(speechRecognizerIntent)
+                                                    } else {
+                                                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                                    }
+                                                }
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicNone,
+                                                contentDescription = "Voice Input",
+                                                tint = if (isListening) Color.Red else Color(0xFF9B72CB),
+                                                modifier = if (isListening) Modifier.size(28.dp) else Modifier.size(24.dp)
+                                            )
+                                        }
+                                    },
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent
+                                    ),
+                                    trailingIcon = {
+                                        IconButton(
+                                            onClick = { 
+                                                if (aiCommand.isNotBlank()) {
+                                                    viewModel.processAiCommand(aiCommand) 
+                                                }
+                                            },
+                                            enabled = aiCommand.isNotBlank() && targetState !is AiState.Loading
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.Send, 
+                                                contentDescription = "Send",
+                                                tint = if (aiCommand.isNotBlank()) Color(0xFF9B72CB) else Color.Gray
+                                            )
+                                        }
+                                    },
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                        imeAction = androidx.compose.ui.text.input.ImeAction.Send
+                                    ),
+                                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                                        onSend = { viewModel.processAiCommand(aiCommand) }
+                                    )
+                                )
+
+                                if (targetState is AiState.Loading) {
+                                    LinearProgressIndicator(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 16.dp)
+                                            .height(2.dp)
+                                            .clip(CircleShape),
+                                        color = Color(0xFF9B72CB),
+                                        trackColor = Color(0xFF9B72CB).copy(alpha = 0.1f)
+                                    )
+                                }
+
+                                if (targetState is AiState.Error) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        targetState.message, 
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+
+                                if (targetState is AiState.Success) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        targetState.message, 
+                                        color = Color(0xFF4CAF50),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        // Delete Confirmation Dialog
+        habitToDelete?.let { habit ->
+            AlertDialog(
+                onDismissRequest = { habitToDelete = null },
+                title = { Text(stringResource(R.string.habits_delete_title)) },
+                text = { Text(stringResource(R.string.habits_delete_msg, habit.name)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteHabit(habit.id)
+                            habitToDelete = null
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text(stringResource(R.string.habits_delete_confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { habitToDelete = null }) {
+                        Text(stringResource(R.string.habits_cancel))
+                    }
+                }
+            )
+        }
 
-        // Habit List
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(habits) { habit ->
-                HabitItem(habit)
-            }
+        // Monthly Calendar Dialog
+        if (showMonthPicker) {
+            MonthPickerDialog(
+                selectedDate = selectedDate,
+                onDateSelected = { date ->
+                    mainViewModel.onHabitDateSelected(date)
+                    showMonthPicker = false
+                    val weekDiff = (date.toEpochDay() - today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toEpochDay()) / 7
+                    scope.launch {
+                        pagerState.scrollToPage(500 + weekDiff.toInt())
+                    }
+                },
+                onDismiss = { showMonthPicker = false }
+            )
         }
     }
 }
 
 @Composable
-fun HabitItem(habit: Habit) {
+fun HabitItem(
+    habit: Habit,
+    onToggle: () -> Unit,
+    onEdit: () -> Unit
+) {
+    val color = remember(habit.colorHex) {
+        try {
+            Color(android.graphics.Color.parseColor(habit.colorHex))
+        } catch (e: Exception) {
+            Color(0xFF1D5FE2)
+        }
+    }
+
+    // Interaction scale animation
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        label = "scale"
+    )
+
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer(scaleX = scale, scaleY = scale) // Apply scale effect
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null, // Disable default ripple to emphasize custom scale
+                onClick = onEdit
+            ),
         shape = RoundedCornerShape(16.dp),
-        color = habit.color.copy(alpha = if (habit.isCompleted) 1f else 0.12f)
+        color = color.copy(alpha = if (habit.isCompleted) 1f else 0.12f)
     ) {
         Row(
             modifier = Modifier
@@ -170,11 +764,10 @@ fun HabitItem(habit: Habit) {
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon
             Surface(
                 modifier = Modifier.size(32.dp),
                 shape = RoundedCornerShape(8.dp),
-                color = Color.White.copy(alpha = 0.1f)
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(habit.icon, fontSize = 16.sp)
@@ -187,11 +780,11 @@ fun HabitItem(habit: Habit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = habit.name,
-                        color = Color.White,
+                        color = if (habit.isCompleted) Color.White else MaterialTheme.colorScheme.onSurface,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    if (habit.streak != null) {
+                    if (habit.streak > 0) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             Icons.Default.LocalFireDepartment, 
@@ -200,43 +793,46 @@ fun HabitItem(habit: Habit) {
                             modifier = Modifier.size(12.dp)
                         )
                         Text(
-                            "${habit.streak} Day",
-                            color = Color.Gray,
+                            "${habit.streak} " + stringResource(R.string.habits_streak_day),
+                            color = if (habit.isCompleted) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
                 Text(
-                    text = "${habit.progress}/${habit.goal}",
-                    color = Color.Gray.copy(alpha = 0.7f),
+                    text = if (habit.reminderTime != null) {
+                        "${habit.progress}/${habit.goal} • 🔔 ${habit.reminderTime}"
+                    } else {
+                        "${habit.progress}/${habit.goal}"
+                    },
+                    color = if (habit.isCompleted) Color.White.copy(alpha = 0.7f) else Color.Gray.copy(alpha = 0.7f),
                     fontSize = 11.sp
                 )
             }
 
-            // Action Button
-            IconButton(
-                onClick = { /* Action */ },
+            Box(
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(20.dp)
                     .clip(CircleShape)
-                    .background(if (habit.isCompleted) Color.Black.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f))
+                    .border(
+                        width = 1.2.dp,
+                        color = if (habit.isCompleted) Color.Transparent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                        shape = CircleShape
+                    )
+                    .background(if (habit.isCompleted) Color.White.copy(alpha = 0.2f) else Color.Transparent)
+                    .clickable { onToggle() },
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = if (habit.isCompleted) Icons.Default.Check else Icons.Default.Add,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(14.dp)
-                )
+                if (habit.isCompleted) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun HabitsScreenPreview() {
-    NewStartTheme {
-        HabitsScreen()
     }
 }

@@ -140,12 +140,13 @@ fun RegisterContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .height(200.dp)
                     .background(
-                        brush = Brush.verticalGradient(
+                        brush = Brush.linearGradient(
                             colors = listOf(
+                                Color(0xFF0D47A1), // Deep Dark Blue
                                 MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                Color(0xFF1565C0)  // Solid Medium Blue
                             )
                         )
                     )
@@ -174,7 +175,8 @@ fun RegisterContent(
 
                     SmallLanguageSwitcher(
                         onClick = { onToggleLanguagePicker(true) },
-                        tintColor = MaterialTheme.colorScheme.onPrimary
+                        tintColor = MaterialTheme.colorScheme.onPrimary,
+                        backgroundColor = Color.Transparent
                     )
                 }
 
@@ -186,20 +188,15 @@ fun RegisterContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+                        .padding(start = 32.dp, end = 32.dp, bottom = 45.dp),
                     verticalArrangement = Arrangement.Bottom
                 ) {
                     Text(
                         text = stringResource(id = R.string.register_title),
                         color = MaterialTheme.colorScheme.onPrimary,
                         fontSize = 30.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = stringResource(id = R.string.register_subtitle),
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                        fontSize = 14.sp,
-                        lineHeight = 18.sp
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
                     )
                 }
             }
@@ -207,7 +204,7 @@ fun RegisterContent(
             // Form Section
             Column(
                 modifier = Modifier
-                    .padding(top = 155.dp)
+                    .padding(top = 175.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(MaterialTheme.colorScheme.surface)
@@ -215,7 +212,7 @@ fun RegisterContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     RegisterInputField(
                         value = fullName,
                         onValueChange = onFullNameChange,
@@ -289,35 +286,29 @@ fun RegisterContent(
                         )
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(
-                            checked = acceptTerms,
-                            onCheckedChange = onAcceptTermsChange,
-                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
-                        )
-                        Text(
-                            text = buildAnnotatedString {
-                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                    append(stringResource(id = R.string.register_terms_prefix))
-                                }
-                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
-                                    append(stringResource(id = R.string.register_terms_service))
-                                }
-                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                    append(stringResource(id = R.string.register_terms_and))
-                                }
-                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
-                                    append(stringResource(id = R.string.register_terms_privacy))
-                                }
-                            },
-                            fontSize = 12.sp,
-                            lineHeight = 18.sp,
-                            modifier = Modifier.clickable { onAcceptTermsChange(!acceptTerms) }
-                        )
-                    }
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                                append(stringResource(id = R.string.register_terms_prefix))
+                            }
+                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
+                                append(stringResource(id = R.string.register_terms_service))
+                            }
+                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                                append(stringResource(id = R.string.register_terms_and))
+                            }
+                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
+                                append(stringResource(id = R.string.register_terms_privacy))
+                            }
+                        },
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        letterSpacing = 0.5.sp,
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp, vertical = 8.dp)
+                            .clickable { onAcceptTermsChange(!acceptTerms) },
+                        textAlign = TextAlign.Start
+                    )
                 }
 
                 Column(

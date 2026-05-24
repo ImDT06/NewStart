@@ -2,16 +2,16 @@
     <string name="app_name">NewStart</string>
 
     <!-- Welcome Screen -->
-    <string name="welcome_simple">Simple</string>
-    <string name="welcome_edu">edu</string>
-    <string name="welcome_slogan">Tận hưởng việc học ngay trong tầm tay!</string>
+    <string name="welcome_simple">New</string>
+    <string name="welcome_edu">Start</string>
+    <string name="welcome_slogan">Khởi đầu hành trình thay đổi bản thân ngay hôm nay!</string>
     <string name="welcome_get_started">Bắt đầu ngay</string>
-    <string name="welcome_new_here">Bạn mới? </string>
+    <string name="welcome_new_here">"Bạn mới? "</string>
     <string name="welcome_sign_up">Đăng ký</string>
 
     <!-- Login Screen -->
     <string name="login_title">Đăng nhập</string>
-    <string name="login_subtitle">Trải nghiệm môi trường học tập tốt hơn</string>
+    <string name="login_subtitle">Đã đến lúc tiếp tục hành trình xây dựng thói quen tốt</string>
     <string name="login_label_email">Địa chỉ Email</string>
     <string name="login_placeholder_email">Địa chỉ Email</string>
     <string name="login_label_password">Mật khẩu</string>
@@ -24,7 +24,7 @@
 
     <!-- Register Screen -->
     <string name="register_title">Đăng ký</string>
-    <string name="register_subtitle">Đăng ký để bắt đầu quá trình học tập của bạn</string>
+    <string name="register_subtitle">Đăng ký để cùng NewStart tạo nên những thay đổi tích cực</string>
     <string name="register_label_name">Họ và tên</string>
     <string name="register_placeholder_name">Họ và tên</string>
     <string name="register_label_mobile">Số điện thoại</string>
@@ -33,12 +33,12 @@
     <string name="register_placeholder_password">Nhập mật khẩu</string>
     <string name="register_label_confirm">Xác nhận mật khẩu</string>
     <string name="register_placeholder_confirm">Nhập lại mật khẩu</string>
-    <string name="register_terms_prefix">Bằng cách đăng ký, bạn chấp nhận </string>
+    <string name="register_terms_prefix">"Bằng cách đăng ký, bạn chấp nhận "</string>
     <string name="register_terms_service">Điều khoản dịch vụ</string>
     <string name="register_terms_and"> &amp; </string>
     <string name="register_terms_privacy">Chính sách bảo mật</string>
     <string name="register_btn_now">Đăng ký</string>
-    <string name="register_already_member">Đã là thành viên? </string>
+    <string name="register_already_member">"Đã là thành viên? "</string>
     <string name="register_login_now">Đăng nhập ngay</string>
 
     <!-- Home Screen -->
@@ -46,7 +46,10 @@
     <string name="home_email">Email: %1$s</string>
     <string name="home_view_details">Xem chi tiết</string>
     <string name="home_loading">Đang tải người dùng…</string>
-    <string name="home_hello">Xin chào %1$s!</string>
+    <string name="home_hello_morning">Chào buổi sáng, %1$s!</string>
+    <string name="home_hello_noon">Chào buổi trưa, %1$s!</string>
+    <string name="home_hello_afternoon">Chào buổi chiều, %1$s!</string>
+    <string name="home_hello_evening">Chào buổi tối, %1$s!</string>
     <string name="home_search_placeholder">Tìm kiếm khóa học, bài học...</string>
     <string name="home_category_courses">Khóa học</string>
     <string name="home_category_exams">Kỳ thi</string>
@@ -83,11 +86,55 @@
     <string name="settings_confirm_logout_title">Đăng xuất</string>
     <string name="settings_confirm_logout_msg">Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này không?</string>
     <string name="settings_cancel">Hủy</string>
+
     <!-- Journal Screen -->
     <string name="journal_title">Nhật ký</string>
-    <string name="journal_greeting">Chào buổi sáng! 🌸</string>
+    <string name="journal_greeting_morning">Chào buổi sáng!</string>
+    <string name="journal_greeting_noon">Chào buổi trưa!</string>
+    <string name="journal_greeting_afternoon">Chào buổi chiều!</string>
+    <string name="journal_greeting_evening">Chào buổi tối!</string>
     <string name="journal_subtitle">Hôm nay là một ngày tuyệt vời để ghi lại những khoảnh khắc đáng nhớ</string>
     <string name="journal_entry_placeholder">Bạn đang nghĩ gì?</string>
+    <string name="journal_memories_title">Kỷ niệm</string>
+    <string name="journal_close_button">Đóng</string>
+    <string name="journal_empty_message">Chưa có nhật ký nào.\nHãy bắt đầu ghi lại khoảnh khắc nhé!</string>
+    <string name="journal_delete_confirm_title">Xóa nhật ký?</string>
+    <string name="journal_delete_confirm_message">Hành động này không thể hoàn tác. Bạn có chắc chắn muốn xóa khoảnh khắc này không?</string>
+    <string name="journal_delete_confirm_button">Xóa</string>
+    <string name="journal_cancel_button">Hủy</string>
+
+    <!-- Habits Screen -->
+    <string name="habits_filter_all">Tất cả</string>
+    <string name="habits_today">Hôm nay</string>
+    <string name="habits_streak_day">Ngày</string>
+    <string name="habits_delete_title">Xóa thói quen</string>
+    <string name="habits_delete_msg">Bạn có chắc chắn muốn xóa \'%1$s\'?</string>
+    <string name="habits_delete_confirm">Xóa</string>
+    <string name="habits_cancel">Hủy</string>
+    <string name="habits_empty">Chưa có thói quen nào cho ngày này.</string>
+
+    <!-- New Habit Sheet -->
+    <string name="habits_new_title">Thói quen mới</string>
+    <string name="habits_cat_popular">Phổ biến</string>
+    <string name="habits_cat_health">Sức khỏe</string>
+    <string name="habits_cat_sports">Thể thao</string>
+    <string name="habits_cat_mind">Tâm trí</string>
+    <string name="habits_cat_study">Học tập</string>
+    <string name="habits_btn_custom">Tùy chỉnh</string>
+    <string name="habits_custom_dialog_title">Cấu hình thói quen</string>
+    <string name="habits_custom_dialog_new">Tạo thói quen mới</string>
+    <string name="habits_custom_name_label">Tên thói quen</string>
+    <string name="habits_custom_icon_label">Biểu tượng</string>
+    <string name="habits_btn_create">Xác nhận</string>
+    <string name="habits_reminder_label">Nhắc trước (phút):</string>
+    <string name="habits_custom_mins">Tùy chỉnh</string>
+    <string name="habits_custom_mins_label">Số phút nhắc trước</string>
+
+    <!-- Journal Entry Panel -->
+    <string name="journal_panel_title">Tạo khoảnh khắc</string>
+    <string name="journal_panel_placeholder">Bạn đang nghĩ gì?</string>
+    <string name="journal_panel_gallery">Chọn từ thư viện</string>
+    <string name="journal_panel_skip">Bỏ qua ảnh</string>
 
     <!-- Errors -->
     <string name="error_email_empty">Email không được để trống</string>

@@ -47,7 +47,15 @@ fun WelcomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.primary)
+            .background(
+                brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFF0D47A1), // Deep Dark Blue
+                        MaterialTheme.colorScheme.primary,
+                        Color(0xFF1565C0)  // Solid Medium Blue
+                    )
+                )
+            )
     ) {
         // Abstract Background Shapes (Waves)
         BackgroundGraphics(MaterialTheme.colorScheme.primaryContainer)
