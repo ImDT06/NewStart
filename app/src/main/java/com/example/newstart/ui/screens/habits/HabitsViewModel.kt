@@ -63,14 +63,14 @@ class HabitsViewModel @Inject constructor(
         val results = json.optJSONArray("results") ?: return emptyList()
         val drafts = mutableListOf<Habit>()
         val defaultDateStr = _selectedDate.value.format(DateTimeFormatter.ISO_LOCAL_DATE)
-        
+
         for (i in 0 until results.length()) {
             val item = results.getJSONObject(i)
             val action = item.optString("action")
             if (action == "ADD") {
                 // Ưu tiên ngày từ AI, nếu không có mới dùng ngày đang chọn trên UI
                 val habitDate = item.optString("date", defaultDateStr)
-                
+
                 drafts.add(Habit(
                     name = item.optString("name"),
                     icon = item.optString("icon", "✨"),

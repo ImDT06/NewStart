@@ -100,84 +100,90 @@ class MainActivity : AppCompatActivity() {
                 val isAuthRoute = listOf(Screen.Welcome.route, Screen.Login.route, Screen.Register.route).contains(currentRoute)
                 val showShell = authState == AuthState.Authenticated && !isAuthRoute
 
+                // Determine start destination based on Auth State
+                val startDestination = remember(authState) {
+                    if (authState == AuthState.Authenticated) Screen.Home.route else Screen.Welcome.route
+                }
+
                 val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    bottomBar = {
-                        if (showShell) {
-                            MainBottomBar(
-                                navController = navController
-                            )
-                        }
-                    },
-                    floatingActionButtonPosition = FabPosition.Center,
-                    floatingActionButton = {
-                        if (showShell) {
-                            FloatingActionButton(
-                                onClick = {
-                                    // 1. Kiểm tra quyền báo thức chính xác (Android 12+)
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                                        if (!alarmManager.canScheduleExactAlarms()) {
-                                            val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                                data = Uri.fromParts("package", packageName, null)
-                                            }
-                                            alarmPermissionLauncher.launch(intent)
-                                            return@FloatingActionButton
-                                        }
-                                    }
-
-                                    // 2. Yêu cầu quyền thông báo nếu cần (Android 13+)
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                        if (ContextCompat.checkSelfPermission(
-                                                context,
-                                                Manifest.permission.POST_NOTIFICATIONS
-                                            ) != PackageManager.PERMISSION_GRANTED
-                                        ) {
-                                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                            return@FloatingActionButton
-                                        }
-                                    }
-
-                                    when (currentRoute) {
-                                        Screen.Habits.route -> {
-                                            sheetContentType = SheetContent.HabitSelection
-                                            showBottomSheet = true
-                                        }
-                                        else -> {
-                                            sheetContentType = SheetContent.JournalEntry
-                                            showBottomSheet = true
-                                        }
-                                    }
-                                },
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .offset(y = 52.dp),
-                                shape = CircleShape,
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = Color.White,
-                                elevation = FloatingActionButtonDefaults.elevation(12.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "Add",
-                                    modifier = Modifier.size(28.dp)
+                if (authState != AuthState.Loading) {
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        bottomBar = {
+                            if (showShell) {
+                                MainBottomBar(
+                                    navController = navController
                                 )
                             }
+                        },
+                        floatingActionButtonPosition = FabPosition.Center,
+                        floatingActionButton = {
+                            if (showShell) {
+                                FloatingActionButton(
+                                    onClick = {
+                                        // 1. Kiểm tra quyền báo thức chính xác (Android 12+)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                                            if (!alarmManager.canScheduleExactAlarms()) {
+                                                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                                    data = Uri.fromParts("package", packageName, null)
+                                                }
+                                                alarmPermissionLauncher.launch(intent)
+                                                return@FloatingActionButton
+                                            }
+                                        }
+
+                                        // 2. Yêu cầu quyền thông báo nếu cần (Android 13+)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            if (ContextCompat.checkSelfPermission(
+                                                    context,
+                                                    Manifest.permission.POST_NOTIFICATIONS
+                                                ) != PackageManager.PERMISSION_GRANTED
+                                            ) {
+                                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                return@FloatingActionButton
+                                            }
+                                        }
+
+                                        when (currentRoute) {
+                                            Screen.Habits.route -> {
+                                                sheetContentType = SheetContent.HabitSelection
+                                                showBottomSheet = true
+                                            }
+                                            else -> {
+                                                sheetContentType = SheetContent.JournalEntry
+                                                showBottomSheet = true
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .offset(y = 30.dp), // Reduced offset to prevent it from being hidden
+                                    shape = CircleShape,
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = Color.White,
+                                    elevation = FloatingActionButtonDefaults.elevation(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Add",
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
                         }
-                    }
-                ) { innerPadding ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(bottom = if (showShell) innerPadding.calculateBottomPadding() else 0.dp)
-                    ) {
-                        NavGraph(
-                            navController = navController,
-                            startDestination = Screen.Home.route,
-                            mainViewModel = mainViewModel
-                        )
+                    ) { innerPadding ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPadding) // Correctly handle all insets including top (status bar)
+                        ) {
+                            NavGraph(
+                                navController = navController,
+                                startDestination = startDestination,
+                                mainViewModel = mainViewModel
+                            )
 
                         if (showBottomSheet) {
                             ModalBottomSheet(
@@ -245,7 +251,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
+}
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_DOWN) {
             val v = currentFocus
