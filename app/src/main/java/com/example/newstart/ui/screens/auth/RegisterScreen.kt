@@ -140,7 +140,7 @@ fun RegisterContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .height(200.dp)
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
@@ -174,7 +174,8 @@ fun RegisterContent(
 
                     SmallLanguageSwitcher(
                         onClick = { onToggleLanguagePicker(true) },
-                        tintColor = MaterialTheme.colorScheme.onPrimary
+                        tintColor = MaterialTheme.colorScheme.onPrimary,
+                        backgroundColor = Color.Transparent
                     )
                 }
 
@@ -186,7 +187,7 @@ fun RegisterContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+                        .padding(start = 32.dp, end = 32.dp, bottom = 45.dp),
                     verticalArrangement = Arrangement.Bottom
                 ) {
                     Text(
@@ -207,7 +208,7 @@ fun RegisterContent(
             // Form Section
             Column(
                 modifier = Modifier
-                    .padding(top = 155.dp)
+                    .padding(top = 175.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(MaterialTheme.colorScheme.surface)
@@ -215,7 +216,7 @@ fun RegisterContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     RegisterInputField(
                         value = fullName,
                         onValueChange = onFullNameChange,

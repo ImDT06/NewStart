@@ -210,7 +210,7 @@ fun LoginContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .height(200.dp) // Increased height to fit subtitle
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
@@ -244,7 +244,8 @@ fun LoginContent(
 
                     SmallLanguageSwitcher(
                         onClick = { onToggleLanguagePicker(true) },
-                        tintColor = MaterialTheme.colorScheme.onPrimary
+                        tintColor = MaterialTheme.colorScheme.onPrimary,
+                        backgroundColor = Color.Transparent // Transparent to see arrow on blue
                     )
                 }
 
@@ -256,7 +257,7 @@ fun LoginContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+                        .padding(start = 32.dp, end = 32.dp, bottom = 45.dp), // Adjusted bottom padding
                     verticalArrangement = Arrangement.Bottom
                 ) {
                     Text(
@@ -277,15 +278,15 @@ fun LoginContent(
             // Form Section
             Column(
                 modifier = Modifier
-                    .padding(top = 155.dp)
+                    .padding(top = 175.dp) // Adjusted to overlap new header height
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(MaterialTheme.colorScheme.surface)
-                    .padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
+                    .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { // Reduced spacing between inputs
                     AuthInputField(
                         value = email,
                         onValueChange = onEmailChange,
@@ -302,39 +303,47 @@ fun LoginContent(
                         )
                     )
 
-                    AuthInputField(
-                        value = password,
-                        onValueChange = onPasswordChange,
-                        label = stringResource(id = R.string.login_label_password),
-                        placeholder = stringResource(id = R.string.login_placeholder_password),
-                        errorText = passwordError,
-                        icon = Icons.Default.Lock,
-                        isPassword = true,
-                        passwordVisible = passwordVisible,
-                        onPasswordVisibleChange = onPasswordVisibleChange,
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Done,
-                            keyboardType = KeyboardType.Password
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                onLoginClick()
-                            }
-                        )
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(onClick = onForgotPasswordClick) {
-                            Text(
-                                text = stringResource(id = R.string.login_forgot_password),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.primary
+                    Column { // Group Password and Forgot Password for tighter spacing
+                        AuthInputField(
+                            value = password,
+                            onValueChange = onPasswordChange,
+                            label = stringResource(id = R.string.login_label_password),
+                            placeholder = stringResource(id = R.string.login_placeholder_password),
+                            errorText = passwordError,
+                            icon = Icons.Default.Lock,
+                            isPassword = true,
+                            passwordVisible = passwordVisible,
+                            onPasswordVisibleChange = onPasswordVisibleChange,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Done,
+                                keyboardType = KeyboardType.Password
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    focusManager.clearFocus()
+                                    onLoginClick()
+                                }
                             )
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .offset(y = (-8).dp), // Negative offset to pull closer to field
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(
+                                onClick = onForgotPasswordClick,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp) // Reduced padding
+                            ) {
+                                Text(
+                                    text = stringResource(id = R.string.login_forgot_password),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }

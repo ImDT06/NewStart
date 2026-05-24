@@ -101,8 +101,41 @@ class MainActivity : AppCompatActivity() {
                 val showShell = authState == AuthState.Authenticated && !isAuthRoute
 
                 // Determine start destination based on Auth State
-                val startDestination = remember(authState) {
-                    if (authState == AuthState.Authenticated) Screen.Home.route else Screen.Welcome.route
+                // We use a constant start destination to avoid NavHost recreation issues
+                // and handle routing logic via LaunchedEffect
+                val startDestination = Screen.Welcome.route
+
+                // Handle navigation based on Auth State
+                LaunchedEffect(authState, currentRoute) {
+                    when (authState) {
+                        AuthState.Authenticated -> {
+                            // Navigate to Home if we are on Welcome/Login/Register
+                            val onAuthRoute = currentRoute == null || 
+                                            currentRoute == Screen.Welcome.route || 
+                                            currentRoute == Screen.Login.route || 
+                                            currentRoute == Screen.Register.route
+                            
+                            if (onAuthRoute) {
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        }
+                        AuthState.Unauthenticated -> {
+                            // Navigate to Welcome if we are not already on an auth route
+                            val onAppRoute = currentRoute != null && 
+                                           currentRoute != Screen.Welcome.route && 
+                                           currentRoute != Screen.Login.route && 
+                                           currentRoute != Screen.Register.route
+                            
+                            if (onAppRoute) {
+                                navController.navigate(Screen.Welcome.route) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        }
+                        else -> {}
+                    }
                 }
 
                 val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -159,7 +192,7 @@ class MainActivity : AppCompatActivity() {
                                     },
                                     modifier = Modifier
                                         .size(56.dp)
-                                        .offset(y = 30.dp), // Reduced offset to prevent it from being hidden
+                                        .offset(y = 56.dp), // Pushed down further to align with the bottom bar center
                                     shape = CircleShape,
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = Color.White,
@@ -177,12 +210,12 @@ class MainActivity : AppCompatActivity() {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(innerPadding) // Correctly handle all insets including top (status bar)
                         ) {
                             NavGraph(
                                 navController = navController,
                                 startDestination = startDestination,
-                                mainViewModel = mainViewModel
+                                mainViewModel = mainViewModel,
+                                modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
                             )
 
                         if (showBottomSheet) {
