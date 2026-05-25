@@ -46,7 +46,7 @@ import com.example.newstart.R
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
-import com.example.newstart.ui.util.SmallLanguageSwitcher
+import com.example.newstart.ui.util.TransparentLanguageSwitcher
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
@@ -243,10 +243,8 @@ fun LoginContent(
                         )
                     }
 
-                    SmallLanguageSwitcher(
-                        onClick = { onToggleLanguagePicker(true) },
-                        tintColor = MaterialTheme.colorScheme.onPrimary,
-                        backgroundColor = Color.Transparent // Transparent to see arrow on blue
+                    TransparentLanguageSwitcher(
+                        onClick = { onToggleLanguagePicker(true) }
                     )
                 }
 

@@ -35,7 +35,7 @@
     <string name="register_placeholder_confirm">Nhập lại mật khẩu</string>
     <string name="register_terms_prefix">"Bằng cách đăng ký, bạn chấp nhận "</string>
     <string name="register_terms_service">Điều khoản dịch vụ</string>
-    <string name="register_terms_and"> &amp; </string>
+    <string name="register_terms_and">" &amp; "</string>
     <string name="register_terms_privacy">Chính sách bảo mật</string>
     <string name="register_btn_now">Đăng ký</string>
     <string name="register_already_member">"Đã là thành viên? "</string>
