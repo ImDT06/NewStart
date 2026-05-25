@@ -246,7 +246,7 @@ fun SettingsScreen(
                 modifier = modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(bottom = 100.dp, start = 20.dp, end = 20.dp)
+                contentPadding = PaddingValues(bottom = 32.dp, start = 20.dp, end = 20.dp)
             ) {
                 // Profile Header Card
                 item {

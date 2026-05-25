@@ -108,17 +108,13 @@ fun JournalContent(
     // Khi bật/tắt tìm kiếm
     LaunchedEffect(isSearchActive) {
         if (isSearchActive) {
-            // Lưu lại filter hiện tại và chuyển sang All
             previousDateRange = selectedDateRange
             onQuickFilterSelected("All")
-            // Tự động focus vào ô tìm kiếm (tránh lỗi trong Preview)
             if (!isInspectionMode) {
                 focusRequester.requestFocus()
             }
         } else {
-            // Khi tắt tìm kiếm, chỉ khôi phục nếu người dùng chưa chọn filter khác trong lúc search
             previousDateRange?.let {
-                // Nếu hiện tại vẫn là "All" (mốc mặ định của search), thì mới khôi phục
                 val isStillAll = selectedDateRange.first == LocalDate.of(2000, 1, 1)
                 if (isStillAll) {
                     onDateRangeSelected(it.first, it.second)
@@ -138,10 +134,6 @@ fun JournalContent(
     val isVietnamese = locale.language == "vi"
 
     val timeFormatter = remember { SimpleDateFormat("HH:mm", locale) }
-    val dateFormatter = remember(locale) {
-        SimpleDateFormat(if (isVietnamese) "dd MMMM, yyyy" else "MMMM dd, yyyy", locale)
-    }
-
     val isDark = isSystemInDarkTheme()
     val today = LocalDate.now()
 
@@ -157,12 +149,12 @@ fun JournalContent(
                 brush = Brush.verticalGradient(
                     colors = if (isDark) {
                         listOf(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            MaterialTheme.colorScheme.background,
                             MaterialTheme.colorScheme.background
                         )
                     } else {
                         listOf(
-                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
                             MaterialTheme.colorScheme.background
                         )
                     }
@@ -175,55 +167,54 @@ fun JournalContent(
                 .statusBarsPadding()
         ) {
             // Header Section
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 0.dp)
             ) {
-                AnimatedContent(
-                    targetState = isSearchActive,
-                    transitionSpec = {
-                        (fadeIn() + expandHorizontally()).togetherWith(fadeOut() + shrinkHorizontally())
-                    },
-                    modifier = Modifier.weight(1f),
-                    label = "search_header"
-                ) { searching ->
-                    if (searching) {
-                        TextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .focusRequester(focusRequester),
-                            placeholder = { Text(stringResource(R.string.home_search_placeholder), fontSize = 14.sp) },
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                            ),
-                            leadingIcon = {
-                                Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.primary)
-                            },
-                            trailingIcon = {
-                                IconButton(onClick = { 
-                                    isSearchActive = false
-                                    searchQuery = ""
-                                    focusManager.clearFocus()
-                                }) {
-                                    Icon(Icons.Default.Close, null)
-                                }
-                            },
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.bodyLarge,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
-                        )
-                    } else {
-                        Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AnimatedContent(
+                        targetState = isSearchActive,
+                        transitionSpec = {
+                            (fadeIn() + expandHorizontally()).togetherWith(fadeOut() + shrinkHorizontally())
+                        },
+                        modifier = Modifier.weight(1f),
+                        label = "search_header"
+                    ) { searching ->
+                        if (searching) {
+                            TextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(focusRequester),
+                                placeholder = { Text(stringResource(R.string.home_search_placeholder), fontSize = 14.sp) },
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                ),
+                                trailingIcon = {
+                                    IconButton(onClick = { 
+                                        isSearchActive = false
+                                        searchQuery = ""
+                                        focusManager.clearFocus()
+                                    }) {
+                                        Icon(Icons.Default.Close, null)
+                                    }
+                                },
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodyLarge,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
+                            )
+                        } else {
                             val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
                             val greetingRes = when (hour) {
                                 in 5..10 -> R.string.journal_greeting_morning
@@ -233,63 +224,64 @@ fun JournalContent(
                             }
                             Text(
                                 text = stringResource(id = greetingRes),
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            
-                            val headerDateText = remember(selectedDateRange, locale) {
-                                val start = selectedDateRange.first
-                                val end = selectedDateRange.second
-                                if (end == null) {
-                                    if (start == today) dateFormatter.format(Date())
-                                    else {
-                                        val pattern = if (isVietnamese) "dd MMMM, yyyy" else "MMMM dd, yyyy"
-                                        start.format(DateTimeFormatter.ofPattern(pattern, locale))
-                                    }
-                                } else {
-                                    val pattern = if (isVietnamese) "dd/MM" else "MM/dd"
-                                    "${start.format(DateTimeFormatter.ofPattern(pattern, locale))} - ${end.format(DateTimeFormatter.ofPattern(pattern, locale))}"
-                                }
-                            }
-                            Text(
-                                text = headerDateText,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.clickable {
-                                    showDatePicker = true
-                                }
+                                style = MaterialTheme.typography.titleLarge, 
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                letterSpacing = (-0.5).sp
                             )
                         }
                     }
-                }
-                
-                if (!isSearchActive) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { isSearchActive = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.size(36.dp),
-                            onClick = { showDatePicker = true }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
+                    
+                    if (!isSearchActive) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { isSearchActive = true }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search",
+                                    modifier = Modifier.size(24.dp), // Match HabitsScreen icon size
+                                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                                )
+                            }
+                            IconButton(
+                                onClick = { showDatePicker = true }
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.CalendarMonth,
                                     contentDescription = "Date Picker",
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(24.dp), // Match HabitsScreen icon size
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
                     }
+                }
+
+                if (!isSearchActive) {
+                    val headerDateText = remember(selectedDateRange, locale) {
+                        val start = selectedDateRange.first
+                        val end = selectedDateRange.second
+                        if (end == null) {
+                            if (start == today) if (isVietnamese) "Hôm nay" else "Today"
+                            else {
+                                val pattern = if (isVietnamese) "dd MMMM" else "MMMM dd"
+                                start.format(DateTimeFormatter.ofPattern(pattern, locale))
+                            }
+                        } else {
+                            val pattern = if (isVietnamese) "dd/MM" else "MM/dd"
+                            "${start.format(DateTimeFormatter.ofPattern(pattern, locale))} - ${end.format(DateTimeFormatter.ofPattern(pattern, locale))}"
+                        }
+                    }
+                    Text(
+                        text = headerDateText,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .offset(y = (-8).dp) // Pull closer to greeting
+                            .clickable { onQuickFilterSelected("Today") }
+                    )
                 }
             }
 
@@ -297,12 +289,13 @@ fun JournalContent(
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(end = 20.dp)
             ) {
                 val filters = listOf(
                     "All" to R.string.habits_filter_all,
-                    "Year" to null, // Special case for Year/Month/Week if no generic string exists
+                    "Year" to null,
                     "Month" to null,
                     "Week" to null,
                     "Today" to R.string.habits_today
@@ -333,7 +326,6 @@ fun JournalContent(
                         selected = isSelected,
                         onClick = { 
                             onQuickFilterSelected(key)
-                            // Nếu người dùng chọn filter thủ công trong lúc search, xóa previousDateRange để không bị ghi đè khi thoát search
                             if (isSearchActive) {
                                 previousDateRange = null
                             }
@@ -349,7 +341,7 @@ fun JournalContent(
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primary,
                             selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            containerColor = if (isDark) Color.White.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                             labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                         ),
                         border = null
@@ -357,20 +349,20 @@ fun JournalContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(2.dp))
-
             // Journal List Surface
             Surface(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
-                color = MaterialTheme.colorScheme.surface
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp // Creates the "layered" effect
             ) {
                 if (filteredEntries.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        val emptyMsg = if (searchQuery.isEmpty()) stringResource(R.string.journal_empty_message)
+                                      else if (isVietnamese) "Không tìm thấy nhật ký phù hợp" else "No matching journal found"
                         Text(
-                            if (searchQuery.isEmpty()) stringResource(R.string.journal_empty_message)
-                            else if (isVietnamese) "Không tìm thấy nhật ký phù hợp" else "No matching journal found",
+                            emptyMsg,
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -400,7 +392,7 @@ fun JournalContent(
                             .pointerInput(Unit) {
                                 detectTapGestures(onTap = { focusManager.clearFocus() })
                             },
-                        contentPadding = PaddingValues(top = 4.dp, bottom = 80.dp, start = 24.dp, end = 24.dp)
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp, start = 16.dp, end = 16.dp)
                     ) {
                         items(
                             items = entriesWithHeaders,
@@ -412,10 +404,10 @@ fun JournalContent(
                                     text = item.format(DateTimeFormatter.ofPattern(pattern, locale)),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(top = 8.dp, bottom = 4.dp, start = 4.dp)
+                                        .padding(top = 16.dp, bottom = 8.dp, start = 8.dp)
                                 )
                             } else if (item is JournalEntry) {
                                 val dismissState = rememberSwipeToDismissBoxState(
@@ -438,13 +430,13 @@ fun JournalContent(
                                     enableDismissFromStartToEnd = false,
                                     backgroundContent = {
                                         val color = when (dismissState.dismissDirection) {
-                                            SwipeToDismissBoxValue.EndToStart -> Color.Red.copy(alpha = 0.8f)
+                                            SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
                                             else -> Color.Transparent
                                         }
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .padding(bottom = 32.dp)
+                                                .padding(vertical = 4.dp)
                                                 .clip(RoundedCornerShape(16.dp))
                                                 .background(color),
                                             contentAlignment = Alignment.CenterEnd
@@ -452,24 +444,18 @@ fun JournalContent(
                                             Icon(
                                                 Icons.Default.Delete,
                                                 contentDescription = "Delete",
-                                                tint = Color.White,
-                                                modifier = Modifier.padding(end = 16.dp)
+                                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                                modifier = Modifier.padding(end = 20.dp)
                                             )
                                         }
                                     },
                                     content = {
-                                        AnimatedVisibility(
-                                            visible = true,
-                                            enter = fadeIn() + slideInVertically(),
-                                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                                        ) {
-                                            TimelineEntryItem(
-                                                entry = item,
-                                                timeFormatted = item.timestamp?.let { timeFormatter.format(it) } ?: "--:--",
-                                                isLast = entries.lastOrNull()?.id == item.id,
-                                                onImageClick = { selectedImageUrl = it }
-                                            )
-                                        }
+                                        TimelineEntryItem(
+                                            entry = item,
+                                            timeFormatted = item.timestamp?.let { timeFormatter.format(it) } ?: "--:--",
+                                            isLast = entries.lastOrNull()?.id == item.id,
+                                            onImageClick = { selectedImageUrl = it }
+                                        )
                                     }
                                 )
                             }
@@ -479,7 +465,7 @@ fun JournalContent(
             }
         }
 
-        // Custom Date Range Picker Dialog
+        // Dialogs
         if (showDatePicker) {
             AdvancedDatePickerDialog(
                 initialStartDate = selectedDateRange.first,
@@ -488,7 +474,6 @@ fun JournalContent(
                 onDateRangeSelected = { start, end ->
                     onDateRangeSelected(start, end)
                     showDatePicker = false
-                    // Update week pager if it's a single date or just start date
                     val weekDiff = (start.toEpochDay() - today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toEpochDay()) / 7
                     scope.launch {
                         pagerState.scrollToPage(500 + weekDiff.toInt())
@@ -497,7 +482,6 @@ fun JournalContent(
             )
         }
 
-        // Delete Confirmation Dialog
         entryToDelete?.let { entry ->
             AlertDialog(
                 onDismissRequest = { entryToDelete = null },
@@ -522,7 +506,6 @@ fun JournalContent(
             )
         }
 
-        // Image Viewer Dialog
         selectedImageUrl?.let { url ->
             Dialog(
                 onDismissRequest = { selectedImageUrl = null },
@@ -550,9 +533,128 @@ fun JournalContent(
     }
 }
 
-enum class PickerViewMode {
-    Day, Month, Year
+@Composable
+fun TimelineEntryItem(
+    entry: JournalEntry,
+    timeFormatted: String,
+    isLast: Boolean,
+    onImageClick: (String) -> Unit
+) {
+    val timelineColor = MaterialTheme.colorScheme.primary
+    val isDark = isSystemInDarkTheme()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min) 
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.width(44.dp) // Tightened
+        ) {
+            Text(
+                text = timeFormatted,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                modifier = Modifier.padding(bottom = 2.dp)
+            )
+            
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                if (!isLast) {
+                    Canvas(modifier = Modifier.fillMaxHeight()) {
+                        drawLine(
+                            color = timelineColor.copy(alpha = 0.1f),
+                            start = Offset(size.width / 2, 0f),
+                            end = Offset(size.width / 2, size.height + 16f),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                    }
+                }
+                
+                Surface(
+                    modifier = Modifier.size(6.dp),
+                    shape = CircleShape,
+                    color = timelineColor.copy(alpha = 0.5f)
+                ) {}
+            }
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        Card(
+            modifier = Modifier
+                .weight(1f)
+                .padding(bottom = 8.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f) 
+                                 else MaterialTheme.colorScheme.surface,
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 0.dp else 0.5.dp),
+            border = BorderStroke(
+                width = 0.5.dp, 
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (isDark) 0.1f else 0.2f)
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(10.dp)
+            ) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Surface(
+                        color = timelineColor.copy(alpha = 0.08f),
+                        shape = CircleShape,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = entry.emoji, fontSize = 18.sp)
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(10.dp))
+                    
+                    Text(
+                        text = entry.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Medium,
+                        lineHeight = 18.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                if (entry.imageUrl != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .clickable { onImageClick(entry.imageUrl) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        AsyncImage(
+                            model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                .data(entry.imageUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                            error = painterResource(id = R.drawable.ic_launcher_foreground)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
+
+
+enum class PickerViewMode { Day, Month, Year }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -571,7 +673,6 @@ fun AdvancedDatePickerDialog(
     val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = initialPage)
     val scope = rememberCoroutineScope()
     
-    // Derived state for displayMonth to avoid unnecessary recompositions during scroll
     val displayMonth by remember {
         derivedStateOf {
             val monthDiff = pagerState.currentPage - initialPage
@@ -598,12 +699,10 @@ fun AdvancedDatePickerDialog(
             Column(
                 modifier = Modifier.padding(16.dp)
             ) {
-                // Top Selectors Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Month Selector
                     TextButton(
                         onClick = { viewMode = if (viewMode == PickerViewMode.Month) PickerViewMode.Day else PickerViewMode.Month },
                         shape = RoundedCornerShape(8.dp)
@@ -626,7 +725,6 @@ fun AdvancedDatePickerDialog(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Year Selector
                     TextButton(
                         onClick = { viewMode = if (viewMode == PickerViewMode.Year) PickerViewMode.Day else PickerViewMode.Year },
                         shape = RoundedCornerShape(8.dp)
@@ -648,7 +746,6 @@ fun AdvancedDatePickerDialog(
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Month Arrows (Only in Day mode)
                     if (viewMode == PickerViewMode.Day) {
                         IconButton(onClick = { 
                             scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
@@ -665,7 +762,6 @@ fun AdvancedDatePickerDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Static Week Headers (Fixed outside Pager to prevent splitting)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -702,7 +798,7 @@ fun AdvancedDatePickerDialog(
                                 androidx.compose.foundation.pager.HorizontalPager(
                                     state = pagerState,
                                     modifier = Modifier.fillMaxSize(),
-                                    pageSpacing = 16.dp // Add spacing between months
+                                    pageSpacing = 16.dp 
                                 ) { page ->
                                     val pageMonth = YearMonth.from(initialStartDate).plusMonths((page - initialPage).toLong())
                                     DayPickerGrid(
@@ -720,7 +816,6 @@ fun AdvancedDatePickerDialog(
                                                 } else if (date.isBefore(selectedStartDate)) {
                                                     selectedStartDate = date
                                                 } else if (date == selectedStartDate) {
-                                                    // Keep as start
                                                 } else {
                                                     selectedEndDate = date
                                                 }
@@ -759,7 +854,6 @@ fun AdvancedDatePickerDialog(
                     }
                 }
 
-                // Bottom Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
@@ -828,14 +922,12 @@ fun DayPickerGrid(
                                                 )
                                             }
                                             isStart -> {
-                                                // Draw capsule for start
                                                 drawRoundRect(
                                                     color = rangeColor,
                                                     topLeft = Offset(0f, verticalPadding),
                                                     size = Size(size.width, rectHeight),
                                                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius)
                                                 )
-                                                // Flatten the right side to connect with next day
                                                 drawRect(
                                                     color = rangeColor,
                                                     topLeft = Offset(size.width / 2, verticalPadding),
@@ -843,14 +935,12 @@ fun DayPickerGrid(
                                                 )
                                             }
                                             isEnd -> {
-                                                // Draw capsule for end
                                                 drawRoundRect(
                                                     color = rangeColor,
                                                     topLeft = Offset(0f, verticalPadding),
                                                     size = Size(size.width, rectHeight),
                                                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius)
                                                 )
-                                                // Flatten the left side to connect with previous day
                                                 drawRect(
                                                     color = rangeColor,
                                                     topLeft = Offset(0f, verticalPadding),
@@ -934,7 +1024,6 @@ fun YearPickerGrid(
     val years = remember { (2020..2050).toList() }
     val gridState = rememberLazyGridState()
 
-    // Focus to current year or selected year
     LaunchedEffect(Unit) {
         val focusYear = if (years.contains(selectedYear)) selectedYear else currentYear
         val index = years.indexOf(focusYear)
@@ -965,129 +1054,6 @@ fun YearPickerGrid(
                         fontWeight = if (isSelected || isTodayYear) FontWeight.Bold else FontWeight.Medium,
                         color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                     )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun TimelineEntryItem(
-    entry: JournalEntry,
-    timeFormatted: String,
-    isLast: Boolean,
-    onImageClick: (String) -> Unit
-) {
-    val timelineColor = MaterialTheme.colorScheme.primary
-    val isDark = isSystemInDarkTheme()
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp)
-            .height(IntrinsicSize.Min) 
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.width(56.dp)
-        ) {
-            Text(
-                text = timeFormatted,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                if (!isLast) {
-                    Canvas(modifier = Modifier.fillMaxHeight()) {
-                        drawLine(
-                            color = timelineColor.copy(alpha = 0.15f),
-                            start = Offset(size.width / 2, 0f),
-                            end = Offset(size.width / 2, size.height + 32f),
-                            strokeWidth = 2.dp.toPx()
-                        )
-                    }
-                }
-                
-                Surface(
-                    modifier = Modifier.size(10.dp),
-                    shape = CircleShape,
-                    color = timelineColor,
-                    border = BorderStroke(2.dp, timelineColor.copy(alpha = 0.2f)),
-                ) {}
-            }
-        }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Card(
-            modifier = Modifier
-                .weight(1f)
-                .padding(bottom = 12.dp, end = 4.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f) 
-                                 else MaterialTheme.colorScheme.surface,
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 0.dp else 1.dp),
-            border = BorderStroke(
-                width = 0.5.dp, 
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        color = timelineColor.copy(alpha = 0.08f),
-                        shape = CircleShape,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(text = entry.emoji, fontSize = 20.sp)
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.width(10.dp))
-                    
-                    Text(
-                        text = entry.text,
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Medium,
-                        lineHeight = 20.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                if (entry.imageUrl != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                            .clickable { onImageClick(entry.imageUrl) },
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    ) {
-                        AsyncImage(
-                            model = coil.request.ImageRequest.Builder(LocalContext.current)
-                                .data(entry.imageUrl)
-                                .crossfade(true)
-                                .diskCachePolicy(coil.request.CachePolicy.ENABLED)
-                                .build(),
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                            error = painterResource(id = R.drawable.ic_launcher_foreground)
-                        )
-                    }
                 }
             }
         }

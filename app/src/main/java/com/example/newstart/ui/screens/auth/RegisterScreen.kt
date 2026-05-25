@@ -147,7 +147,7 @@ fun RegisterContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
+                    .height(180.dp)
                     .background(brush = headerGradient)
             ) {
                 Row(
@@ -185,7 +185,7 @@ fun RegisterContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(start = 32.dp, end = 32.dp, bottom = 45.dp),
+                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
                     verticalArrangement = Arrangement.Bottom
                 ) {
                     Text(
@@ -201,7 +201,7 @@ fun RegisterContent(
             // Form Section
             Column(
                 modifier = Modifier
-                    .padding(top = 175.dp)
+                    .padding(top = 155.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
                     .background(MaterialTheme.colorScheme.surface)

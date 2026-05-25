@@ -217,7 +217,7 @@ fun LoginContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
+                    .height(180.dp)
                     .background(brush = headerGradient)
             ) {
                 Row(
@@ -255,7 +255,7 @@ fun LoginContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(start = 32.dp, end = 32.dp, bottom = 45.dp), // Adjusted bottom padding
+                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp), // Adjusted bottom padding
                     verticalArrangement = Arrangement.Bottom
                 ) {
                     Text(
@@ -271,7 +271,7 @@ fun LoginContent(
             // Form Section
             Column(
                 modifier = Modifier
-                    .padding(top = 175.dp) // Adjusted to overlap new header height
+                    .padding(top = 155.dp) // Adjusted to overlap new header height
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
                     .background(MaterialTheme.colorScheme.surface)

@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.Color
 data class AppPalette(
     val light: ColorScheme,
     val dark: ColorScheme,
-    val authGradient: List<Color> // Thêm bộ màu chuyên biệt cho Gradient
+    val authGradient: List<Color>
 )
 
 object AppPalettes {
@@ -18,7 +18,7 @@ object AppPalettes {
             onPrimary = Color(0xFFFFFFFF),
             primaryContainer = Color(0xFFD9E2FF),
             onPrimaryContainer = Color(0xFF001945),
-            background = Color(0xFFFDFBFF), // Trắng sạch
+            background = Color(0xFFFDFBFF),
             surface = Color(0xFFFDFBFF),
             onSurface = Color(0xFF1B1B1F),
             outline = Color(0xFF757780)
@@ -34,9 +34,9 @@ object AppPalettes {
             outline = Color(0xFF3A3A3C)
         ),
         authGradient = listOf(
-            Color(0xFF0D47A1), // Màu Deep Blue gốc của bạn
-            Color(0xFF1D5FE2), // Màu Primary
-            Color(0xFF1565C0)  // Màu Medium Blue gốc của bạn
+            Color(0xFF0D47A1),
+            Color(0xFF1D5FE2),
+            Color(0xFF1565C0)
         )
     )
 
@@ -46,25 +46,25 @@ object AppPalettes {
             onPrimary = Color(0xFFFFFFFF),
             primaryContainer = Color(0xFFBCF2C1),
             onPrimaryContainer = Color(0xFF00210E),
-            background = Color(0xFFFDFBFF), // Đưa về Trắng sạch giống Blue
+            background = Color(0xFFFDFBFF),
             surface = Color(0xFFFDFBFF),
             onSurface = Color(0xFF191C19),
             outline = Color(0xFF717971)
         ),
         dark = darkColorScheme(
-            primary = Color(0xFF80D99D),
-            onPrimary = Color(0xFF00391A),
+            primary = Color(0xFF00A34D), // Xanh lục bảo rực rỡ trên nền đen
+            onPrimary = Color(0xFFFFFFFF),
             primaryContainer = Color(0xFF00522B),
             onPrimaryContainer = Color(0xFFBCF2C1),
-            background = Color(0xFF000000),
+            background = Color(0xFF000000), // Chuẩn đen
             surface = Color(0xFF000000),
-            onSurface = Color(0xFFE1E3DF),
-            outline = Color(0xFF8B938A)
+            onSurface = Color(0xFFFFFFFF),
+            outline = Color(0xFF3A3A3C)
         ),
         authGradient = listOf(
-            Color(0xFF003217), // Deep Green (Đậm hơn 004B23)
-            Color(0xFF004B23), // Royal Green Primary
-            Color(0xFF00612D)  // Medium Green (Sáng hơn một chút)
+            Color(0xFF003217),
+            Color(0xFF004B23),
+            Color(0xFF00612D)
         )
     )
 
@@ -80,19 +80,19 @@ object AppPalettes {
             outline = Color(0xFF857372)
         ),
         dark = darkColorScheme(
-            primary = Color(0xFFFFB4AB),
-            onPrimary = Color(0xFF690005),
+            primary = Color(0xFFFF3B30), // Đỏ rực rỡ chuẩn Apple/Vibrant
+            onPrimary = Color(0xFFFFFFFF),
             primaryContainer = Color(0xFF93000A),
             onPrimaryContainer = Color(0xFFFFDAD6),
-            background = Color(0xFF000000),
+            background = Color(0xFF000000), // Chuẩn đen
             surface = Color(0xFF000000),
-            onSurface = Color(0xFFEDE0DF),
-            outline = Color(0xFFA08C8B)
+            onSurface = Color(0xFFFFFFFF),
+            outline = Color(0xFF3A3A3C)
         ),
         authGradient = listOf(
-            Color(0xFF7F1D1D), // Deep Red
-            Color(0xFFB91D1D), // Crimson Primary
-            Color(0xFFDC2626)  // Vibrant Red
+            Color(0xFF7F1D1D),
+            Color(0xFFB91D1D),
+            Color(0xFFDC2626)
         )
     )
 
