@@ -10,6 +10,7 @@ import com.example.newstart.domain.repository.AuthRepository
 import com.example.newstart.domain.repository.HabitRepository
 import com.example.newstart.domain.repository.JournalRepository
 import com.example.newstart.domain.repository.UserRepository
+import com.example.newstart.ui.theme.AppThemeColor
 import com.example.newstart.ui.theme.ThemeMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -78,6 +79,13 @@ class MainViewModel @Inject constructor(
             initialValue = ThemeMode.SYSTEM
         )
 
+    val themeColor: StateFlow<AppThemeColor> = userPreferencesRepository.themeColorFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = AppThemeColor.BLUE
+        )
+
     val avatarUri: StateFlow<Uri?> = currentUser
         .map { user -> 
             user?.avatarUrl?.let { Uri.parse(it) } 
@@ -91,6 +99,12 @@ class MainViewModel @Inject constructor(
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
             userPreferencesRepository.setThemeMode(mode)
+        }
+    }
+
+    fun setThemeColor(color: AppThemeColor) {
+        viewModelScope.launch {
+            userPreferencesRepository.setThemeColor(color)
         }
     }
 

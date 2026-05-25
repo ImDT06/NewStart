@@ -55,6 +55,8 @@ Tệp này ghi lại các tính năng đã hoàn thiện, công nghệ sử dụ
 - [x] **Offline Mode:** Sử dụng Room để lưu dữ liệu khi không có mạng.
 - [x] **Auto Sync:** Dùng WorkManager tự động đẩy dữ liệu lên Firebase khi có mạng lại.
 - [x] Cài đặt giao diện (Sáng/Tối/Hệ thống).
+- [x] **Dynamic Themes:** Hỗ trợ đa dạng màu sắc chủ đề (Blue, Royal Green) với cấu trúc mở rộng linh hoạt.
+- [x] **Branded Gradients:** Tự động đồng bộ dải màu Gradient theo màu chủ đề đã chọn.
 - [x] Cập nhật thông tin cá nhân và ảnh đại diện.
 
 ---

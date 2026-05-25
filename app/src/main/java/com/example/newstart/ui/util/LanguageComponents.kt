@@ -80,7 +80,7 @@ fun TransparentLanguageSwitcher(
     Surface(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         color = Color.White.copy(alpha = 0.2f),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
     ) {

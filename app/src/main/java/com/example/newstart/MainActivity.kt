@@ -67,9 +67,10 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContent {
             val themeMode by mainViewModel.themeMode.collectAsState()
+            val themeColor by mainViewModel.themeColor.collectAsState()
             val authState by mainViewModel.authState.collectAsState()
             
-            NewStartTheme(themeMode = themeMode) {
+            NewStartTheme(themeMode = themeMode, themeColor = themeColor) {
                 val context = LocalContext.current
                 
                 // Launcher để xin quyền báo thức chính xác

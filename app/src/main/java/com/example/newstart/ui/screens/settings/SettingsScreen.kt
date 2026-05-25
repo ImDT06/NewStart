@@ -31,6 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.example.newstart.R
 import com.example.newstart.ui.MainViewModel
+import com.example.newstart.ui.theme.AppThemeColor
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.theme.ThemeMode
 import com.example.newstart.ui.util.AppCombinedPreviews
@@ -170,9 +171,11 @@ fun SettingsScreen(
 ) {
     var showLanguagePicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
+    var showColorPicker by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     
     val themeMode by mainViewModel.themeMode.collectAsState()
+    val themeColor by mainViewModel.themeColor.collectAsState()
     val avatarUri by mainViewModel.avatarUri.collectAsState()
     val currentUser by mainViewModel.currentUser.collectAsState()
     val isDark = isSystemInDarkTheme()
@@ -301,6 +304,12 @@ fun SettingsScreen(
                             onClick = { showThemePicker = true }
                         )
                         SettingsDivider()
+                        SettingsItem(
+                            icon = Icons.Default.Palette,
+                            title = stringResource(id = R.string.settings_color_select),
+                            onClick = { showColorPicker = true }
+                        )
+                        SettingsDivider()
                         SettingsToggleItem(
                             icon = Icons.Default.Notifications,
                             titleRes = R.string.settings_notifications,
@@ -349,6 +358,17 @@ fun SettingsScreen(
                 showThemePicker = false
             },
             onDismiss = { showThemePicker = false }
+        )
+    }
+
+    if (showColorPicker) {
+        ColorSelectionDialog(
+            currentColor = themeColor,
+            onColorSelected = {
+                mainViewModel.setThemeColor(it)
+                showColorPicker = false
+            },
+            onDismiss = { showColorPicker = false }
         )
     }
 }
@@ -443,6 +463,91 @@ fun ThemeSelectionDialog(
                 onModeSelected(ThemeMode.SYSTEM)
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ColorSelectionDialog(
+    currentColor: AppThemeColor,
+    onColorSelected: (AppThemeColor) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp)
+        ) {
+            Text(
+                text = stringResource(id = R.string.settings_color_select),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            
+            ColorOption(
+                label = stringResource(id = R.string.settings_color_blue),
+                color = Color(0xFF1D5FE2),
+                isSelected = currentColor == AppThemeColor.BLUE
+            ) {
+                onColorSelected(AppThemeColor.BLUE)
+            }
+            ColorOption(
+                label = stringResource(id = R.string.settings_color_green),
+                color = Color(0xFF006B3F), // Cập nhật sang Deep Emerald
+                isSelected = currentColor == AppThemeColor.ROYAL_GREEN
+            ) {
+                onColorSelected(AppThemeColor.ROYAL_GREEN)
+            }
+            ColorOption(
+                label = stringResource(id = R.string.settings_color_red),
+                color = Color(0xFFB91D1D),
+                isSelected = currentColor == AppThemeColor.RED
+            ) {
+                onColorSelected(AppThemeColor.RED)
+            }
+        }
+    }
+}
+
+@Composable
+fun ColorOption(
+    label: String,
+    color: Color,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = label, 
+            fontSize = 16.sp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.weight(1f)
+        )
+        RadioButton(
+            selected = isSelected,
+            onClick = onClick,
+            colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
+        )
     }
 }
 

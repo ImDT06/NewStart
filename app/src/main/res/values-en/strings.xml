@@ -83,6 +83,10 @@
     <string name="settings_theme_dark">Dark Mode</string>
     <string name="settings_theme_system">System Mode</string>
     <string name="settings_theme_select">Select Theme</string>
+    <string name="settings_color_select">App Accent Color</string>
+    <string name="settings_color_blue">Vibrant Blue</string>
+    <string name="settings_color_green">Royal Green</string>
+    <string name="settings_color_red">Vibrant Red</string>
     <string name="settings_confirm_logout_title">Logout</string>
     <string name="settings_confirm_logout_msg">Are you sure you want to log out of this account?</string>
     <string name="settings_cancel">Cancel</string>
