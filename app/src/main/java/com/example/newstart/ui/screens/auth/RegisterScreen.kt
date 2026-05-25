@@ -41,7 +41,7 @@ import com.example.newstart.R
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
-import com.example.newstart.ui.util.SmallLanguageSwitcher
+import com.example.newstart.ui.util.TransparentLanguageSwitcher
 
 @Composable
 fun RegisterScreen(
@@ -173,10 +173,8 @@ fun RegisterContent(
                         )
                     }
 
-                    SmallLanguageSwitcher(
-                        onClick = { onToggleLanguagePicker(true) },
-                        tintColor = MaterialTheme.colorScheme.onPrimary,
-                        backgroundColor = Color.Transparent
+                    TransparentLanguageSwitcher(
+                        onClick = { onToggleLanguagePicker(true) }
                     )
                 }
 
