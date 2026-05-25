@@ -106,7 +106,8 @@ fun NavGraph(
                 },
                 onNavigateToRegister = {
                     navController.navigate(Screen.Register.route)
-                }
+                },
+                mainViewModel = mainViewModel
             )
         }
 
@@ -117,13 +118,17 @@ fun NavGraph(
                     navController.popBackStack()
                 },
                 onNavigateToRegister = {
-                    navController.navigate(Screen.Register.route)
+                    navController.navigate(Screen.Register.route) {
+                        // Xóa trang Login hiện tại để nếu ở Register nhấn back sẽ về Welcome
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
                 },
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Welcome.route) { inclusive = true }
                     }
-                }
+                },
+                mainViewModel = mainViewModel
             )
         }
 
@@ -133,13 +138,19 @@ fun NavGraph(
                 onNavigateBack = {
                     navController.popBackStack()
                 },
-                onRegisterSuccess = {
-                    // Sau khi đăng ký thành công (Get Set to Explore), chuyển sang trang Login
+                onNavigateToLogin = {
                     navController.navigate(Screen.Login.route) {
-                        // Xóa trang Register khỏi stack để không bị quay lại trang này khi ấn back ở Login
+                        // Xóa trang Register hiện tại để nếu ở Login nhấn back sẽ về Welcome
                         popUpTo(Screen.Register.route) { inclusive = true }
                     }
-                }
+                },
+                onRegisterSuccess = {
+                    // Sau khi đăng ký thành công, chuyển sang trang Login
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Register.route) { inclusive = true }
+                    }
+                },
+                mainViewModel = mainViewModel
             )
         }
 

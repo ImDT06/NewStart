@@ -26,14 +26,12 @@ class JournalViewModel @Inject constructor(
     private val _selectedDateRange = MutableStateFlow<Pair<LocalDate, LocalDate?>>(LocalDate.now() to null)
     val selectedDateRange: StateFlow<Pair<LocalDate, LocalDate?>> = _selectedDateRange.asStateFlow()
 
-    // For backward compatibility or single date access
     val selectedDate: StateFlow<LocalDate> = _selectedDateRange.map { it.first }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LocalDate.now())
 
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
 
-    // Lấy tất cả nhật ký có ảnh để làm Highlights
     val allEntriesWithImages: StateFlow<List<JournalEntry>> = journalRepository.getJournalEntries()
         .map { entries -> entries.filter { it.imageUrl != null }.sortedByDescending { it.timestamp } }
         .stateIn(
@@ -80,7 +78,6 @@ class JournalViewModel @Inject constructor(
         val today = LocalDate.now()
         when (filter) {
             "All" -> {
-                // Đặt một dải ngày cực rộng để lấy tất cả
                 _selectedDateRange.value = LocalDate.of(2000, 1, 1) to LocalDate.of(2100, 12, 31)
             }
             "Year" -> {

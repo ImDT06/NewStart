@@ -199,20 +199,13 @@ fun HabitsScreen(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
 
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(36.dp),
-                    onClick = { showMonthPicker = true }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarMonth,
-                            contentDescription = "Month Picker",
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                IconButton(onClick = { showMonthPicker = true }) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarMonth,
+                        contentDescription = "Month Picker",
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
 

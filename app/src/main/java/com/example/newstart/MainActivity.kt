@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.newstart.ui.AuthState
@@ -66,10 +67,11 @@ class MainActivity : AppCompatActivity() {
         
         enableEdgeToEdge()
         setContent {
-            val themeMode by mainViewModel.themeMode.collectAsState()
-            val authState by mainViewModel.authState.collectAsState()
+            val themeMode by mainViewModel.themeMode.collectAsStateWithLifecycle()
+            val themeColor by mainViewModel.themeColor.collectAsStateWithLifecycle()
+            val authState by mainViewModel.authState.collectAsStateWithLifecycle()
             
-            NewStartTheme(themeMode = themeMode) {
+            NewStartTheme(themeMode = themeMode, themeColor = themeColor) {
                 val context = LocalContext.current
                 
                 // Launcher để xin quyền báo thức chính xác
@@ -88,7 +90,7 @@ class MainActivity : AppCompatActivity() {
                 var showBottomSheet by remember { mutableStateOf(false) }
                 var sheetContentType by remember { mutableStateOf(SheetContent.None) }
 
-                val editingHabit by mainViewModel.editingHabit.collectAsState()
+                val editingHabit by mainViewModel.editingHabit.collectAsStateWithLifecycle()
                 
                 LaunchedEffect(editingHabit) {
                     if (editingHabit != null) {
@@ -232,7 +234,7 @@ class MainActivity : AppCompatActivity() {
                             ) {
                                 when (sheetContentType) {
                                     SheetContent.JournalEntry -> {
-                                        val isUploading by mainViewModel.isUploading.collectAsState()
+                                        val isUploading by mainViewModel.isUploading.collectAsStateWithLifecycle()
                                         JournalEntryPanel(
                                             onDismiss = { showBottomSheet = false },
                                             onPost = { emoji, text, uri ->
@@ -244,8 +246,8 @@ class MainActivity : AppCompatActivity() {
                                         )
                                     }
                                     SheetContent.HabitSelection -> {
-                                        val selectedHabitDate by mainViewModel.selectedHabitDate.collectAsState()
-                                        val editingHabitData by mainViewModel.editingHabit.collectAsState()
+                                        val selectedHabitDate by mainViewModel.selectedHabitDate.collectAsStateWithLifecycle()
+                                        val editingHabitData by mainViewModel.editingHabit.collectAsStateWithLifecycle()
                                         NewHabitSheet(
                                             initialDate = selectedHabitDate,
                                             editingHabit = editingHabitData,

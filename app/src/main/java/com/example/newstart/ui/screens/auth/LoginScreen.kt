@@ -43,8 +43,11 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.newstart.R
+import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.theme.NewStartTheme
+import com.example.newstart.ui.theme.authHeaderGradient
 import com.example.newstart.ui.util.AppCombinedPreviews
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.TransparentLanguageSwitcher
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
@@ -57,7 +60,8 @@ fun LoginScreen(
     onNavigateToRegister: () -> Unit,
     onLoginSuccess: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: LoginViewModel = hiltViewModel()
+    viewModel: LoginViewModel = hiltViewModel(),
+    mainViewModel: MainViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -79,7 +83,7 @@ fun LoginScreen(
                         label = { Text("Email") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(20.dp)
                     )
                 }
             },
@@ -96,7 +100,8 @@ fun LoginScreen(
                                 Toast.makeText(context, error, Toast.LENGTH_LONG).show()
                             }
                         )
-                    }
+                    },
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Text("Gửi yêu cầu")
                 }
@@ -167,6 +172,7 @@ fun LoginScreen(
         showLanguagePicker = showLanguagePicker,
         onToggleLanguagePicker = { showLanguagePicker = it },
         modifier = modifier,
+        headerGradient = authHeaderGradient(mainViewModel)
     )
 }
 
@@ -189,6 +195,7 @@ fun LoginContent(
     showLanguagePicker: Boolean,
     onToggleLanguagePicker: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    headerGradient: Brush
 ) {
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
@@ -210,16 +217,8 @@ fun LoginContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color(0xFF0D47A1), // Deep Dark Blue
-                                MaterialTheme.colorScheme.primary,
-                                Color(0xFF1565C0)  // Solid Medium Blue
-                            )
-                        )
-                    )
+                    .height(180.dp)
+                    .background(brush = headerGradient)
             ) {
                 Row(
                     modifier = Modifier
@@ -256,7 +255,7 @@ fun LoginContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(start = 32.dp, end = 32.dp, bottom = 45.dp), // Adjusted bottom padding
+                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp), // Adjusted bottom padding
                     verticalArrangement = Arrangement.Bottom
                 ) {
                     Text(
@@ -272,9 +271,9 @@ fun LoginContent(
             // Form Section
             Column(
                 modifier = Modifier
-                    .padding(top = 175.dp) // Adjusted to overlap new header height
+                    .padding(top = 155.dp) // Adjusted to overlap new header height
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
                     .background(MaterialTheme.colorScheme.surface)
                     .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -357,7 +356,7 @@ fun LoginContent(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(20.dp),
                         contentPadding = PaddingValues(horizontal = 24.dp)
                     ) {
                         if (isLoading) {
@@ -404,7 +403,7 @@ fun LoginContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(20.dp),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -505,7 +504,7 @@ fun AuthInputField(
             },
             isError = errorText != null,
             visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
@@ -552,7 +551,8 @@ fun LoginScreenPreview() {
             onRegisterClick = {},
             onBackClick = {},
             showLanguagePicker = false,
-            onToggleLanguagePicker = {}
+            onToggleLanguagePicker = {},
+            headerGradient = authHeaderGradient(com.example.newstart.ui.theme.AppThemeColor.BLUE)
         )
     }
 }

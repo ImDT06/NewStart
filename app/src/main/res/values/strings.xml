@@ -83,6 +83,10 @@
     <string name="settings_theme_dark">Chế độ tối</string>
     <string name="settings_theme_system">Chế độ hệ thống</string>
     <string name="settings_theme_select">Chọn giao diện</string>
+    <string name="settings_color_select">Chọn màu chủ đề</string>
+    <string name="settings_color_blue">Xanh dương (Blue)</string>
+    <string name="settings_color_green">Xanh hoàng gia (Royal Green)</string>
+    <string name="settings_color_red">Đỏ rực rỡ (Vibrant Red)</string>
     <string name="settings_confirm_logout_title">Đăng xuất</string>
     <string name="settings_confirm_logout_msg">Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này không?</string>
     <string name="settings_cancel">Hủy</string>

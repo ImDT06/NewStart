@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.newstart.ui.theme.AppThemeColor
 import com.example.newstart.ui.theme.ThemeMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +21,7 @@ class UserPreferencesRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val themeModeKey = stringPreferencesKey("theme_mode")
+    private val themeColorKey = stringPreferencesKey("theme_color")
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
         val modeName = preferences[themeModeKey] ?: ThemeMode.SYSTEM.name
@@ -30,9 +32,24 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
+    val themeColorFlow: Flow<AppThemeColor> = context.dataStore.data.map { preferences ->
+        val colorName = preferences[themeColorKey] ?: AppThemeColor.BLUE.name
+        try {
+            AppThemeColor.valueOf(colorName)
+        } catch (e: Exception) {
+            AppThemeColor.BLUE
+        }
+    }
+
     suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { preferences ->
             preferences[themeModeKey] = mode.name
+        }
+    }
+
+    suspend fun setThemeColor(color: AppThemeColor) {
+        context.dataStore.edit { preferences ->
+            preferences[themeColorKey] = color.name
         }
     }
 }

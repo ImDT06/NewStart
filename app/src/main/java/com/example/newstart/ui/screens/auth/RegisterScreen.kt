@@ -38,8 +38,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.newstart.R
+import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.theme.NewStartTheme
+import com.example.newstart.ui.theme.authHeaderGradient
 import com.example.newstart.ui.util.AppCombinedPreviews
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.TransparentLanguageSwitcher
 
@@ -47,8 +50,10 @@ import com.example.newstart.ui.util.TransparentLanguageSwitcher
 fun RegisterScreen(
     modifier: Modifier = Modifier,
     onNavigateBack: () -> Unit = {},
+    onNavigateToLogin: () -> Unit = {},
     onRegisterSuccess: () -> Unit = {},
     viewModel: RegisterViewModel = hiltViewModel(),
+    mainViewModel: MainViewModel = viewModel()
 ) {
     val context = LocalContext.current
     var showLanguagePicker by remember { mutableStateOf(false) }
@@ -84,11 +89,12 @@ fun RegisterScreen(
                 }
             )
         },
-        onLoginNowClick = onNavigateBack,
+        onLoginNowClick = onNavigateToLogin,
         onBackClick = onNavigateBack,
         showLanguagePicker = showLanguagePicker,
         onToggleLanguagePicker = { showLanguagePicker = it },
         modifier = modifier,
+        headerGradient = authHeaderGradient(mainViewModel)
     )
 }
 
@@ -119,6 +125,7 @@ fun RegisterContent(
     showLanguagePicker: Boolean,
     onToggleLanguagePicker: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    headerGradient: Brush
 ) {
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
@@ -140,16 +147,8 @@ fun RegisterContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color(0xFF0D47A1), // Deep Dark Blue
-                                MaterialTheme.colorScheme.primary,
-                                Color(0xFF1565C0)  // Solid Medium Blue
-                            )
-                        )
-                    )
+                    .height(180.dp)
+                    .background(brush = headerGradient)
             ) {
                 Row(
                     modifier = Modifier
@@ -186,7 +185,7 @@ fun RegisterContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(start = 32.dp, end = 32.dp, bottom = 45.dp),
+                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
                     verticalArrangement = Arrangement.Bottom
                 ) {
                     Text(
@@ -202,9 +201,9 @@ fun RegisterContent(
             // Form Section
             Column(
                 modifier = Modifier
-                    .padding(top = 175.dp)
+                    .padding(top = 155.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
                     .background(MaterialTheme.colorScheme.surface)
                     .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -324,7 +323,7 @@ fun RegisterContent(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(20.dp)
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
@@ -422,7 +421,7 @@ fun RegisterInputField(
             },
             isError = errorText != null,
             visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
@@ -477,7 +476,8 @@ fun RegisterScreenPreview() {
             onLoginNowClick = {},
             onBackClick = {},
             showLanguagePicker = false,
-            onToggleLanguagePicker = {}
+            onToggleLanguagePicker = {},
+            headerGradient = authHeaderGradient(com.example.newstart.ui.theme.AppThemeColor.BLUE)
         )
     }
 }
