@@ -19,6 +19,7 @@ import com.example.newstart.ui.features.home.HomeScreen
 import com.example.newstart.ui.features.settings.SettingsScreen
 import com.example.newstart.ui.features.journal.JournalScreen
 import com.example.newstart.ui.features.habits.HabitsScreen
+import com.example.newstart.ui.features.social.SocialScreen
 import com.example.newstart.ui.screens.PlaceholderScreen
 
 import com.example.newstart.ui.MainViewModel
@@ -121,7 +122,15 @@ fun NavGraph(
         }
 
         composable(route = Screen.Profile.route) {
-            SettingsScreen()
+            SettingsScreen(onNavigateToSocial = {
+                navController.navigate(Screen.Social.route)
+            })
+        }
+
+        composable(route = Screen.Social.route) {
+            SocialScreen(onNavigateBack = {
+                navController.popBackStack()
+            })
         }
 
         // Màn hình Detail

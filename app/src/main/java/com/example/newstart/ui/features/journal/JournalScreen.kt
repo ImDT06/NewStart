@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -69,12 +70,14 @@ fun JournalScreen(
     viewModel: JournalViewModel = hiltViewModel()
 ) {
     val entries by viewModel.entries.collectAsStateWithLifecycle()
+    val socialFeed by viewModel.socialFeed.collectAsStateWithLifecycle()
     val selectedDateRange by viewModel.selectedDateRange.collectAsStateWithLifecycle()
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     
     JournalContent(
         modifier = modifier,
         entries = entries,
+        socialFeed = socialFeed,
         selectedDateRange = selectedDateRange,
         currentTab = currentTab,
         onTabSelected = { viewModel.onTabSelected(it) },
@@ -89,6 +92,7 @@ fun JournalScreen(
 fun JournalContent(
     modifier: Modifier = Modifier,
     entries: List<JournalEntry>,
+    socialFeed: List<JournalEntry>,
     selectedDateRange: Pair<LocalDate, LocalDate?>,
     currentTab: Int,
     onTabSelected: (Int) -> Unit,
@@ -352,7 +356,12 @@ fun JournalContent(
                     onImageClick = { selectedImageUrl = it }
                 )
             } else {
-                SocialFeedList(isVietnamese = isVietnamese)
+                SocialFeedList(
+                    socialFeed = socialFeed,
+                    isVietnamese = isVietnamese,
+                    timeFormatter = timeFormatter,
+                    onImageClick = { selectedImageUrl = it }
+                )
             }
         }
 
@@ -625,28 +634,113 @@ private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun SocialFeedList(isVietnamese: Boolean) {
+private fun SocialFeedList(
+    socialFeed: List<JournalEntry>,
+    isVietnamese: Boolean,
+    timeFormatter: SimpleDateFormat,
+    onImageClick: (String) -> Unit
+) {
     Surface(
         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(Icons.Default.Group, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-            Spacer(Modifier.height(16.dp))
-            Text(
-                if (isVietnamese) "Bảng tin cộng đồng sắp ra mắt!" else "Community feed coming soon!",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                if (isVietnamese) "Kết nối với bạn bè để cùng nhau kỷ luật" else "Connect with friends to stay disciplined together",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-            )
+        if (socialFeed.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(Icons.Default.Group, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    if (isVietnamese) "Bảng tin cộng đồng sắp ra mắt!" else "Community feed coming soon!",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    if (isVietnamese) "Kết nối với bạn bè để cùng nhau kỷ luật" else "Connect with friends to stay disciplined together",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp, start = 12.dp, end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(items = socialFeed, key = { it.id }) { entry ->
+                    SocialFeedItem(
+                        entry = entry,
+                        timeFormatted = remember(entry.timestamp) { entry.timestamp?.let { timeFormatter.format(it) } ?: "--:--" },
+                        onImageClick = onImageClick
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SocialFeedItem(
+    entry: JournalEntry,
+    timeFormatted: String,
+    onImageClick: (String) -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    modifier = Modifier.size(36.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Person, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "User ${entry.userId.take(5)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = timeFormatted,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+                Text(entry.emoji, fontSize = 24.sp)
+            }
+            
+            if (entry.text.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = entry.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            
+            entry.imageUrl?.let { url ->
+                Spacer(modifier = Modifier.height(12.dp))
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onImageClick(url) },
+                    contentScale = ContentScale.Crop
+                )
+            }
         }
     }
 }
@@ -660,7 +754,10 @@ fun JournalScreenPreview() {
                 JournalEntry(id = "1", emoji = "😊", text = "Một ngày tuyệt vời!", timestamp = Date()),
                 JournalEntry(id = "2", emoji = "🥰", text = "Học Compose thú vị quá", timestamp = Date())
             ),
+            socialFeed = emptyList(),
             selectedDateRange = LocalDate.now() to null,
+            currentTab = 0,
+            onTabSelected = {},
             onDateRangeSelected = { _, _ -> },
             onQuickFilterSelected = {},
             onDeleteEntry = {}

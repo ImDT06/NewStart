@@ -15,7 +15,9 @@ interface SocialRepository {
     
     // Squads
     fun getSquads(): Flow<List<Squad>>
+    suspend fun createSquad(squad: Squad)
     suspend fun joinSquad(squadId: String)
+    suspend fun leaveSquad(squadId: String)
     
     // Feed
     fun getSocialFeed(): Flow<List<JournalEntry>>

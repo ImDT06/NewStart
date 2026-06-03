@@ -167,6 +167,7 @@ fun StatItem(label: String, value: String, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    onNavigateToSocial: () -> Unit,
     modifier: Modifier = Modifier,
     mainViewModel: MainViewModel = hiltViewModel()
 ) {
@@ -281,7 +282,7 @@ fun SettingsScreen(
                         SettingsItem(
                             icon = Icons.Default.Group,
                             title = if (currentUser?.name?.isNotEmpty() == true) "Bạn bè (Inner Circle)" else "Inner Circle",
-                            onClick = {}
+                            onClick = onNavigateToSocial
                         )
                         SettingsDivider()
                         SettingsItem(
@@ -756,6 +757,6 @@ fun SettingsDivider() {
 @Composable
 fun SettingsScreenPreview() {
     NewStartTheme {
-        SettingsScreen()
+        SettingsScreen(onNavigateToSocial = {})
     }
 }

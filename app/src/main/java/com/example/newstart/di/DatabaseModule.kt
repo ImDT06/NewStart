@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.example.newstart.data.local.NewStartDatabase
 import com.example.newstart.data.local.dao.HabitDao
+import com.example.newstart.data.local.dao.TodoDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,11 +23,16 @@ object DatabaseModule {
             context,
             NewStartDatabase::class.java,
             NewStartDatabase.DATABASE_NAME
-        ).build()
+        ).fallbackToDestructiveMigration().build()
     }
 
     @Provides
     fun provideHabitDao(database: NewStartDatabase): HabitDao {
         return database.habitDao()
+    }
+
+    @Provides
+    fun provideTodoDao(database: NewStartDatabase): TodoDao {
+        return database.todoDao()
     }
 }
