@@ -114,7 +114,10 @@ fun NavGraph(
         }
 
         composable(route = Screen.Habits.route) {
-            HabitsScreen(mainViewModel = mainViewModel)
+            HabitsScreen(
+                mainViewModel = mainViewModel,
+                navController = navController
+            )
         }
 
         composable(route = Screen.Profile.route) {

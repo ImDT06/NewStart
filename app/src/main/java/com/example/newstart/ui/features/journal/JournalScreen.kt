@@ -70,11 +70,14 @@ fun JournalScreen(
 ) {
     val entries by viewModel.entries.collectAsStateWithLifecycle()
     val selectedDateRange by viewModel.selectedDateRange.collectAsStateWithLifecycle()
+    val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     
     JournalContent(
         modifier = modifier,
         entries = entries,
         selectedDateRange = selectedDateRange,
+        currentTab = currentTab,
+        onTabSelected = { viewModel.onTabSelected(it) },
         onDateRangeSelected = { start, end -> viewModel.onDateRangeSelected(start, end) },
         onQuickFilterSelected = { viewModel.setQuickFilter(it) },
         onDeleteEntry = { viewModel.deleteEntry(it) }
@@ -87,6 +90,8 @@ fun JournalContent(
     modifier: Modifier = Modifier,
     entries: List<JournalEntry>,
     selectedDateRange: Pair<LocalDate, LocalDate?>,
+    currentTab: Int,
+    onTabSelected: (Int) -> Unit,
     onDateRangeSelected: (LocalDate, LocalDate?) -> Unit,
     onQuickFilterSelected: (String) -> Unit,
     onDeleteEntry: (String) -> Unit
@@ -266,55 +271,89 @@ fun JournalContent(
                 }
             }
 
-            // Ngày tháng & Filter
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val headerDateText = remember(selectedDateRange, locale) {
-                    val start = selectedDateRange.first
-                    val end = selectedDateRange.second
-                    if (end == null) {
-                        if (start == today) if (isVietnamese) "Hôm nay" else "Today"
-                        else start.format(DateTimeFormatter.ofPattern(if (isVietnamese) "dd MMMM" else "MMMM dd", locale))
-                    } else {
-                        val pattern = if (isVietnamese) "dd/MM" else "MM/dd"
-                        "${start.format(DateTimeFormatter.ofPattern(pattern, locale))} - ${end.format(DateTimeFormatter.ofPattern(pattern, locale))}"
+            // Tabs: Cá nhân | Cộng đồng
+            TabRow(
+                selectedTabIndex = currentTab,
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.primary,
+                divider = {},
+                indicator = { tabPositions ->
+                    if (currentTab < tabPositions.size) {
+                        TabRowDefaults.SecondaryIndicator(
+                            Modifier.tabIndicatorOffset(tabPositions[currentTab]),
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
-                }
-
-                Text(
-                    text = headerDateText,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onQuickFilterSelected("Today") }
+                },
+                modifier = Modifier.padding(horizontal = 20.dp)
+            ) {
+                Tab(
+                    selected = currentTab == 0,
+                    onClick = { onTabSelected(0) },
+                    text = { Text(if (isVietnamese) "Cá nhân" else "Personal", fontWeight = FontWeight.Bold) }
                 )
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                QuickFiltersSection(
-                    selectedDateRange = selectedDateRange,
-                    onQuickFilterSelected = {
-                        onQuickFilterSelected(it)
-                        if (isSearchActive) previousDateRange = null
-                    },
-                    isVietnamese = isVietnamese,
-                    isDark = isDark
+                Tab(
+                    selected = currentTab == 1,
+                    onClick = { onTabSelected(1) },
+                    text = { Text(if (isVietnamese) "Cộng đồng" else "Community", fontWeight = FontWeight.Bold) }
                 )
             }
 
-            JournalList(
-                filteredEntries = filteredEntries,
-                searchQuery = searchQuery,
-                isVietnamese = isVietnamese,
-                locale = locale,
-                timeFormatter = timeFormatter,
-                onOptionsClick = { entryForOptions = it },
-                onImageClick = { selectedImageUrl = it }
-            )
+            // Ngày tháng & Filter (Chỉ hiện khi ở tab Cá nhân)
+            AnimatedVisibility(visible = currentTab == 0) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val headerDateText = remember(selectedDateRange, locale) {
+                        val start = selectedDateRange.first
+                        val end = selectedDateRange.second
+                        if (end == null) {
+                            if (start == today) if (isVietnamese) "Hôm nay" else "Today"
+                            else start.format(DateTimeFormatter.ofPattern(if (isVietnamese) "dd MMMM" else "MMMM dd", locale))
+                        } else {
+                            val pattern = if (isVietnamese) "dd/MM" else "MM/dd"
+                            "${start.format(DateTimeFormatter.ofPattern(pattern, locale))} - ${end.format(DateTimeFormatter.ofPattern(pattern, locale))}"
+                        }
+                    }
+
+                    Text(
+                        text = headerDateText,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { onQuickFilterSelected("Today") }
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    QuickFiltersSection(
+                        selectedDateRange = selectedDateRange,
+                        onQuickFilterSelected = {
+                            onQuickFilterSelected(it)
+                            if (isSearchActive) previousDateRange = null
+                        },
+                        isVietnamese = isVietnamese,
+                        isDark = isDark
+                    )
+                }
+            }
+
+            if (currentTab == 0) {
+                JournalList(
+                    filteredEntries = filteredEntries,
+                    searchQuery = searchQuery,
+                    isVietnamese = isVietnamese,
+                    locale = locale,
+                    timeFormatter = timeFormatter,
+                    onOptionsClick = { entryForOptions = it },
+                    onImageClick = { selectedImageUrl = it }
+                )
+            } else {
+                SocialFeedList(isVietnamese = isVietnamese)
+            }
         }
 
         // Dialogs
@@ -580,6 +619,33 @@ private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(32.dp)),
                 contentScale = ContentScale.Crop
+            )
+        }
+    }
+}
+
+@Composable
+private fun SocialFeedList(isVietnamese: Boolean) {
+    Surface(
+        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(Icons.Default.Group, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+            Spacer(Modifier.height(16.dp))
+            Text(
+                if (isVietnamese) "Bảng tin cộng đồng sắp ra mắt!" else "Community feed coming soon!",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                if (isVietnamese) "Kết nối với bạn bè để cùng nhau kỷ luật" else "Connect with friends to stay disciplined together",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
         }
     }

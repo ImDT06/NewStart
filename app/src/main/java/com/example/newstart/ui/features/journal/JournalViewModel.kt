@@ -28,6 +28,9 @@ class JournalViewModel @Inject constructor(
     private val _selectedDateRange = MutableStateFlow<Pair<LocalDate, LocalDate?>>(LocalDate.now() to null)
     val selectedDateRange: StateFlow<Pair<LocalDate, LocalDate?>> = _selectedDateRange.asStateFlow()
 
+    private val _currentTab = MutableStateFlow(0) // 0: Cá nhân, 1: Cộng đồng
+    val currentTab: StateFlow<Int> = _currentTab.asStateFlow()
+
     val selectedDate: StateFlow<LocalDate> = _selectedDateRange.map { it.first }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LocalDate.now())
 
@@ -77,6 +80,10 @@ class JournalViewModel @Inject constructor(
 
     fun onDateRangeSelected(start: LocalDate, end: LocalDate?) {
         _selectedDateRange.value = start to end
+    }
+
+    fun onTabSelected(index: Int) {
+        _currentTab.value = index
     }
 
     fun setQuickFilter(filter: String) {

@@ -275,6 +275,23 @@ fun SettingsScreen(
                 }
 
                 // Settings Groups
+                item { SectionTitle(title = if (currentUser?.name?.isNotEmpty() == true) "Cộng đồng" else "Community") }
+                item {
+                    SettingsCard {
+                        SettingsItem(
+                            icon = Icons.Default.Group,
+                            title = if (currentUser?.name?.isNotEmpty() == true) "Bạn bè (Inner Circle)" else "Inner Circle",
+                            onClick = {}
+                        )
+                        SettingsDivider()
+                        SettingsItem(
+                            icon = Icons.Default.Diversity3,
+                            title = if (currentUser?.name?.isNotEmpty() == true) "Nhóm thử thách (Squads)" else "Squads",
+                            onClick = {}
+                        )
+                    }
+                }
+
                 item { SectionTitle(titleRes = R.string.settings_account_section) }
                 item {
                     SettingsCard {
@@ -600,12 +617,17 @@ fun ThemeOption(
 
 @Composable
 fun SectionTitle(titleRes: Int) {
+    SectionTitle(title = stringResource(id = titleRes))
+}
+
+@Composable
+fun SectionTitle(title: String) {
     Text(
-        text = stringResource(id = titleRes),
+        text = title,
         fontSize = 14.sp,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.outline,
-        modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
+        modifier = Modifier.padding(start = 8.dp, bottom = 4.dp, top = 16.dp)
     )
 }
 

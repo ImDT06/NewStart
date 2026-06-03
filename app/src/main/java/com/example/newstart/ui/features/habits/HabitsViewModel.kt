@@ -36,6 +36,9 @@ class HabitsViewModel @Inject constructor(
     private val _aiState = MutableStateFlow<AiState>(AiState.Idle)
     val aiState: StateFlow<AiState> = _aiState.asStateFlow()
 
+    private val _completedHabitForJournal = MutableStateFlow<Habit?>(null)
+    val completedHabitForJournal: StateFlow<Habit?> = _completedHabitForJournal.asStateFlow()
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val habits: StateFlow<List<Habit>> = _selectedDate
         .flatMapLatest { date ->
@@ -55,7 +58,14 @@ class HabitsViewModel @Inject constructor(
     fun toggleHabit(habit: Habit, completed: Boolean) {
         viewModelScope.launch {
             habitRepository.toggleHabitCompletion(habit, completed)
+            if (completed) {
+                _completedHabitForJournal.value = habit
+            }
         }
+    }
+
+    fun clearJournalPrompt() {
+        _completedHabitForJournal.value = null
     }
 
     fun deleteHabit(habitId: String) {

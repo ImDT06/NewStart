@@ -40,9 +40,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import com.example.newstart.R
 import com.example.newstart.domain.model.Habit
 import com.example.newstart.ui.MainViewModel
+import com.example.newstart.ui.navigation.Screen
 import com.example.newstart.ui.components.MonthPickerDialog
 import com.example.newstart.ui.features.habits.components.HabitItem
 import kotlinx.coroutines.launch
@@ -56,12 +58,14 @@ import kotlin.math.roundToInt
 @Composable
 fun HabitsScreen(
     mainViewModel: MainViewModel,
+    navController: NavController,
     modifier: Modifier = Modifier,
     viewModel: HabitsViewModel = hiltViewModel()
 ) {
     val habits by viewModel.habits.collectAsStateWithLifecycle()
     val selectedDate by mainViewModel.selectedHabitDate.collectAsStateWithLifecycle()
     val aiState by viewModel.aiState.collectAsStateWithLifecycle()
+    val completedHabitForJournal by viewModel.completedHabitForJournal.collectAsStateWithLifecycle()
     
     val scope = rememberCoroutineScope()
     var habitToDelete by remember { mutableStateOf<Habit?>(null) }
@@ -223,6 +227,17 @@ fun HabitsScreen(
                     scope.launch { pagerState.scrollToPage(500 + weekDiff.toInt()) }
                 },
                 onDismiss = { showMonthPicker = false }
+            )
+        }
+
+        if (completedHabitForJournal != null) {
+            JournalPromptDialog(
+                habitName = completedHabitForJournal!!.name,
+                onDismiss = { viewModel.clearJournalPrompt() },
+                onConfirm = {
+                    viewModel.clearJournalPrompt()
+                    navController.navigate(Screen.Journal.route)
+                }
             )
         }
     }
@@ -504,6 +519,25 @@ private fun AiInputView(
         )
         if (state is AiState.Loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(2.dp).clip(CircleShape), color = Color(0xFF9B72CB))
     }
+}
+
+@Composable
+private fun JournalPromptDialog(habitName: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Tuyệt vời!") },
+        text = { Text("Bạn vừa hoàn thành '$habitName'. Bạn có muốn lưu lại khoảnh khắc này vào nhật ký không?") },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("Viết nhật ký ngay")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Để sau")
+            }
+        }
+    )
 }
 
 @Composable
