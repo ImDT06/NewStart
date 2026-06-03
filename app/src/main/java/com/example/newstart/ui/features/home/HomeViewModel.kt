@@ -1,4 +1,4 @@
-package com.example.newstart.ui.screens.home
+package com.example.newstart.ui.features.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

@@ -1,6 +1,5 @@
 package com.example.newstart.ui.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,10 +15,10 @@ import com.example.newstart.ui.screens.auth.LoginScreen
 import com.example.newstart.ui.screens.auth.RegisterScreen
 import com.example.newstart.ui.screens.auth.WelcomeScreen
 import com.example.newstart.ui.screens.detail.DetailScreen
-import com.example.newstart.ui.screens.home.HomeScreen
-import com.example.newstart.ui.screens.settings.SettingsScreen
-import com.example.newstart.ui.screens.journal.JournalScreen
-import com.example.newstart.ui.screens.habits.HabitsScreen
+import com.example.newstart.ui.features.home.HomeScreen
+import com.example.newstart.ui.features.settings.SettingsScreen
+import com.example.newstart.ui.features.journal.JournalScreen
+import com.example.newstart.ui.features.habits.HabitsScreen
 import com.example.newstart.ui.screens.PlaceholderScreen
 
 import com.example.newstart.ui.MainViewModel
@@ -31,71 +30,21 @@ fun NavGraph(
     mainViewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
-    val bottomNavRoutes = listOf(
-        Screen.Home.route,
-        Screen.Journal.route,
-        Screen.Scan.route,
-        Screen.Habits.route,
-        Screen.Profile.route
-    )
-
     NavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier,
         enterTransition = {
-            val initialRoute = initialState.destination.route
-            val targetRoute = targetState.destination.route
-
-            val initialIndex = bottomNavRoutes.indexOf(initialRoute)
-            val targetIndex = bottomNavRoutes.indexOf(targetRoute)
-
-            if (initialIndex != -1 && targetIndex != -1) {
-                val direction = if (targetIndex > initialIndex)
-                    AnimatedContentTransitionScope.SlideDirection.Left
-                else
-                    AnimatedContentTransitionScope.SlideDirection.Right
-
-                fadeIn(animationSpec = tween(300)) + slideIntoContainer(
-                    direction,
-                    animationSpec = tween(300)
-                )
-            } else {
-                fadeIn(animationSpec = tween(300))
-            }
+            fadeIn(animationSpec = tween(300))
         },
         exitTransition = {
-            val initialRoute = initialState.destination.route
-            val targetRoute = targetState.destination.route
-
-            val initialIndex = bottomNavRoutes.indexOf(initialRoute)
-            val targetIndex = bottomNavRoutes.indexOf(targetRoute)
-
-            if (initialIndex != -1 && targetIndex != -1) {
-                val direction = if (targetIndex > initialIndex)
-                    AnimatedContentTransitionScope.SlideDirection.Left
-                else
-                    AnimatedContentTransitionScope.SlideDirection.Right
-
-                fadeOut(animationSpec = tween(300)) + slideOutOfContainer(
-                    direction,
-                    animationSpec = tween(300)
-                )
-            } else {
-                fadeOut(animationSpec = tween(300))
-            }
+            fadeOut(animationSpec = tween(300))
         },
         popEnterTransition = {
-            fadeIn(animationSpec = tween(300)) + slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(300)
-            )
+            fadeIn(animationSpec = tween(300))
         },
         popExitTransition = {
-            fadeOut(animationSpec = tween(300)) + slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(300)
-            )
+            fadeOut(animationSpec = tween(300))
         }
     ) {
         // Màn hình Welcome (Khởi đầu)
@@ -119,7 +68,6 @@ fun NavGraph(
                 },
                 onNavigateToRegister = {
                     navController.navigate(Screen.Register.route) {
-                        // Xóa trang Login hiện tại để nếu ở Register nhấn back sẽ về Welcome
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -140,12 +88,10 @@ fun NavGraph(
                 },
                 onNavigateToLogin = {
                     navController.navigate(Screen.Login.route) {
-                        // Xóa trang Register hiện tại để nếu ở Login nhấn back sẽ về Welcome
                         popUpTo(Screen.Register.route) { inclusive = true }
                     }
                 },
                 onRegisterSuccess = {
-                    // Sau khi đăng ký thành công, chuyển sang trang Login
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Register.route) { inclusive = true }
                     }

@@ -251,21 +251,9 @@ fun LoginContent(
                     LanguagePickerDialog(onDismiss = { onToggleLanguagePicker(false) })
                 }
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp), // Adjusted bottom padding
-                    verticalArrangement = Arrangement.Bottom
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.login_title),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                }
+                HeaderTitle(
+                    title = stringResource(id = R.string.login_title)
+                )
             }
 
             // Form Section
@@ -528,6 +516,24 @@ fun AuthInputField(
                 modifier = Modifier.padding(start = 12.dp, top = 2.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun HeaderTitle(title: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+        verticalArrangement = Arrangement.Bottom
+    ) {
+        Text(
+            text = title,
+            color = MaterialTheme.colorScheme.onPrimary,
+            fontSize = 30.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
     }
 }
 

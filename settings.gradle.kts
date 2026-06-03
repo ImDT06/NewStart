@@ -18,3 +18,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "NewStart"
 include(":app")
+include(":baselineprofile")
