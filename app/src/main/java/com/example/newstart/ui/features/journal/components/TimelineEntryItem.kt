@@ -28,7 +28,8 @@ fun TimelineEntryItem(
     entry: JournalEntry,
     timeFormatted: String,
     isLast: Boolean,
-    onImageClick: (String) -> Unit
+    onImageClick: (String) -> Unit,
+    onOptionsClick: () -> Unit
 ) {
     val timelineColor = MaterialTheme.colorScheme.primary
     val isDark = LocalDarkTheme.current
@@ -68,11 +69,11 @@ fun TimelineEntryItem(
             modifier = Modifier.weight(1f).padding(start = 2.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isDark) MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp) 
+                containerColor = if (isDark) MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp) 
                                  else MaterialTheme.colorScheme.surface,
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 0.dp else 1.dp),
-            border = if (isDark) BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)) else null
+            elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 2.dp else 1.dp),
+            border = if (isDark) BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f)) else null
         ) {
             Column {
                 Column(modifier = Modifier.padding(12.dp)) {
@@ -83,7 +84,17 @@ fun TimelineEntryItem(
                             fontWeight = FontWeight.ExtraBold, 
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                         )
-                        Icon(Icons.Default.MoreHoriz, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                        IconButton(
+                            onClick = onOptionsClick,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreHoriz, 
+                                contentDescription = "Options", 
+                                modifier = Modifier.size(16.dp), 
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(

@@ -1,7 +1,9 @@
 package com.example.newstart.ui.features.journal
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,18 +13,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
@@ -50,6 +52,7 @@ import com.example.newstart.ui.features.journal.components.TimelineEntryItem
 import com.example.newstart.ui.theme.LocalDarkTheme
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.util.AppCombinedPreviews
+import com.example.newstart.ui.util.ImageDownloader
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.time.DayOfWeek
@@ -57,6 +60,8 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
 import java.util.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 @Composable
 fun JournalScreen(
@@ -88,6 +93,7 @@ fun JournalContent(
 ) {
     var selectedImageUrl by remember { mutableStateOf<String?>(null) }
     var entryToDelete by remember { mutableStateOf<JournalEntry?>(null) }
+    var entryForOptions by remember { mutableStateOf<JournalEntry?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var isSearchActive by remember { mutableStateOf(false) }
@@ -98,6 +104,23 @@ fun JournalContent(
     val isInspectionMode = LocalInspectionMode.current
     val isDark = LocalDarkTheme.current
     val today = LocalDate.now()
+    
+    val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500)
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val locale = remember(context) { context.resources.configuration.locales[0] }
+    val isVietnamese = locale.language == "vi"
+    val timeFormatter = remember { SimpleDateFormat("HH:mm", locale) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            entryForOptions?.imageUrl?.let { url ->
+                scope.launch { ImageDownloader.downloadImage(context, url) }
+            }
+        }
+    }
 
     LaunchedEffect(isSearchActive) {
         if (isSearchActive) {
@@ -113,13 +136,6 @@ fun JournalContent(
             }
         }
     }
-    
-    val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500)
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    val locale = remember(context) { context.resources.configuration.locales[0] }
-    val isVietnamese = locale.language == "vi"
-    val timeFormatter = remember { SimpleDateFormat("HH:mm", locale) }
 
     val filteredEntries by remember(entries, searchQuery) {
         derivedStateOf {
@@ -144,29 +160,151 @@ fun JournalContent(
             )
     ) {
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-            JournalHeader(
-                isSearchActive = isSearchActive,
-                searchQuery = searchQuery,
-                onSearchQueryChange = { searchQuery = it },
-                onSearchToggle = { isSearchActive = it },
-                onShowDatePicker = { showDatePicker = true },
-                focusRequester = focusRequester,
-                focusManager = focusManager,
-                selectedDateRange = selectedDateRange,
-                onQuickFilterSelected = onQuickFilterSelected,
-                isVietnamese = isVietnamese,
-                locale = locale
-            )
+            // Header với hiệu ứng Search Icon chạy từ phải sang trái
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .padding(horizontal = 20.dp)
+            ) {
+                val maxWidth = maxWidth
+                val searchIconSize = 48.dp
 
-            QuickFiltersSection(
-                selectedDateRange = selectedDateRange,
-                onQuickFilterSelected = { 
-                    onQuickFilterSelected(it)
-                    if (isSearchActive) previousDateRange = null
-                },
-                isVietnamese = isVietnamese,
-                isDark = isDark
-            )
+                // Vị trí bắt đầu (bên phải, trước icon lịch) và kết thúc (bên trái)
+                val startOffset = maxWidth - (searchIconSize * 2)
+                val endOffset = (-12).dp // Chỉnh một chút để khớp với padding của TextField
+
+                val searchOffset by animateDpAsState(
+                    targetValue = if (isSearchActive) endOffset else startOffset,
+                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+                    label = "search_offset"
+                )
+
+                // 1. Tiêu đề (Fade out khi search)
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !isSearchActive,
+                    enter = fadeIn(tween(200)),
+                    exit = fadeOut(tween(200)),
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) {
+                    Text(
+                        text = if (isVietnamese) "Nhật ký" else "Journal",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+
+                // 2. Icon Lịch (Fade out khi search)
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !isSearchActive,
+                    enter = fadeIn(tween(200)),
+                    exit = fadeOut(tween(200)),
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                ) {
+                    IconButton(onClick = { showDatePicker = true }) {
+                        Icon(Icons.Default.CalendarMonth, null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+                    }
+                }
+
+                // 3. Khu vực Search
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .offset(x = searchOffset),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (isSearchActive) {
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier
+                                .width(maxWidth + 12.dp)
+                                .focusRequester(focusRequester),
+                            placeholder = {
+                                Text(
+                                    stringResource(R.string.home_search_placeholder),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Search,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            trailingIcon = {
+                                IconButton(onClick = { 
+                                    if (searchQuery.isNotEmpty()) searchQuery = ""
+                                    else {
+                                        isSearchActive = false
+                                        focusManager.clearFocus()
+                                    }
+                                }) {
+                                    Icon(Icons.Default.Close, null, modifier = Modifier.size(22.dp))
+                                }
+                            },
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                cursorColor = MaterialTheme.colorScheme.primary
+                            ),
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyMedium,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
+                        )
+                    } else {
+                        IconButton(onClick = { isSearchActive = true }) {
+                            Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+                        }
+                    }
+                }
+            }
+
+            // Ngày tháng & Filter
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val headerDateText = remember(selectedDateRange, locale) {
+                    val start = selectedDateRange.first
+                    val end = selectedDateRange.second
+                    if (end == null) {
+                        if (start == today) if (isVietnamese) "Hôm nay" else "Today"
+                        else start.format(DateTimeFormatter.ofPattern(if (isVietnamese) "dd MMMM" else "MMMM dd", locale))
+                    } else {
+                        val pattern = if (isVietnamese) "dd/MM" else "MM/dd"
+                        "${start.format(DateTimeFormatter.ofPattern(pattern, locale))} - ${end.format(DateTimeFormatter.ofPattern(pattern, locale))}"
+                    }
+                }
+
+                Text(
+                    text = headerDateText,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { onQuickFilterSelected("Today") }
+                )
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                QuickFiltersSection(
+                    selectedDateRange = selectedDateRange,
+                    onQuickFilterSelected = {
+                        onQuickFilterSelected(it)
+                        if (isSearchActive) previousDateRange = null
+                    },
+                    isVietnamese = isVietnamese,
+                    isDark = isDark
+                )
+            }
 
             JournalList(
                 filteredEntries = filteredEntries,
@@ -174,7 +312,7 @@ fun JournalContent(
                 isVietnamese = isVietnamese,
                 locale = locale,
                 timeFormatter = timeFormatter,
-                onDeleteRequest = { entryToDelete = it },
+                onOptionsClick = { entryForOptions = it },
                 onImageClick = { selectedImageUrl = it }
             )
         }
@@ -207,112 +345,29 @@ fun JournalContent(
         selectedImageUrl?.let { url ->
             ImagePreviewDialog(url = url, onDismiss = { selectedImageUrl = null })
         }
-    }
-}
 
-@Composable
-private fun JournalHeader(
-    isSearchActive: Boolean,
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
-    onSearchToggle: (Boolean) -> Unit,
-    onShowDatePicker: () -> Unit,
-    focusRequester: FocusRequester,
-    focusManager: FocusManager,
-    selectedDateRange: Pair<LocalDate, LocalDate?>,
-    onQuickFilterSelected: (String) -> Unit,
-    isVietnamese: Boolean,
-    locale: Locale
-) {
-    val today = LocalDate.now()
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 0.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AnimatedContent(
-                targetState = isSearchActive,
-                transitionSpec = { (fadeIn() + expandHorizontally()).togetherWith(fadeOut() + shrinkHorizontally()) },
-                modifier = Modifier.weight(1f),
-                label = "search_header"
-            ) { searching ->
-                if (searching) {
-                    TextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChange,
-                        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
-                        placeholder = { Text(stringResource(R.string.home_search_placeholder), fontSize = 14.sp) },
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                        ),
-                        trailingIcon = {
-                            IconButton(onClick = { 
-                                onSearchToggle(false)
-                                onSearchQueryChange("")
-                                focusManager.clearFocus()
-                            }) { Icon(Icons.Default.Close, null) }
-                        },
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyLarge,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
-                    )
-                } else {
-                    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
-                    val greetingRes = when (hour) {
-                        in 5..10 -> R.string.journal_greeting_morning
-                        in 11..13 -> R.string.journal_greeting_noon
-                        in 14..17 -> R.string.journal_greeting_afternoon
-                        else -> R.string.journal_greeting_evening
+        entryForOptions?.let { entry ->
+            JournalOptionsSheet(
+                onDismiss = { entryForOptions = null },
+                onShare = { /* TODO */ },
+                onDownload = {
+                    entry.imageUrl?.let { url ->
+                        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q &&
+                            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                            permissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        } else {
+                            scope.launch {
+                                ImageDownloader.downloadImage(context, url)
+                            }
+                        }
+                    } ?: run {
+                        android.widget.Toast.makeText(context, "Bài viết không có ảnh", android.widget.Toast.LENGTH_SHORT).show()
                     }
-                    Text(
-                        text = stringResource(id = greetingRes),
-                        style = MaterialTheme.typography.titleLarge, 
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        letterSpacing = (-0.5).sp
-                    )
+                },
+                onDelete = {
+                    entryToDelete = entry
+                    entryForOptions = null
                 }
-            }
-            
-            if (!isSearchActive) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { onSearchToggle(true) }) {
-                        Icon(Icons.Default.Search, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
-                    }
-                    IconButton(onClick = onShowDatePicker) {
-                        Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-        }
-
-        if (!isSearchActive) {
-            val headerDateText = remember(selectedDateRange, locale) {
-                val start = selectedDateRange.first
-                val end = selectedDateRange.second
-                if (end == null) {
-                    if (start == today) if (isVietnamese) "Hôm nay" else "Today"
-                    else start.format(DateTimeFormatter.ofPattern(if (isVietnamese) "dd MMMM" else "MMMM dd", locale))
-                } else {
-                    val pattern = if (isVietnamese) "dd/MM" else "MM/dd"
-                    "${start.format(DateTimeFormatter.ofPattern(pattern, locale))} - ${end.format(DateTimeFormatter.ofPattern(pattern, locale))}"
-                }
-            }
-            Text(
-                text = headerDateText,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.offset(y = (-8).dp).clickable { onQuickFilterSelected("Today") }
             )
         }
     }
@@ -326,11 +381,11 @@ private fun QuickFiltersSection(
     isDark: Boolean
 ) {
     LazyRow(
-        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(end = 20.dp)
     ) {
-        val filters = listOf("Today" to R.string.habits_today, "All" to R.string.habits_filter_all, "Month" to null)
+        val filters = listOf("All" to R.string.habits_filter_all, "Month" to null)
         items(filters) { (key, labelRes) ->
             val label = when {
                 labelRes != null -> stringResource(labelRes)
@@ -341,7 +396,6 @@ private fun QuickFiltersSection(
             val isSelected = remember(selectedDateRange, key) {
                 val today = LocalDate.now()
                 when (key) {
-                    "Today" -> selectedDateRange.first == today && selectedDateRange.second == null
                     "Month" -> selectedDateRange.first == today.withDayOfMonth(1) && selectedDateRange.second == today.withDayOfMonth(today.lengthOfMonth())
                     "All" -> selectedDateRange.first == LocalDate.of(2000, 1, 1)
                     else -> false
@@ -351,7 +405,7 @@ private fun QuickFiltersSection(
             FilterChip(
                 selected = isSelected,
                 onClick = { onQuickFilterSelected(key) },
-                label = { Text(text = label, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium) },
+                label = { Text(text = label, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium) },
                 shape = RoundedCornerShape(12.dp),
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -373,14 +427,15 @@ private fun JournalList(
     isVietnamese: Boolean,
     locale: Locale,
     timeFormatter: SimpleDateFormat,
-    onDeleteRequest: (JournalEntry) -> Unit,
+    onOptionsClick: (JournalEntry) -> Unit,
     onImageClick: (String) -> Unit
 ) {
     val focusManager = LocalFocusManager.current
+    val listBackgroundColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
+    
     Surface(
         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp
+        color = listBackgroundColor
     ) {
         if (filteredEntries.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -405,7 +460,10 @@ private fun JournalList(
             ) {
                 groupedEntries.forEach { (date, entriesInDate) ->
                     stickyHeader {
-                        Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(), 
+                            color = listBackgroundColor.copy(alpha = 0.98f)
+                        ) {
                             Text(
                                 text = date.format(DateTimeFormatter.ofPattern(if (isVietnamese) "dd MMMM, yyyy" else "MMMM dd, yyyy", locale)),
                                 style = MaterialTheme.typography.labelLarge,
@@ -417,13 +475,14 @@ private fun JournalList(
                     }
 
                     items(items = entriesInDate, key = { it.id }) { entry ->
-                        JournalSwipeableItem(
+                        TimelineEntryItem(
                             entry = entry,
                             timeFormatted = remember(entry.timestamp) { entry.timestamp?.let { timeFormatter.format(it) } ?: "--:--" },
                             isLast = entriesInDate.last().id == entry.id,
-                            onDeleteRequest = onDeleteRequest,
-                            onImageClick = onImageClick
+                            onImageClick = onImageClick,
+                            onOptionsClick = { onOptionsClick(entry) }
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
                 }
             }
@@ -433,39 +492,54 @@ private fun JournalList(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun JournalSwipeableItem(
-    entry: JournalEntry,
-    timeFormatted: String,
-    isLast: Boolean,
-    onDeleteRequest: (JournalEntry) -> Unit,
-    onImageClick: (String) -> Unit
+private fun JournalOptionsSheet(
+    onDismiss: () -> Unit,
+    onShare: () -> Unit,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit
 ) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = {
-            if (it == SwipeToDismissBoxValue.EndToStart) {
-                onDeleteRequest(entry)
-                false
-            } else false
-        }
-    )
-
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = false,
-        modifier = Modifier.padding(bottom = 12.dp),
-        backgroundContent = {
-            val isDismissing = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
-            val color = if (isDismissing) MaterialTheme.colorScheme.errorContainer else Color.Transparent
-            val scale by animateFloatAsState(if (isDismissing) 1.2f else 1f, label = "icon_scale")
-            
-            Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)).background(color), contentAlignment = Alignment.CenterEnd) {
-                Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(end = 24.dp).scale(scale))
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 40.dp, top = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            TextButton(
+                onClick = { onShare(); onDismiss() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Chia sẻ", style = MaterialTheme.typography.bodyLarge)
             }
-        },
-        content = {
-            TimelineEntryItem(entry = entry, timeFormatted = timeFormatted, isLast = isLast, onImageClick = onImageClick)
+            
+            TextButton(
+                onClick = { onDownload(); onDismiss() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Tải về", style = MaterialTheme.typography.bodyLarge)
+            }
+            
+            TextButton(
+                onClick = onDelete,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Xóa", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Hủy", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
-    )
+    }
 }
 
 @Composable
@@ -487,9 +561,26 @@ private fun DeleteConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
 
 @Composable
 private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)).clickable { onDismiss() }, contentAlignment = Alignment.Center) {
-            AsyncImage(model = url, contentDescription = null, modifier = Modifier.fillMaxWidth(0.95f).clip(RoundedCornerShape(24.dp)), contentScale = ContentScale.Fit)
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.9f))
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(32.dp)),
+                contentScale = ContentScale.Crop
+            )
         }
     }
 }

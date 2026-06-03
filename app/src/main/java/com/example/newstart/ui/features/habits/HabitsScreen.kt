@@ -263,7 +263,7 @@ private fun HabitsHeader(
         )
 
         IconButton(onClick = onShowMonthPicker) {
-            Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
         }
     }
 }

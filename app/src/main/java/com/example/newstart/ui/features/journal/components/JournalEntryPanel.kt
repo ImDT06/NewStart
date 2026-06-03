@@ -33,6 +33,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.media.MediaActionSound
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -703,11 +707,55 @@ private fun takePhoto(
             }
 
             override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                // Xử lý cắt ảnh vuông sau khi lưu thành công
+                processImageToSquare(photoFile)
                 val savedUri = Uri.fromFile(photoFile)
                 onImageCaptured(savedUri)
             }
         }
     )
+}
+
+private fun processImageToSquare(file: File) {
+    try {
+        val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return
+        
+        // Đọc thông tin xoay từ EXIF
+        val exif = ExifInterface(file.absolutePath)
+        val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+        }
+
+        // Tạo bitmap đã xoay đúng chiều
+        val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        
+        // Cắt vuông (Center Crop)
+        val width = rotatedBitmap.width
+        val height = rotatedBitmap.height
+        val newDimension = if (width < height) width else height
+        
+        val xOffset = (width - newDimension) / 2
+        val yOffset = (height - newDimension) / 2
+        
+        val squareBitmap = Bitmap.createBitmap(rotatedBitmap, xOffset, yOffset, newDimension, newDimension)
+        
+        // Lưu đè lại file cũ
+        java.io.FileOutputStream(file).use { out ->
+            squareBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+        }
+        
+        // Giải phóng bộ nhớ
+        if (bitmap != rotatedBitmap) bitmap.recycle()
+        rotatedBitmap.recycle()
+        squareBitmap.recycle()
+    } catch (e: Exception) {
+        Log.e("ImageProcess", "Failed to crop square", e)
+    }
 }
 
 private fun getOutputDirectory(context: android.content.Context): File {
