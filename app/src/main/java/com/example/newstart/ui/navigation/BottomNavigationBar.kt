@@ -1,8 +1,7 @@
 package com.example.newstart.ui.navigation
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,7 +31,8 @@ data class BottomNavItem(
 
 @Composable
 fun MainBottomBar(
-    navController: NavController
+    navController: NavController,
+    isVisible: Boolean = true
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -47,23 +47,30 @@ fun MainBottomBar(
 
     val showBottomBar = items.any { it.screen.route == currentRoute } || currentRoute == Screen.Scan.route
 
-    if (showBottomBar) {
-        val isDark = isSystemInDarkTheme()
+    AnimatedVisibility(
+        visible = showBottomBar && isVisible,
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                .padding(start = 20.dp, end = 20.dp, bottom = 10.dp) // Sát đáy hơn
         ) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(24.dp),
-                shadowElevation = if (isDark) 0.dp else 8.dp,
-                tonalElevation = if (isDark) 8.dp else 0.dp, // Material 3: Tonal tint for dark mode
-                border = if (isDark) BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f)) else null
+                    .height(60.dp), // Thu gọn chiều cao
+                color = MaterialTheme.colorScheme.surface, // Đồng bộ màu sắc với ThemeMode
+                shape = RoundedCornerShape(24.dp), 
+                shadowElevation = 8.dp,
+                tonalElevation = 3.dp,
+                border = BorderStroke(
+                    width = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                )
             ) {
                 Row(
                     modifier = Modifier.fillMaxSize(),
@@ -72,7 +79,6 @@ fun MainBottomBar(
                 ) {
                     items.forEachIndexed { index, item ->
                         if (index == 2) {
-                            // Khoảng trống cho FAB nổi ở giữa
                             Spacer(modifier = Modifier.weight(1f))
                         } else {
                             val isSelected = currentRoute == item.screen.route

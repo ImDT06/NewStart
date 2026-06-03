@@ -1,4 +1,4 @@
-package com.example.newstart.ui.screens.settings
+package com.example.newstart.ui.features.settings
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.newstart.R
 import com.example.newstart.ui.MainViewModel
@@ -174,11 +175,16 @@ fun SettingsScreen(
     var showColorPicker by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     
-    val themeMode by mainViewModel.themeMode.collectAsState()
-    val themeColor by mainViewModel.themeColor.collectAsState()
-    val avatarUri by mainViewModel.avatarUri.collectAsState()
-    val currentUser by mainViewModel.currentUser.collectAsState()
-    val isDark = isSystemInDarkTheme()
+    val themeMode by mainViewModel.themeMode.collectAsStateWithLifecycle()
+    val themeColor by mainViewModel.themeColor.collectAsStateWithLifecycle()
+    val avatarUri by mainViewModel.avatarUri.collectAsStateWithLifecycle()
+    val currentUser by mainViewModel.currentUser.collectAsStateWithLifecycle()
+
+    val isDark = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -229,17 +235,22 @@ fun SettingsScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
+        val background = MaterialTheme.colorScheme.background
+        val primaryContainer = MaterialTheme.colorScheme.primaryContainer
+        
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    brush = Brush.verticalGradient(
-                        colors = if (isDark) {
-                            listOf(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), MaterialTheme.colorScheme.background)
-                        } else {
-                            listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), MaterialTheme.colorScheme.background)
-                        }
-                    )
+                    brush = remember(isDark, background, primaryContainer) {
+                        Brush.verticalGradient(
+                            colors = if (isDark) {
+                                listOf(Color(0xFF001A33), background)
+                            } else {
+                                listOf(primaryContainer.copy(alpha = 0.5f), background)
+                            }
+                        )
+                    }
                 )
         ) {
             LazyColumn(

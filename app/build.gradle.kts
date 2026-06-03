@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.google.gms.google.services)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 kotlin {
@@ -44,6 +45,7 @@ android {
 }
 
 dependencies {
+    baselineProfile(project(":baselineprofile"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.credentials)

@@ -1,4 +1,4 @@
-package com.example.newstart.ui.screens.journal
+package com.example.newstart.ui.features.journal
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel
@@ -6,11 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.example.newstart.domain.model.JournalEntry
 import com.example.newstart.domain.repository.JournalRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -33,7 +35,10 @@ class JournalViewModel @Inject constructor(
     val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
 
     val allEntriesWithImages: StateFlow<List<JournalEntry>> = journalRepository.getJournalEntries()
-        .map { entries -> entries.filter { it.imageUrl != null }.sortedByDescending { it.timestamp } }
+        .map { entries -> 
+            entries.filter { it.imageUrl != null }.sortedByDescending { it.timestamp } 
+        }
+        .flowOn(Dispatchers.Default)
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -58,7 +63,7 @@ class JournalViewModel @Inject constructor(
                         }
                     } ?: false
                 }.sortedByDescending { it.timestamp }
-            }
+            }.flowOn(Dispatchers.Default)
         }
         .stateIn(
             scope = viewModelScope,

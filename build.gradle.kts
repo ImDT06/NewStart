@@ -17,4 +17,7 @@ plugins {
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.hilt.android) apply false
     alias(libs.plugins.google.gms.google.services) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.android.test) apply false
+    alias(libs.plugins.androidx.baselineprofile) apply false
 }

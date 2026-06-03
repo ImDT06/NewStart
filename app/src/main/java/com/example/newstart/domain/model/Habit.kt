@@ -1,5 +1,6 @@
 package com.example.newstart.domain.model
 
+import androidx.compose.runtime.Immutable
 import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.IgnoreExtraProperties
 import com.google.firebase.firestore.PropertyName
@@ -10,6 +11,7 @@ import java.util.*
  * Đã chuyển isCompleted sang 'val' để đảm bảo tính Immutable (Bất biến),
  * giúp Jetpack Compose tối ưu hóa việc vẽ lại màn hình (Skip recomposition).
  */
+@Immutable
 @IgnoreExtraProperties
 data class Habit(
     @DocumentId
