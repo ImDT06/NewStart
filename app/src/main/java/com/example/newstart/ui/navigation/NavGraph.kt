@@ -20,6 +20,7 @@ import com.example.newstart.ui.features.settings.SettingsScreen
 import com.example.newstart.ui.features.journal.JournalScreen
 import com.example.newstart.ui.features.habits.HabitsScreen
 import com.example.newstart.ui.features.social.SocialScreen
+import com.example.newstart.ui.features.pomodoro.PomodoroScreen
 import com.example.newstart.ui.screens.PlaceholderScreen
 
 import com.example.newstart.ui.MainViewModel
@@ -131,6 +132,15 @@ fun NavGraph(
             SocialScreen(onNavigateBack = {
                 navController.popBackStack()
             })
+        }
+
+        composable(route = Screen.Pomodoro.route) {
+            PomodoroScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                mainViewModel = mainViewModel
+            )
         }
 
         // Màn hình Detail

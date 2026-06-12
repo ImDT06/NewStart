@@ -9,6 +9,9 @@ import android.speech.SpeechRecognizer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -31,6 +34,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -132,7 +136,13 @@ fun HabitsScreen(
         viewModel.onDateSelected(selectedDate)
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val maxWidth = constraints.maxWidth.toFloat()
+        val maxHeight = constraints.maxHeight.toFloat()
+        val density = LocalDensity.current
+        val buttonSizePx = with(density) { 56.dp.toPx() }
+        val paddingPx = with(density) { 16.dp.toPx() }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -169,9 +179,10 @@ fun HabitsScreen(
         }
 
         AiFloatingButton(
-            modifier = Modifier.align(Alignment.BottomEnd),
-            offset = aiButtonOffset,
-            onOffsetChange = { aiButtonOffset = it },
+            maxWidth = maxWidth,
+            maxHeight = maxHeight,
+            buttonSizePx = buttonSizePx,
+            paddingPx = paddingPx,
             onClick = { showAiDialog = true }
         )
 
@@ -253,14 +264,14 @@ private fun HabitsHeader(
     onShowMonthPicker: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(color = MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(12.dp)) {
-            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(text = stringResource(R.string.habits_filter_all), color = MaterialTheme.colorScheme.onPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(12.dp))
+        Surface(color = MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(10.dp)) {
+            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(text = stringResource(R.string.habits_filter_all), color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(10.dp))
             }
         }
 
@@ -272,13 +283,13 @@ private fun HabitsHeader(
         Text(
             text = headerDateText ?: stringResource(R.string.habits_today),
             color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 16.sp,
+            fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onTodayClick() }.padding(horizontal = 8.dp, vertical = 4.dp)
         )
 
         IconButton(onClick = onShowMonthPicker) {
-            Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+            Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
         }
     }
 }
@@ -293,13 +304,13 @@ private fun HorizontalDatePicker(
     locale: java.util.Locale,
     onDateClick: (LocalDate) -> Unit
 ) {
-    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) { page ->
+    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) { page ->
         val weekStart = remember(page) {
             today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks((page - 500).toLong())
         }
         val weekDays = remember(weekStart) { (0..6).map { weekStart.plusDays(it.toLong()) } }
 
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             weekDays.forEach { day ->
                 val isSelected = day == selectedDate
                 val isToday = day == today
@@ -318,16 +329,16 @@ private fun HorizontalDatePicker(
                 }
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f).clickable { onDateClick(day) }) {
-                    Text(text = dayName, color = if (isSelected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
+                    Text(text = dayName, color = if (isSelected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
                     Surface(
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(32.dp),
                         shape = CircleShape,
                         color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        border = if (!isSelected && isToday) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+                        border = if (!isSelected && isToday) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(text = day.dayOfMonth.toString(), color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal)
+                            Text(text = day.dayOfMonth.toString(), color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground, fontSize = 13.sp, fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal)
                         }
                     }
                 }
@@ -351,7 +362,7 @@ private fun HabitList(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(items = habits, key = { it.id }) { habit ->
                 HabitSwipeableItem(habit = habit, onDeleteRequest = onDeleteRequest, onToggle = onToggle, onEdit = onEdit)
@@ -397,20 +408,57 @@ private fun HabitSwipeableItem(
 
 @Composable
 private fun AiFloatingButton(
-    modifier: Modifier = Modifier,
-    offset: Offset,
-    onOffsetChange: (Offset) -> Unit,
+    maxWidth: Float,
+    maxHeight: Float,
+    buttonSizePx: Float,
+    paddingPx: Float,
     onClick: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+    
+    // Khởi tạo vị trí mặc định (Góc dưới bên phải)
+    val offsetX = remember { Animatable(maxWidth - buttonSizePx - paddingPx) }
+    val offsetY = remember { Animatable(maxHeight - buttonSizePx - paddingPx - 200f) }
+
     Surface(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 6.dp,
-        modifier = modifier
-            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
-            .pointerInput(Unit) { detectDragGestures { change, dragAmount -> change.consume(); onOffsetChange(offset + dragAmount) } }
-            .padding(end = 20.dp, bottom = 100.dp)
+        modifier = Modifier
             .size(56.dp)
+            .offset { IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt()) }
+            .pointerInput(maxWidth, maxHeight) {
+                detectDragGestures(
+                    onDragEnd = {
+                        // Hiệu ứng hút về 2 phía dựa trên tâm của nút
+                        val centerX = offsetX.value + buttonSizePx / 2
+                        val targetX = if (centerX < maxWidth / 2) {
+                            paddingPx // Hút về bên trái
+                        } else {
+                            maxWidth - buttonSizePx - paddingPx // Hút về bên phải
+                        }
+                        scope.launch {
+                            offsetX.animateTo(
+                                targetValue = targetX,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioLowBouncy,
+                                    stiffness = Spring.StiffnessLow
+                                )
+                            )
+                        }
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        scope.launch {
+                            // Cập nhật vị trí và giới hạn biên (clamping) trong vùng an toàn
+                            val newX = (offsetX.value + dragAmount.x).coerceIn(paddingPx, maxWidth - buttonSizePx - paddingPx)
+                            val newY = (offsetY.value + dragAmount.y).coerceIn(paddingPx, maxHeight - buttonSizePx - paddingPx)
+                            offsetX.snapTo(newX)
+                            offsetY.snapTo(newY)
+                        }
+                    }
+                )
+            }
             .border(2.dp, Brush.linearGradient(listOf(Color(0xFF4285F4), Color(0xFF9B72CB))), CircleShape),
         onClick = onClick
     ) {

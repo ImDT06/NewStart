@@ -151,6 +151,13 @@ class HabitRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun getAllHabits(): Flow<List<Habit>> {
+        val userId = auth.currentUser?.uid ?: ""
+        return habitDao.getAllHabits(userId).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
     private suspend fun syncHabitsFromNetwork(userId: String, date: String) {
         try {
             val snapshot = firestore.collection("habits")

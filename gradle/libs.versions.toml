@@ -34,6 +34,7 @@ okhttp = "4.12.0"
 generativeai = "0.9.0"
 glance = "1.1.1"
 room = "2.8.4"
+wheelPicker = "1.1.11"
 androidx-baselineprofile = "1.5.0-alpha06"
 androidx-uiautomator = "2.3.0"
 androidx-benchmark = "1.5.0-alpha06"
@@ -93,6 +94,7 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-test-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "androidx-uiautomator" }
 androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "androidx-benchmark" }
+wheelPicker = { group = "com.github.commandiron", name = "WheelPickerCompose", version.ref = "wheelPicker" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

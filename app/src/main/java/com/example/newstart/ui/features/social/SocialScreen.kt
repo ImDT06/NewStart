@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -66,21 +67,22 @@ fun SocialScreen(
                         Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
                         color = MaterialTheme.colorScheme.primary
                     )
-                }
+                },
+                modifier = Modifier.height(44.dp)
             ) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Bạn bè", fontWeight = FontWeight.Bold) }
+                    text = { Text("Bạn bè", fontWeight = FontWeight.Bold, fontSize = 14.sp) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Nhóm (Squads)", fontWeight = FontWeight.Bold) }
+                    text = { Text("Nhóm (Squads)", fontWeight = FontWeight.Bold, fontSize = 14.sp) }
                 )
             }
 
-            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 if (selectedTab == 0) {
                     FriendsTab(
                         searchQuery = searchQuery,
@@ -117,22 +119,23 @@ private fun FriendsTab(
             value = searchQuery,
             onValueChange = onSearchQueryChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Tìm kiếm tên hoặc email") },
-            leadingIcon = { Icon(Icons.Default.Search, null) },
-            shape = RoundedCornerShape(16.dp),
-            singleLine = true
+            placeholder = { Text("Tìm kiếm tên hoặc email", fontSize = 14.sp) },
+            leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(20.dp)) },
+            shape = RoundedCornerShape(12.dp),
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         if (isSearching) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(16.dp))
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(2.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
             if (searchQuery.isNotEmpty()) {
@@ -182,9 +185,9 @@ private fun SquadsTab(squads: List<Squad>) {
         ) {
             SectionTitle("Squads của bạn")
             TextButton(onClick = { /* TODO: Create Squad */ }) {
-                Icon(Icons.Default.Add, null)
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("Tạo mới")
+                Text("Tạo mới", fontSize = 13.sp)
             }
         }
 
@@ -215,24 +218,26 @@ fun UserItem(user: User, action: @Composable () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-            .padding(12.dp),
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
             model = user.avatarUrl,
             contentDescription = null,
             modifier = Modifier
-                .size(48.dp)
+                .size(40.dp)
                 .clip(CircleShape),
             contentScale = ContentScale.Crop
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(user.name, fontWeight = FontWeight.Bold)
-            Text(user.email, fontSize = 12.sp, color = Color.Gray)
+            Text(user.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(user.email, fontSize = 11.sp, color = Color.Gray)
         }
-        action()
+        Box(modifier = Modifier.scale(0.85f)) {
+            action()
+        }
     }
 }
 
@@ -241,15 +246,19 @@ fun RequestItem(fromUserId: String, onAccept: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
-            .padding(12.dp),
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+            .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Default.Person, null, modifier = Modifier.size(40.dp))
-        Spacer(modifier = Modifier.width(12.dp))
-        Text("Lời mời từ $fromUserId", modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
-        Button(onClick = onAccept) {
-            Text("Chấp nhận")
+        Icon(Icons.Default.Person, null, modifier = Modifier.size(32.dp))
+        Spacer(modifier = Modifier.width(10.dp))
+        Text("Lời mời từ ${fromUserId.take(8)}...", modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium, fontSize = 13.sp)
+        Button(
+            onClick = onAccept,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            modifier = Modifier.height(32.dp)
+        ) {
+            Text("Chấp nhận", fontSize = 11.sp)
         }
     }
 }
@@ -258,19 +267,19 @@ fun RequestItem(fromUserId: String, onAccept: () -> Unit) {
 fun SquadItem(squad: Squad) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(squad.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(squad.habitCategory, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(8.dp))
-            Text(squad.description, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
-            Spacer(Modifier.height(12.dp))
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(squad.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(squad.habitCategory, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(6.dp))
+            Text(squad.description, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+            Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Group, null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Group, null, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("${squad.members.size} thành viên", fontSize = 12.sp)
+                Text("${squad.members.size} thành viên", fontSize = 11.sp)
             }
         }
     }
@@ -280,9 +289,9 @@ fun SquadItem(squad: Squad) {
 private fun SectionTitle(title: String) {
     Text(
         text = title,
-        fontSize = 14.sp,
+        fontSize = 13.sp,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(vertical = 8.dp)
+        modifier = Modifier.padding(vertical = 6.dp)
     )
 }

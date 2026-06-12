@@ -100,6 +100,7 @@ fun JournalContent(
     onQuickFilterSelected: (String) -> Unit,
     onDeleteEntry: (String) -> Unit
 ) {
+    val isDark = LocalDarkTheme.current
     var selectedImageUrl by remember { mutableStateOf<String?>(null) }
     var entryToDelete by remember { mutableStateOf<JournalEntry?>(null) }
     var entryForOptions by remember { mutableStateOf<JournalEntry?>(null) }
@@ -111,7 +112,6 @@ fun JournalContent(
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
     val isInspectionMode = LocalInspectionMode.current
-    val isDark = LocalDarkTheme.current
     val today = LocalDate.now()
     
     val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500)
@@ -160,10 +160,10 @@ fun JournalContent(
         modifier = modifier
             .fillMaxSize()
             .background(
-                brush = remember(isDark, backgroundColor, primaryContainer) {
+                brush = remember(isDark, backgroundColor) {
                     Brush.verticalGradient(
-                        colors = if (isDark) listOf(Color(0xFF001A33), backgroundColor)
-                        else listOf(primaryContainer.copy(alpha = 0.4f), backgroundColor)
+                        colors = if (isDark) listOf(Color.Black, Color.Black)
+                        else listOf(backgroundColor, backgroundColor) // Trắng đồng bộ ở chế độ sáng
                     )
                 }
             )
@@ -173,15 +173,15 @@ fun JournalContent(
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp)
-                    .padding(horizontal = 20.dp)
+                    .height(56.dp)
+                    .padding(horizontal = 16.dp)
             ) {
-                val maxWidth = maxWidth
-                val searchIconSize = 48.dp
+                val availableWidth = maxWidth
+                val searchIconSize = 44.dp
 
                 // Vị trí bắt đầu (bên phải, trước icon lịch) và kết thúc (bên trái)
-                val startOffset = maxWidth - (searchIconSize * 2)
-                val endOffset = (-12).dp // Chỉnh một chút để khớp với padding của TextField
+                val startOffset = availableWidth - (searchIconSize * 2)
+                val endOffset = (-8).dp // Chỉnh một chút để khớp với padding của TextField
 
                 val searchOffset by animateDpAsState(
                     targetValue = if (isSearchActive) endOffset else startOffset,
@@ -198,7 +198,7 @@ fun JournalContent(
                 ) {
                     Text(
                         text = if (isVietnamese) "Nhật ký" else "Journal",
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onBackground
                     )
@@ -228,7 +228,7 @@ fun JournalContent(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             modifier = Modifier
-                                .width(maxWidth + 12.dp)
+                                .width(availableWidth + 12.dp)
                                 .focusRequester(focusRequester),
                             placeholder = {
                                 Text(
@@ -289,17 +289,17 @@ fun JournalContent(
                         )
                     }
                 },
-                modifier = Modifier.padding(horizontal = 20.dp)
+                modifier = Modifier.padding(horizontal = 16.dp).height(44.dp)
             ) {
                 Tab(
                     selected = currentTab == 0,
                     onClick = { onTabSelected(0) },
-                    text = { Text(if (isVietnamese) "Cá nhân" else "Personal", fontWeight = FontWeight.Bold) }
+                    text = { Text(if (isVietnamese) "Cá nhân" else "Personal", fontWeight = FontWeight.Bold, fontSize = 14.sp) }
                 )
                 Tab(
                     selected = currentTab == 1,
                     onClick = { onTabSelected(1) },
-                    text = { Text(if (isVietnamese) "Cộng đồng" else "Community", fontWeight = FontWeight.Bold) }
+                    text = { Text(if (isVietnamese) "Cộng đồng" else "Community", fontWeight = FontWeight.Bold, fontSize = 14.sp) }
                 )
             }
 
@@ -308,7 +308,7 @@ fun JournalContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val headerDateText = remember(selectedDateRange, locale) {
@@ -325,13 +325,13 @@ fun JournalContent(
 
                     Text(
                         text = headerDateText,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.clickable { onQuickFilterSelected("Today") }
                     )
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     QuickFiltersSection(
                         selectedDateRange = selectedDateRange,
@@ -348,6 +348,7 @@ fun JournalContent(
             if (currentTab == 0) {
                 JournalList(
                     filteredEntries = filteredEntries,
+                    isDark = isDark,
                     searchQuery = searchQuery,
                     isVietnamese = isVietnamese,
                     locale = locale,
@@ -359,6 +360,7 @@ fun JournalContent(
                 SocialFeedList(
                     socialFeed = socialFeed,
                     isVietnamese = isVietnamese,
+                    isDark = isDark,
                     timeFormatter = timeFormatter,
                     onImageClick = { selectedImageUrl = it }
                 )
@@ -471,6 +473,7 @@ private fun QuickFiltersSection(
 @Composable
 private fun JournalList(
     filteredEntries: List<JournalEntry>,
+    isDark: Boolean,
     searchQuery: String,
     isVietnamese: Boolean,
     locale: Locale,
@@ -479,11 +482,10 @@ private fun JournalList(
     onImageClick: (String) -> Unit
 ) {
     val focusManager = LocalFocusManager.current
-    val listBackgroundColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
+    val listBackgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.background
     
-    Surface(
-        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
-        color = listBackgroundColor
+    Box(
+        modifier = Modifier.fillMaxSize()
     ) {
         if (filteredEntries.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -504,7 +506,7 @@ private fun JournalList(
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) },
-                contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp, start = 12.dp, end = 12.dp)
+                contentPadding = PaddingValues(top = 4.dp, bottom = 100.dp, start = 12.dp, end = 12.dp)
             ) {
                 groupedEntries.forEach { (date, entriesInDate) ->
                     stickyHeader {
@@ -517,7 +519,7 @@ private fun JournalList(
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp)
+                                modifier = Modifier.padding(vertical = 4.dp, horizontal = 12.dp)
                             )
                         }
                     }
@@ -637,12 +639,13 @@ private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
 private fun SocialFeedList(
     socialFeed: List<JournalEntry>,
     isVietnamese: Boolean,
+    isDark: Boolean,
     timeFormatter: SimpleDateFormat,
     onImageClick: (String) -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
+        color = if (isDark) Color.Black else MaterialTheme.colorScheme.background
     ) {
         if (socialFeed.isEmpty()) {
             Column(
@@ -687,10 +690,16 @@ fun SocialFeedItem(
     timeFormatted: String,
     onImageClick: (String) -> Unit
 ) {
+    val isDark = LocalDarkTheme.current
+    
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (isDark) MaterialTheme.colorScheme.surface 
+                             else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (isDark) 2.dp else 0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

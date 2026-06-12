@@ -70,9 +70,9 @@ fun TimelineEntryItem(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = if (isDark) MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp) 
-                                 else MaterialTheme.colorScheme.surface,
+                                 else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 2.dp else 1.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 2.dp else 0.dp),
             border = if (isDark) BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f)) else null
         ) {
             Column {

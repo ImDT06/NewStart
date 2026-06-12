@@ -3,6 +3,7 @@ package com.example.newstart.ui.features.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.newstart.domain.model.Habit
+import com.example.newstart.domain.model.Priority
 import com.example.newstart.domain.model.Todo
 import com.example.newstart.domain.model.User
 import com.example.newstart.domain.repository.AuthRepository
@@ -55,9 +56,48 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun addTodo(task: String) {
+    fun addTodo(task: String, priority: Priority = Priority.MEDIUM) {
         viewModelScope.launch {
-            todoRepository.insertTodo(Todo(task = task))
+            todoRepository.insertTodo(Todo(task = task, priority = priority))
         }
+    }
+
+    fun deleteTodo(todo: Todo) {
+        viewModelScope.launch {
+            todoRepository.deleteTodo(todo)
+        }
+    }
+
+    fun updateTodo(todo: Todo) {
+        viewModelScope.launch {
+            todoRepository.updateTodo(todo)
+        }
+    }
+
+    private val _timerSeconds = MutableStateFlow(0)
+    val timerSeconds: StateFlow<Int> = _timerSeconds.asStateFlow()
+
+    private val _isTimerRunning = MutableStateFlow(false)
+    val isTimerRunning: StateFlow<Boolean> = _isTimerRunning.asStateFlow()
+
+    private var timerJob: kotlinx.coroutines.Job? = null
+
+    fun startTimer() {
+        if (_isTimerRunning.value) return
+        _isTimerRunning.value = true
+        _timerSeconds.value = 25 * 60
+        timerJob = viewModelScope.launch {
+            while (_timerSeconds.value > 0) {
+                kotlinx.coroutines.delay(1000)
+                _timerSeconds.value -= 1
+            }
+            _isTimerRunning.value = false
+        }
+    }
+
+    fun stopTimer() {
+        timerJob?.cancel()
+        _isTimerRunning.value = false
+        _timerSeconds.value = 0
     }
 }

@@ -8,4 +8,5 @@ interface HabitRepository {
     suspend fun deleteHabit(habitId: String): Result<Unit>
     suspend fun toggleHabitCompletion(habit: Habit, isCompleted: Boolean): Result<Unit>
     fun getHabits(date: String): Flow<List<Habit>>
+    fun getAllHabits(): Flow<List<Habit>>
 }

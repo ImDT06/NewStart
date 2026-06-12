@@ -83,7 +83,14 @@ class MainViewModel @Inject constructor(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = AppThemeColor.BLUE
+            initialValue = AppThemeColor.BLACK
+        )
+
+    val commonPomoTimes: StateFlow<List<Int>> = userPreferencesRepository.commonPomoTimesFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = listOf(25, 40, 60, 180)
         )
 
     val avatarUri: StateFlow<Uri?> = currentUser
@@ -105,6 +112,26 @@ class MainViewModel @Inject constructor(
     fun setThemeColor(color: AppThemeColor) {
         viewModelScope.launch {
             userPreferencesRepository.setThemeColor(color)
+        }
+    }
+
+    fun addCommonPomoTime(minutes: Int) {
+        viewModelScope.launch {
+            val currentTimes = commonPomoTimes.value.toMutableList()
+            if (!currentTimes.contains(minutes)) {
+                currentTimes.add(minutes)
+                userPreferencesRepository.setCommonPomoTimes(currentTimes.sorted())
+            }
+        }
+    }
+
+    fun removeCommonPomoTime(minutes: Int) {
+        viewModelScope.launch {
+            val currentTimes = commonPomoTimes.value.toMutableList()
+            if (currentTimes.contains(minutes)) {
+                currentTimes.remove(minutes)
+                userPreferencesRepository.setCommonPomoTimes(currentTimes.sorted())
+            }
         }
     }
 
@@ -168,4 +195,128 @@ class MainViewModel @Inject constructor(
             }
         }
     }
+
+    private val _timerSeconds = MutableStateFlow(25 * 60)
+    val timerSeconds: StateFlow<Int> = _timerSeconds.asStateFlow()
+
+    private val _isTimerRunning = MutableStateFlow(false)
+    val isTimerRunning: StateFlow<Boolean> = _isTimerRunning.asStateFlow()
+
+    private val _focusTime = MutableStateFlow(25)
+    val focusTime = _focusTime.asStateFlow()
+
+    private val _breakTime = MutableStateFlow(5)
+    val breakTime = _breakTime.asStateFlow()
+
+    private val _isFocusMode = MutableStateFlow(true)
+    val isFocusMode = _isFocusMode.asStateFlow()
+
+    private var timerJob: kotlinx.coroutines.Job? = null
+
+    fun setFocusTime(minutes: Int) {
+        _focusTime.value = minutes
+        if (!_isTimerRunning.value && _isFocusMode.value) {
+            _timerSeconds.value = minutes * 60
+        }
+    }
+
+    fun setBreakTime(minutes: Int) {
+        _breakTime.value = minutes
+        if (!_isTimerRunning.value && !_isFocusMode.value) {
+            _timerSeconds.value = minutes * 60
+        }
+    }
+
+    fun startTimer() {
+        if (_isTimerRunning.value) return
+        
+        if (_timerSeconds.value <= 0) {
+            _timerSeconds.value = (if (_isFocusMode.value) _focusTime.value else _breakTime.value) * 60
+        }
+        
+        _isTimerRunning.value = true
+        timerJob?.cancel()
+        timerJob = viewModelScope.launch {
+            try {
+                while (_timerSeconds.value > 0) {
+                    kotlinx.coroutines.delay(1000)
+                    _timerSeconds.value -= 1
+                }
+                onTimerFinished()
+            } catch (e: Exception) {
+                // Timer cancelled
+            }
+        }
+    }
+
+    fun pauseTimer() {
+        _isTimerRunning.value = false
+        timerJob?.cancel()
+    }
+
+    fun resetTimer() {
+        _isTimerRunning.value = false
+        timerJob?.cancel()
+        _timerSeconds.value = (if (_isFocusMode.value) _focusTime.value else _breakTime.value) * 60
+    }
+
+    private fun onTimerFinished() {
+        _isFocusMode.value = !_isFocusMode.value
+        resetTimer()
+    }
+
+    fun stopTimer() {
+        resetTimer()
+    }
+
+    // --- Thống kê người dùng (Real-time Stats) ---
+
+    val journalCount: StateFlow<Int> = journalRepository.getJournalEntries()
+        .map { it.size }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+
+    val habitStats: StateFlow<Pair<Int, Int>> = habitRepository.getAllHabits()
+        .map { habits ->
+            if (habits.isEmpty()) 0 to 0
+            else {
+                val total = habits.size
+                val completed = habits.count { it.isCompleted }
+                val percent = (completed.toFloat() / total * 100).toInt()
+                
+                // Tính toán chuỗi ngày (Streak)
+                val completedDates = habits.filter { it.isCompleted }
+                    .map { it.date }
+                    .distinct()
+                    .map { LocalDate.parse(it) }
+                    .sortedDescending()
+
+                var streak = 0
+                if (completedDates.isNotEmpty()) {
+                    var current = LocalDate.now()
+                    // Nếu hôm nay chưa hoàn thành gì, kiểm tra từ hôm qua
+                    if (!completedDates.contains(current)) {
+                        current = current.minusDays(1)
+                    }
+                    
+                    for (date in completedDates) {
+                        if (date == current) {
+                            streak++
+                            current = current.minusDays(1)
+                        } else if (date.isBefore(current)) {
+                            break
+                        }
+                    }
+                }
+                percent to streak
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0 to 0
+        )
 }

@@ -22,6 +22,7 @@ class UserPreferencesRepository @Inject constructor(
 ) {
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val themeColorKey = stringPreferencesKey("theme_color")
+    private val commonPomoTimesKey = stringPreferencesKey("common_pomo_times")
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
         val modeName = preferences[themeModeKey] ?: ThemeMode.SYSTEM.name
@@ -33,12 +34,17 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     val themeColorFlow: Flow<AppThemeColor> = context.dataStore.data.map { preferences ->
-        val colorName = preferences[themeColorKey] ?: AppThemeColor.BLUE.name
+        val colorName = preferences[themeColorKey] ?: AppThemeColor.BLACK.name
         try {
             AppThemeColor.valueOf(colorName)
         } catch (e: Exception) {
-            AppThemeColor.BLUE
+            AppThemeColor.BLACK
         }
+    }
+
+    val commonPomoTimesFlow: Flow<List<Int>> = context.dataStore.data.map { preferences ->
+        val timesString = preferences[commonPomoTimesKey] ?: "25,40,60,180"
+        timesString.split(",").mapNotNull { it.toIntOrNull() }.sorted()
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
@@ -50,6 +56,12 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun setThemeColor(color: AppThemeColor) {
         context.dataStore.edit { preferences ->
             preferences[themeColorKey] = color.name
+        }
+    }
+
+    suspend fun setCommonPomoTimes(times: List<Int>) {
+        context.dataStore.edit { preferences ->
+            preferences[commonPomoTimesKey] = times.joinToString(",")
         }
     }
 }
