@@ -38,17 +38,22 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.newstart.R
+import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.theme.NewStartTheme
+import com.example.newstart.ui.theme.authHeaderGradient
 import com.example.newstart.ui.util.AppCombinedPreviews
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.newstart.ui.util.LanguagePickerDialog
-import com.example.newstart.ui.util.SmallLanguageSwitcher
+import com.example.newstart.ui.util.TransparentLanguageSwitcher
 
 @Composable
 fun RegisterScreen(
     modifier: Modifier = Modifier,
     onNavigateBack: () -> Unit = {},
+    onNavigateToLogin: () -> Unit = {},
     onRegisterSuccess: () -> Unit = {},
     viewModel: RegisterViewModel = hiltViewModel(),
+    mainViewModel: MainViewModel = viewModel()
 ) {
     val context = LocalContext.current
     var showLanguagePicker by remember { mutableStateOf(false) }
@@ -84,11 +89,12 @@ fun RegisterScreen(
                 }
             )
         },
-        onLoginNowClick = onNavigateBack,
+        onLoginNowClick = onNavigateToLogin,
         onBackClick = onNavigateBack,
         showLanguagePicker = showLanguagePicker,
         onToggleLanguagePicker = { showLanguagePicker = it },
         modifier = modifier,
+        headerGradient = authHeaderGradient(mainViewModel)
     )
 }
 
@@ -119,6 +125,7 @@ fun RegisterContent(
     showLanguagePicker: Boolean,
     onToggleLanguagePicker: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    headerGradient: Brush
 ) {
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
@@ -141,14 +148,7 @@ fun RegisterContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                            )
-                        )
-                    )
+                    .background(brush = headerGradient)
             ) {
                 Row(
                     modifier = Modifier
@@ -167,14 +167,13 @@ fun RegisterContent(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(28.dp)
                         )
                     }
 
-                    SmallLanguageSwitcher(
-                        onClick = { onToggleLanguagePicker(true) },
-                        tintColor = MaterialTheme.colorScheme.onPrimary
+                    TransparentLanguageSwitcher(
+                        onClick = { onToggleLanguagePicker(true) }
                     )
                 }
 
@@ -191,15 +190,10 @@ fun RegisterContent(
                 ) {
                     Text(
                         text = stringResource(id = R.string.register_title),
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = Color.White,
                         fontSize = 30.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = stringResource(id = R.string.register_subtitle),
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                        fontSize = 14.sp,
-                        lineHeight = 18.sp
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
                     )
                 }
             }
@@ -209,13 +203,13 @@ fun RegisterContent(
                 modifier = Modifier
                     .padding(top = 155.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
                     .background(MaterialTheme.colorScheme.surface)
                     .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     RegisterInputField(
                         value = fullName,
                         onValueChange = onFullNameChange,
@@ -289,35 +283,29 @@ fun RegisterContent(
                         )
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(
-                            checked = acceptTerms,
-                            onCheckedChange = onAcceptTermsChange,
-                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
-                        )
-                        Text(
-                            text = buildAnnotatedString {
-                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                    append(stringResource(id = R.string.register_terms_prefix))
-                                }
-                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
-                                    append(stringResource(id = R.string.register_terms_service))
-                                }
-                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                    append(stringResource(id = R.string.register_terms_and))
-                                }
-                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
-                                    append(stringResource(id = R.string.register_terms_privacy))
-                                }
-                            },
-                            fontSize = 12.sp,
-                            lineHeight = 18.sp,
-                            modifier = Modifier.clickable { onAcceptTermsChange(!acceptTerms) }
-                        )
-                    }
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                                append(stringResource(id = R.string.register_terms_prefix))
+                            }
+                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
+                                append(stringResource(id = R.string.register_terms_service))
+                            }
+                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                                append(stringResource(id = R.string.register_terms_and))
+                            }
+                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
+                                append(stringResource(id = R.string.register_terms_privacy))
+                            }
+                        },
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        letterSpacing = 0.5.sp,
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp, vertical = 8.dp)
+                            .clickable { onAcceptTermsChange(!acceptTerms) },
+                        textAlign = TextAlign.Start
+                    )
                 }
 
                 Column(
@@ -335,7 +323,7 @@ fun RegisterContent(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(20.dp)
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
@@ -433,7 +421,7 @@ fun RegisterInputField(
             },
             isError = errorText != null,
             visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
@@ -488,7 +476,8 @@ fun RegisterScreenPreview() {
             onLoginNowClick = {},
             onBackClick = {},
             showLanguagePicker = false,
-            onToggleLanguagePicker = {}
+            onToggleLanguagePicker = {},
+            headerGradient = authHeaderGradient(com.example.newstart.ui.theme.AppThemeColor.BLUE)
         )
     }
 }

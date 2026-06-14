@@ -1,6 +1,5 @@
 package com.example.newstart.ui.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,10 +15,12 @@ import com.example.newstart.ui.screens.auth.LoginScreen
 import com.example.newstart.ui.screens.auth.RegisterScreen
 import com.example.newstart.ui.screens.auth.WelcomeScreen
 import com.example.newstart.ui.screens.detail.DetailScreen
-import com.example.newstart.ui.screens.home.HomeScreen
-import com.example.newstart.ui.screens.settings.SettingsScreen
-import com.example.newstart.ui.screens.journal.JournalScreen
-import com.example.newstart.ui.screens.habits.HabitsScreen
+import com.example.newstart.ui.features.home.HomeScreen
+import com.example.newstart.ui.features.settings.SettingsScreen
+import com.example.newstart.ui.features.journal.JournalScreen
+import com.example.newstart.ui.features.habits.HabitsScreen
+import com.example.newstart.ui.features.social.SocialScreen
+import com.example.newstart.ui.features.pomodoro.PomodoroScreen
 import com.example.newstart.ui.screens.PlaceholderScreen
 
 import com.example.newstart.ui.MainViewModel
@@ -31,71 +32,21 @@ fun NavGraph(
     mainViewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
-    val bottomNavRoutes = listOf(
-        Screen.Home.route,
-        Screen.Journal.route,
-        Screen.Scan.route,
-        Screen.Habits.route,
-        Screen.Profile.route
-    )
-
     NavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier,
         enterTransition = {
-            val initialRoute = initialState.destination.route
-            val targetRoute = targetState.destination.route
-
-            val initialIndex = bottomNavRoutes.indexOf(initialRoute)
-            val targetIndex = bottomNavRoutes.indexOf(targetRoute)
-
-            if (initialIndex != -1 && targetIndex != -1) {
-                val direction = if (targetIndex > initialIndex)
-                    AnimatedContentTransitionScope.SlideDirection.Left
-                else
-                    AnimatedContentTransitionScope.SlideDirection.Right
-
-                fadeIn(animationSpec = tween(300)) + slideIntoContainer(
-                    direction,
-                    animationSpec = tween(300)
-                )
-            } else {
-                fadeIn(animationSpec = tween(300))
-            }
+            fadeIn(animationSpec = tween(300))
         },
         exitTransition = {
-            val initialRoute = initialState.destination.route
-            val targetRoute = targetState.destination.route
-
-            val initialIndex = bottomNavRoutes.indexOf(initialRoute)
-            val targetIndex = bottomNavRoutes.indexOf(targetRoute)
-
-            if (initialIndex != -1 && targetIndex != -1) {
-                val direction = if (targetIndex > initialIndex)
-                    AnimatedContentTransitionScope.SlideDirection.Left
-                else
-                    AnimatedContentTransitionScope.SlideDirection.Right
-
-                fadeOut(animationSpec = tween(300)) + slideOutOfContainer(
-                    direction,
-                    animationSpec = tween(300)
-                )
-            } else {
-                fadeOut(animationSpec = tween(300))
-            }
+            fadeOut(animationSpec = tween(300))
         },
         popEnterTransition = {
-            fadeIn(animationSpec = tween(300)) + slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(300)
-            )
+            fadeIn(animationSpec = tween(300))
         },
         popExitTransition = {
-            fadeOut(animationSpec = tween(300)) + slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(300)
-            )
+            fadeOut(animationSpec = tween(300))
         }
     ) {
         // Màn hình Welcome (Khởi đầu)
@@ -106,7 +57,8 @@ fun NavGraph(
                 },
                 onNavigateToRegister = {
                     navController.navigate(Screen.Register.route)
-                }
+                },
+                mainViewModel = mainViewModel
             )
         }
 
@@ -117,13 +69,16 @@ fun NavGraph(
                     navController.popBackStack()
                 },
                 onNavigateToRegister = {
-                    navController.navigate(Screen.Register.route)
+                    navController.navigate(Screen.Register.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
                 },
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Welcome.route) { inclusive = true }
                     }
-                }
+                },
+                mainViewModel = mainViewModel
             )
         }
 
@@ -133,13 +88,17 @@ fun NavGraph(
                 onNavigateBack = {
                     navController.popBackStack()
                 },
-                onRegisterSuccess = {
-                    // Sau khi đăng ký thành công (Get Set to Explore), chuyển sang trang Login
+                onNavigateToLogin = {
                     navController.navigate(Screen.Login.route) {
-                        // Xóa trang Register khỏi stack để không bị quay lại trang này khi ấn back ở Login
                         popUpTo(Screen.Register.route) { inclusive = true }
                     }
-                }
+                },
+                onRegisterSuccess = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Register.route) { inclusive = true }
+                    }
+                },
+                mainViewModel = mainViewModel
             )
         }
 
@@ -157,11 +116,31 @@ fun NavGraph(
         }
 
         composable(route = Screen.Habits.route) {
-            HabitsScreen(mainViewModel = mainViewModel)
+            HabitsScreen(
+                mainViewModel = mainViewModel,
+                navController = navController
+            )
         }
 
         composable(route = Screen.Profile.route) {
-            SettingsScreen()
+            SettingsScreen(onNavigateToSocial = {
+                navController.navigate(Screen.Social.route)
+            })
+        }
+
+        composable(route = Screen.Social.route) {
+            SocialScreen(onNavigateBack = {
+                navController.popBackStack()
+            })
+        }
+
+        composable(route = Screen.Pomodoro.route) {
+            PomodoroScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                mainViewModel = mainViewModel
+            )
         }
 
         // Màn hình Detail

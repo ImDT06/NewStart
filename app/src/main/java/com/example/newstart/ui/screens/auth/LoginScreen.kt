@@ -43,10 +43,13 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.newstart.R
+import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.theme.NewStartTheme
+import com.example.newstart.ui.theme.authHeaderGradient
 import com.example.newstart.ui.util.AppCombinedPreviews
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.newstart.ui.util.LanguagePickerDialog
-import com.example.newstart.ui.util.SmallLanguageSwitcher
+import com.example.newstart.ui.util.TransparentLanguageSwitcher
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
@@ -57,7 +60,8 @@ fun LoginScreen(
     onNavigateToRegister: () -> Unit,
     onLoginSuccess: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: LoginViewModel = hiltViewModel()
+    viewModel: LoginViewModel = hiltViewModel(),
+    mainViewModel: MainViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -79,7 +83,7 @@ fun LoginScreen(
                         label = { Text("Email") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(20.dp)
                     )
                 }
             },
@@ -96,7 +100,8 @@ fun LoginScreen(
                                 Toast.makeText(context, error, Toast.LENGTH_LONG).show()
                             }
                         )
-                    }
+                    },
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Text("Gửi yêu cầu")
                 }
@@ -167,6 +172,7 @@ fun LoginScreen(
         showLanguagePicker = showLanguagePicker,
         onToggleLanguagePicker = { showLanguagePicker = it },
         modifier = modifier,
+        headerGradient = authHeaderGradient(mainViewModel)
     )
 }
 
@@ -189,6 +195,7 @@ fun LoginContent(
     showLanguagePicker: Boolean,
     onToggleLanguagePicker: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    headerGradient: Brush
 ) {
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
@@ -211,14 +218,7 @@ fun LoginContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                            )
-                        )
-                    )
+                    .background(brush = headerGradient)
             ) {
                 Row(
                     modifier = Modifier
@@ -237,14 +237,13 @@ fun LoginContent(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(28.dp)
                         )
                     }
 
-                    SmallLanguageSwitcher(
-                        onClick = { onToggleLanguagePicker(true) },
-                        tintColor = MaterialTheme.colorScheme.onPrimary
+                    TransparentLanguageSwitcher(
+                        onClick = { onToggleLanguagePicker(true) }
                     )
                 }
 
@@ -261,15 +260,10 @@ fun LoginContent(
                 ) {
                     Text(
                         text = stringResource(id = R.string.login_title),
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = Color.White,
                         fontSize = 30.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = stringResource(id = R.string.login_subtitle),
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                        fontSize = 14.sp,
-                        lineHeight = 18.sp
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
                     )
                 }
             }
@@ -277,15 +271,15 @@ fun LoginContent(
             // Form Section
             Column(
                 modifier = Modifier
-                    .padding(top = 155.dp)
+                    .padding(top = 155.dp) // Adjusted to overlap new header height
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
                     .background(MaterialTheme.colorScheme.surface)
-                    .padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
+                    .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { // Reduced spacing between inputs
                     AuthInputField(
                         value = email,
                         onValueChange = onEmailChange,
@@ -302,39 +296,47 @@ fun LoginContent(
                         )
                     )
 
-                    AuthInputField(
-                        value = password,
-                        onValueChange = onPasswordChange,
-                        label = stringResource(id = R.string.login_label_password),
-                        placeholder = stringResource(id = R.string.login_placeholder_password),
-                        errorText = passwordError,
-                        icon = Icons.Default.Lock,
-                        isPassword = true,
-                        passwordVisible = passwordVisible,
-                        onPasswordVisibleChange = onPasswordVisibleChange,
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Done,
-                            keyboardType = KeyboardType.Password
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                onLoginClick()
-                            }
-                        )
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(onClick = onForgotPasswordClick) {
-                            Text(
-                                text = stringResource(id = R.string.login_forgot_password),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.primary
+                    Column { // Group Password and Forgot Password for tighter spacing
+                        AuthInputField(
+                            value = password,
+                            onValueChange = onPasswordChange,
+                            label = stringResource(id = R.string.login_label_password),
+                            placeholder = stringResource(id = R.string.login_placeholder_password),
+                            errorText = passwordError,
+                            icon = Icons.Default.Lock,
+                            isPassword = true,
+                            passwordVisible = passwordVisible,
+                            onPasswordVisibleChange = onPasswordVisibleChange,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Done,
+                                keyboardType = KeyboardType.Password
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    focusManager.clearFocus()
+                                    onLoginClick()
+                                }
                             )
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .offset(y = (-8).dp), // Negative offset to pull closer to field
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(
+                                onClick = onForgotPasswordClick,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp) // Reduced padding
+                            ) {
+                                Text(
+                                    text = stringResource(id = R.string.login_forgot_password),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
@@ -354,7 +356,7 @@ fun LoginContent(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(20.dp),
                         contentPadding = PaddingValues(horizontal = 24.dp)
                     ) {
                         if (isLoading) {
@@ -401,7 +403,7 @@ fun LoginContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(20.dp),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -502,7 +504,7 @@ fun AuthInputField(
             },
             isError = errorText != null,
             visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
@@ -549,7 +551,8 @@ fun LoginScreenPreview() {
             onRegisterClick = {},
             onBackClick = {},
             showLanguagePicker = false,
-            onToggleLanguagePicker = {}
+            onToggleLanguagePicker = {},
+            headerGradient = authHeaderGradient(com.example.newstart.ui.theme.AppThemeColor.BLUE)
         )
     }
 }

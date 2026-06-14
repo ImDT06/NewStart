@@ -2,16 +2,16 @@
     <string name="app_name">NewStart</string>
 
     <!-- Welcome Screen -->
-    <string name="welcome_simple">Simple</string>
-    <string name="welcome_edu">edu</string>
-    <string name="welcome_slogan">Enjoy Your Education at Your Fingertips!</string>
+    <string name="welcome_simple">New</string>
+    <string name="welcome_edu">Start</string>
+    <string name="welcome_slogan">Start your journey to self-transformation today!</string>
     <string name="welcome_get_started">Get Started</string>
-    <string name="welcome_new_here">New Here? </string>
+    <string name="welcome_new_here">"New Here? "</string>
     <string name="welcome_sign_up">Sign Up</string>
 
     <!-- Login Screen -->
     <string name="login_title">Log In</string>
-    <string name="login_subtitle">Experience a better learning environment</string>
+    <string name="login_subtitle">Time to continue your habit-building journey</string>
     <string name="login_label_email">Email address</string>
     <string name="login_placeholder_email">Email address</string>
     <string name="login_label_password">Password</string>
@@ -24,7 +24,7 @@
 
     <!-- Register Screen -->
     <string name="register_title">Sign Up</string>
-    <string name="register_subtitle">Register to Start Your Learning Process</string>
+    <string name="register_subtitle">Sign up to create positive changes with NewStart</string>
     <string name="register_label_name">Full Name</string>
     <string name="register_placeholder_name">Full Name</string>
     <string name="register_label_mobile">Mobile number</string>
@@ -33,12 +33,12 @@
     <string name="register_placeholder_password">Enter a Password</string>
     <string name="register_label_confirm">Confirm Password</string>
     <string name="register_placeholder_confirm">Retype Password</string>
-    <string name="register_terms_prefix">By Signing up you accept our </string>
+    <string name="register_terms_prefix">"By Signing up you accept our "</string>
     <string name="register_terms_service">Terms of Service</string>
-    <string name="register_terms_and"> &amp; </string>
+    <string name="register_terms_and">" &amp; "</string>
     <string name="register_terms_privacy">Privacy Policy</string>
     <string name="register_btn_now">Sign Up</string>
-    <string name="register_already_member">Already a Member? </string>
+    <string name="register_already_member">"Already a Member? "</string>
     <string name="register_login_now">Login Now</string>
 
     <!-- Home Screen -->
@@ -83,6 +83,10 @@
     <string name="settings_theme_dark">Dark Mode</string>
     <string name="settings_theme_system">System Mode</string>
     <string name="settings_theme_select">Select Theme</string>
+    <string name="settings_color_select">App Accent Color</string>
+    <string name="settings_color_blue">Vibrant Blue</string>
+    <string name="settings_color_green">Royal Green</string>
+    <string name="settings_color_red">Vibrant Red</string>
     <string name="settings_confirm_logout_title">Logout</string>
     <string name="settings_confirm_logout_msg">Are you sure you want to log out of this account?</string>
     <string name="settings_cancel">Cancel</string>

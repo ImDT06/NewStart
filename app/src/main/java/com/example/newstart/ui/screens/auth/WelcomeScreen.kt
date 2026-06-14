@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.res.stringResource
@@ -32,22 +33,39 @@ import androidx.compose.ui.unit.sp
 import androidx.core.os.LocaleListCompat
 import androidx.appcompat.app.AppCompatDelegate
 import com.example.newstart.R
+import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.theme.NewStartTheme
+import com.example.newstart.ui.theme.authHeaderGradient
 import com.example.newstart.ui.util.AppCombinedPreviews
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.TransparentLanguageSwitcher
 
 @Composable
 fun WelcomeScreen(
     onNavigateToLogin: () -> Unit,
-    onNavigateToRegister: () -> Unit
+    onNavigateToRegister: () -> Unit,
+    mainViewModel: MainViewModel = viewModel()
+) {
+    WelcomeContent(
+        onNavigateToLogin = onNavigateToLogin,
+        onNavigateToRegister = onNavigateToRegister,
+        backgroundGradient = authHeaderGradient(mainViewModel)
+    )
+}
+
+@Composable
+fun WelcomeContent(
+    onNavigateToLogin: () -> Unit,
+    onNavigateToRegister: () -> Unit,
+    backgroundGradient: Brush
 ) {
     var showLanguagePicker by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.primary)
+            .background(brush = backgroundGradient)
     ) {
         // Abstract Background Shapes (Waves)
         BackgroundGraphics(MaterialTheme.colorScheme.primaryContainer)
@@ -91,14 +109,14 @@ fun WelcomeScreen(
 
                 Text(
                     text = stringResource(id = R.string.welcome_simple),
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Color.White,
                     fontSize = 54.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 1.sp
                 )
                 Text(
                     text = stringResource(id = R.string.welcome_edu),
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Color.White,
                     fontSize = 54.sp,
                     fontWeight = FontWeight.ExtraBold,
                     modifier = Modifier.offset(y = (-15).dp),
@@ -111,7 +129,7 @@ fun WelcomeScreen(
                 modifier = Modifier
                     .padding(horizontal = 24.dp)
                     .fillMaxWidth(),
-                shape = RoundedCornerShape(32.dp),
+                shape = RoundedCornerShape(40.dp),
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 4.dp
             ) {
@@ -141,7 +159,7 @@ fun WelcomeScreen(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(20.dp)
                     ) {
                         Text(
                             text = stringResource(id = R.string.welcome_get_started),
@@ -158,7 +176,7 @@ fun WelcomeScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(54.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(20.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                     ) {
                         Text(
@@ -218,9 +236,10 @@ fun BackgroundGraphics(accentColor: Color) {
 @Composable
 fun WelcomeScreenPreview() {
     NewStartTheme {
-        WelcomeScreen(
+        WelcomeContent(
             onNavigateToLogin = {},
-            onNavigateToRegister = {}
+            onNavigateToRegister = {},
+            backgroundGradient = authHeaderGradient(com.example.newstart.ui.theme.AppThemeColor.BLUE)
         )
     }
 }

@@ -127,6 +127,21 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun searchUsers(query: String): List<User> {
+        return try {
+            val snapshot = firestore.collection("users")
+                .whereGreaterThanOrEqualTo("name", query)
+                .whereLessThanOrEqualTo("name", query + "\uf8ff")
+                .limit(20)
+                .get()
+                .await()
+            
+            snapshot.documents.mapNotNull { it.toObject(User::class.java)?.copy(id = it.id) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     private fun uploadToCloudinary(uri: Uri): String? {
         return try {
             val bytes = compressImage(uri) ?: return null

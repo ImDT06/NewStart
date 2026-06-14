@@ -1,9 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.google.gms.google.services)
+    alias(libs.plugins.androidx.baselineprofile)
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 android {
@@ -18,11 +25,21 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Đọc API Key từ local.properties
+        val localProperties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localProperties.load(localPropertiesFile.inputStream())
+        }
+        val geminiKey = localProperties.getProperty("GEMINI_API_KEY") ?: ""
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -30,21 +47,24 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-     }
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
 dependencies {
+    baselineProfile(project(":baselineprofile"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.appcompat)
     implementation(platform(libs.androidx.compose.bom))
@@ -78,17 +98,31 @@ dependencies {
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
 
+    // Wheel Picker
+    implementation(libs.wheelPicker)
+
+    // Room
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+
     // Navigation
     implementation(libs.androidx.navigation.compose)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
+    implementation(libs.firebase.functions)
     implementation(libs.googleid)
 
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
+
+    // WorkManager
+    implementation(libs.androidx.work.runtime)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

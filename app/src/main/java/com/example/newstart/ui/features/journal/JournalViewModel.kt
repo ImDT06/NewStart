@@ -1,16 +1,19 @@
-package com.example.newstart.ui.screens.journal
+package com.example.newstart.ui.features.journal
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.newstart.domain.model.JournalEntry
 import com.example.newstart.domain.repository.JournalRepository
+import com.example.newstart.domain.repository.SocialRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -20,22 +23,27 @@ import javax.inject.Inject
 
 @HiltViewModel
 class JournalViewModel @Inject constructor(
-    private val journalRepository: JournalRepository
+    private val journalRepository: JournalRepository,
+    private val socialRepository: SocialRepository
 ) : ViewModel() {
 
     private val _selectedDateRange = MutableStateFlow<Pair<LocalDate, LocalDate?>>(LocalDate.now() to null)
     val selectedDateRange: StateFlow<Pair<LocalDate, LocalDate?>> = _selectedDateRange.asStateFlow()
 
-    // For backward compatibility or single date access
+    private val _currentTab = MutableStateFlow(0) // 0: Cá nhân, 1: Cộng đồng
+    val currentTab: StateFlow<Int> = _currentTab.asStateFlow()
+
     val selectedDate: StateFlow<LocalDate> = _selectedDateRange.map { it.first }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LocalDate.now())
 
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
 
-    // Lấy tất cả nhật ký có ảnh để làm Highlights
     val allEntriesWithImages: StateFlow<List<JournalEntry>> = journalRepository.getJournalEntries()
-        .map { entries -> entries.filter { it.imageUrl != null }.sortedByDescending { it.timestamp } }
+        .map { entries -> 
+            entries.filter { it.imageUrl != null }.sortedByDescending { it.timestamp } 
+        }
+        .flowOn(Dispatchers.Default)
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -60,8 +68,15 @@ class JournalViewModel @Inject constructor(
                         }
                     } ?: false
                 }.sortedByDescending { it.timestamp }
-            }
+            }.flowOn(Dispatchers.Default)
         }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val socialFeed: StateFlow<List<JournalEntry>> = socialRepository.getSocialFeed()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -76,11 +91,14 @@ class JournalViewModel @Inject constructor(
         _selectedDateRange.value = start to end
     }
 
+    fun onTabSelected(index: Int) {
+        _currentTab.value = index
+    }
+
     fun setQuickFilter(filter: String) {
         val today = LocalDate.now()
         when (filter) {
             "All" -> {
-                // Đặt một dải ngày cực rộng để lấy tất cả
                 _selectedDateRange.value = LocalDate.of(2000, 1, 1) to LocalDate.of(2100, 12, 31)
             }
             "Year" -> {

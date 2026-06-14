@@ -1,4 +1,4 @@
-package com.example.newstart.ui.screens.journal
+package com.example.newstart.ui.features.journal.components
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -33,6 +33,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.media.MediaActionSound
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -48,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.concurrent.futures.await
 import coil.compose.AsyncImage
@@ -65,7 +71,7 @@ import java.util.concurrent.Executors
 @Composable
 fun JournalEntryPanel(
     onDismiss: () -> Unit,
-    onPost: (String, String, Uri?) -> Unit, // Emoji, Text, ImageUri
+    onPost: (String, String, Uri?) -> Unit,
     isUploading: Boolean = false
 ) {
     var text by remember { mutableStateOf("") }
@@ -80,7 +86,6 @@ fun JournalEntryPanel(
     val executor = remember { Executors.newSingleThreadExecutor() }
     val imageCapture = remember { ImageCapture.Builder().build() }
     
-    // Nạp sẵn âm thanh để tránh bị trễ
     LaunchedEffect(Unit) {
         mediaActionSound.load(MediaActionSound.SHUTTER_CLICK)
         mediaActionSound.load(MediaActionSound.FOCUS_COMPLETE)
@@ -89,7 +94,6 @@ fun JournalEntryPanel(
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var flashMode by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
     
-    // Trạng thái Camera được chia sẻ từ CameraPreview
     var currentCameraInfo by remember { mutableStateOf<CameraInfo?>(null) }
     var currentCameraControl by remember { mutableStateOf<CameraControl?>(null) }
     var currentZoomRatio by remember { mutableFloatStateOf(1f) }
@@ -167,7 +171,7 @@ fun JournalEntryPanel(
             Spacer(modifier = Modifier.size(48.dp))
         }
 
-        // Camera Preview hoặc Ảnh đã chụp - Tỉ lệ Vuông (1:1)
+        // Camera Preview
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -189,7 +193,6 @@ fun JournalEntryPanel(
                     contentScale = ContentScale.Crop
                 )
             } else if (isTextOnlyMode) {
-                // Chế độ chỉ nhập văn bản
                 Icon(
                     Icons.Default.EditNote, 
                     contentDescription = null, 
@@ -209,9 +212,7 @@ fun JournalEntryPanel(
                     onZoomRatioChanged = { currentZoomRatio = it }
                 )
                 
-                // Camera Controls Overlays
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // Flash & Flip Buttons
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -220,10 +221,7 @@ fun JournalEntryPanel(
                     ) {
                         IconButton(
                             onClick = { 
-                                flashMode = when(flashMode) {
-                                    ImageCapture.FLASH_MODE_OFF -> ImageCapture.FLASH_MODE_ON
-                                    else -> ImageCapture.FLASH_MODE_OFF
-                                }
+                                flashMode = if (flashMode == ImageCapture.FLASH_MODE_OFF) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
                             },
                             modifier = Modifier
                                 .background(Color.Black.copy(alpha = 0.3f), CircleShape)
@@ -255,7 +253,6 @@ fun JournalEntryPanel(
                         }
                     }
 
-                    // Zoom Controls - Animated Buttons
                     Row(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -264,7 +261,6 @@ fun JournalEntryPanel(
                             .padding(horizontal = 4.dp, vertical = 2.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // Nút 1x
                         ZoomOption(label = "1x", isSelected = currentZoomRatio < 1.5f) { 
                             scope.launch {
                                 val anim = Animatable(currentZoomRatio)
@@ -273,7 +269,6 @@ fun JournalEntryPanel(
                                 }
                             }
                         }
-                        // Nút 3x - Chính xác tuyệt đối
                         ZoomOption(label = "3x", isSelected = currentZoomRatio >= 2.8f && currentZoomRatio <= 3.2f) { 
                             scope.launch {
                                 val minZ = currentCameraInfo?.zoomState?.value?.minZoomRatio ?: 1f
@@ -290,7 +285,6 @@ fun JournalEntryPanel(
                 }
             }
 
-            // TEXT OVERLAY - Hiện khi ĐÃ chụp xong HOẶC ở TextOnlyMode
             if (capturedImageUri != null || isTextOnlyMode) {
                 Box(
                     modifier = Modifier
@@ -348,7 +342,6 @@ fun JournalEntryPanel(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Capture / Send Button Section
         Box(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.Center
@@ -366,9 +359,7 @@ fun JournalEntryPanel(
                     modifier = Modifier.size(88.dp), 
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
                     if (isUploading) {
@@ -404,11 +395,7 @@ fun JournalEntryPanel(
                         .pointerInput(Unit) {
                             detectTapGestures(
                                 onPress = {
-                                    try {
-                                        mediaActionSound.play(MediaActionSound.SHUTTER_CLICK)
-                                    } catch (e: Exception) {
-                                        Log.e("Camera", "Shutter sound failed", e)
-                                    }
+                                    try { mediaActionSound.play(MediaActionSound.SHUTTER_CLICK) } catch (e: Exception) {}
                                     takePhoto(
                                         context = context,
                                         imageCapture = imageCapture,
@@ -425,7 +412,6 @@ fun JournalEntryPanel(
                 )
             }
 
-            // Retake / Back to Camera Button
             if (capturedImageUri != null || isTextOnlyMode) {
                 IconButton(
                     onClick = { 
@@ -448,7 +434,6 @@ fun JournalEntryPanel(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Gallery & Skip Buttons
         if (capturedImageUri == null && !isTextOnlyMode) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -480,7 +465,6 @@ fun JournalEntryPanel(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Emoji Selection
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
@@ -553,7 +537,6 @@ fun CameraPreview(
     var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
     var cameraInfo by remember { mutableStateOf<CameraInfo?>(null) }
     
-    // Trạng thái Zoom phản hồi (Reactive State)
     var currentZoomState by remember { mutableStateOf<ZoomState?>(null) }
 
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
@@ -564,7 +547,6 @@ fun CameraPreview(
         cameraProvider = cameraProviderFuture.await()
     }
     
-    // Bind Camera
     LaunchedEffect(cameraProvider, lensFacing) {
         val safeProvider = cameraProvider ?: return@LaunchedEffect
         val cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
@@ -579,7 +561,6 @@ fun CameraPreview(
         }
     }
 
-    // Lắng nghe ZoomState từ phần cứng và cập nhật Compose State liên tục
     DisposableEffect(cameraInfo) {
         val observer = androidx.lifecycle.Observer<ZoomState> { state ->
             currentZoomState = state
@@ -591,12 +572,10 @@ fun CameraPreview(
         }
     }
 
-    // Flash update
     LaunchedEffect(flashMode) {
         imageCapture.flashMode = flashMode
     }
 
-    // Auto-hide focus circle
     LaunchedEffect(focusTapOffset) {
         if (focusTapOffset != null) {
             kotlinx.coroutines.delay(1000)
@@ -612,7 +591,6 @@ fun CameraPreview(
     }
 
     Box(modifier = modifier) {
-        // ScaleGestureDetector handles zoom internally
         val scaleGestureDetector = remember(context, cameraInfo) {
             ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
                 override fun onScale(detector: ScaleGestureDetector): Boolean {
@@ -651,10 +629,8 @@ fun CameraPreview(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Overlay UI
         focusTapOffset?.let { offset -> FocusCircle(offset) }
         
-        // HUD Zoom Ratio - Sử dụng currentZoomState để cập nhật liên tục
         val zoomRatio = currentZoomState?.zoomRatio ?: 1.0f
         if (zoomRatio > 1.01f) {
             Box(
@@ -690,14 +666,19 @@ fun FocusCircle(offset: Offset) {
 
     Box(
         modifier = Modifier
-            .offset(
-                x = (offset.x / LocalContext.current.resources.displayMetrics.density).dp - 35.dp,
-                y = (offset.y / LocalContext.current.resources.displayMetrics.density).dp - 35.dp
-            )
+            .offset {
+                IntOffset(
+                    (offset.x - 35.dp.toPx()).roundToInt(),
+                    (offset.y - 35.dp.toPx()).roundToInt()
+                )
+            }
             .size(70.dp)
             .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
             .padding(10.dp)
-            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
     )
 }
@@ -726,11 +707,55 @@ private fun takePhoto(
             }
 
             override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                // Xử lý cắt ảnh vuông sau khi lưu thành công
+                processImageToSquare(photoFile)
                 val savedUri = Uri.fromFile(photoFile)
                 onImageCaptured(savedUri)
             }
         }
     )
+}
+
+private fun processImageToSquare(file: File) {
+    try {
+        val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return
+        
+        // Đọc thông tin xoay từ EXIF
+        val exif = ExifInterface(file.absolutePath)
+        val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+        }
+
+        // Tạo bitmap đã xoay đúng chiều
+        val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        
+        // Cắt vuông (Center Crop)
+        val width = rotatedBitmap.width
+        val height = rotatedBitmap.height
+        val newDimension = if (width < height) width else height
+        
+        val xOffset = (width - newDimension) / 2
+        val yOffset = (height - newDimension) / 2
+        
+        val squareBitmap = Bitmap.createBitmap(rotatedBitmap, xOffset, yOffset, newDimension, newDimension)
+        
+        // Lưu đè lại file cũ
+        java.io.FileOutputStream(file).use { out ->
+            squareBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+        }
+        
+        // Giải phóng bộ nhớ
+        if (bitmap != rotatedBitmap) bitmap.recycle()
+        rotatedBitmap.recycle()
+        squareBitmap.recycle()
+    } catch (e: Exception) {
+        Log.e("ImageProcess", "Failed to crop square", e)
+    }
 }
 
 private fun getOutputDirectory(context: android.content.Context): File {

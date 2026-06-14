@@ -1,8 +1,7 @@
 package com.example.newstart.ui.navigation
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,15 +23,21 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.newstart.R
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+
 data class BottomNavItem(
     val screen: Screen,
     val labelRes: Int,
-    val iconRes: Int
+    val icon: Any // Can be Int (drawable) or ImageVector
 )
 
 @Composable
 fun MainBottomBar(
-    navController: NavController
+    navController: NavController,
+    isVisible: Boolean = true
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -40,57 +45,57 @@ fun MainBottomBar(
     val items = listOf(
         BottomNavItem(Screen.Home, R.string.nav_home, R.drawable.ic_home),
         BottomNavItem(Screen.Journal, R.string.nav_journal, R.drawable.ic_notebook),
-        BottomNavItem(Screen.Home, 0, R.drawable.ic_home), // Placeholder for FAB space
+        BottomNavItem(Screen.Home, 0, Icons.Default.Add), // Placeholder
         BottomNavItem(Screen.Habits, R.string.nav_habits, R.drawable.ic_list_check),
         BottomNavItem(Screen.Profile, R.string.nav_profile, R.drawable.ic_user)
     )
 
     val showBottomBar = items.any { it.screen.route == currentRoute } || currentRoute == Screen.Scan.route
 
-    if (showBottomBar) {
-        val isDark = isSystemInDarkTheme()
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+    AnimatedVisibility(
+        visible = showBottomBar && isVisible,
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.background,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), // Bo 2 góc trên
+            tonalElevation = 0.dp,
+            border = BorderStroke(
+                width = 0.5.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f) // Làm viền rõ hơn một chút để thấy độ bo
+            )
         ) {
-            Surface(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
                     .height(64.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(24.dp),
-                shadowElevation = if (isDark) 0.dp else 8.dp,
-                tonalElevation = if (isDark) 8.dp else 0.dp, // Material 3: Tonal tint for dark mode
-                border = if (isDark) BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f)) else null
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.SpaceAround,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    items.forEachIndexed { index, item ->
-                        if (index == 2) {
-                            // Khoảng trống cho FAB nổi ở giữa
-                            Spacer(modifier = Modifier.weight(1f))
-                        } else {
-                            val isSelected = currentRoute == item.screen.route
-                            ModernNavItem(
-                                modifier = Modifier.weight(1f),
-                                item = item,
-                                isSelected = isSelected,
-                                onClick = {
-                                    if (!isSelected) {
-                                        navController.navigate(item.screen.route) {
-                                            popUpTo(Screen.Home.route) { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
+                items.forEachIndexed { index, item ->
+                    if (index == 2) {
+                        // Khoảng trống cho FAB ở giữa
+                        Spacer(modifier = Modifier.weight(1f))
+                    } else {
+                        val isSelected = currentRoute == item.screen.route
+                        ModernNavItem(
+                            modifier = Modifier.weight(1f),
+                            item = item,
+                            isSelected = isSelected,
+                            onClick = {
+                                if (!isSelected) {
+                                    navController.navigate(item.screen.route) {
+                                        popUpTo(Screen.Home.route) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
                                 }
-                            )
-                        }
+                            }
+                        )
                     }
                 }
             }
@@ -105,66 +110,35 @@ fun ModernNavItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val iconColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-        animationSpec = tween(300),
-        label = "iconColor"
-    )
-
-    val scale by animateFloatAsState(
-        targetValue = if (isSelected) 1.1f else 1.0f,
-        animationSpec = tween(300),
-        label = "scale"
-    )
-
-    Column(
+    Box(
         modifier = modifier
             .fillMaxHeight()
-            .clip(RoundedCornerShape(16.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick
             ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .scale(scale),
-            contentAlignment = Alignment.Center
-        ) {
-            if (isSelected) {
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                            CircleShape
-                        )
+        val iconColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+        
+        when (val icon = item.icon) {
+            is ImageVector -> {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(26.dp),
+                    tint = iconColor
                 )
             }
-
-            val painter = painterResource(id = item.iconRes)
-
-            Icon(
-                painter = painter,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = iconColor
-            )
-        }
-
-        if (isSelected) {
-            Box(
-                modifier = Modifier
-                    .padding(top = 2.dp)
-                    .size(4.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-            )
-        } else {
-            Spacer(modifier = Modifier.height(6.dp))
+            is Int -> {
+                Icon(
+                    painter = painterResource(id = icon),
+                    contentDescription = null,
+                    modifier = Modifier.size(26.dp),
+                    tint = iconColor
+                )
+            }
         }
     }
 }
