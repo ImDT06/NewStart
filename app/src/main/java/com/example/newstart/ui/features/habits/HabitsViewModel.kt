@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.newstart.domain.model.Habit
 import com.example.newstart.domain.repository.HabitRepository
+import com.example.newstart.data.remote.AiHabitService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
@@ -27,7 +29,8 @@ sealed class AiState {
 
 @HiltViewModel
 class HabitsViewModel @Inject constructor(
-    private val habitRepository: HabitRepository
+    private val habitRepository: HabitRepository,
+    private val aiHabitService: AiHabitService
 ) : ViewModel() {
 
     private val _selectedDate = MutableStateFlow(LocalDate.now())
@@ -74,29 +77,46 @@ class HabitsViewModel @Inject constructor(
         }
     }
 
+    fun restoreHabit(habit: Habit) {
+        viewModelScope.launch {
+            habitRepository.saveHabit(habit)
+        }
+    }
+
     fun processAiCommand(command: String) {
         viewModelScope.launch {
             _aiState.value = AiState.Loading
             try {
-                // Giả lập xử lý AI
-                kotlinx.coroutines.delay(1500)
+                val currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                val response = aiHabitService.processCommand(command, currentTime)
+                val results = response.getJSONArray("results")
                 
-                if (command.contains("gym", ignoreCase = true)) {
-                    val draft = Habit(
-                        id = "temp_1",
-                        name = "Tập Gym",
-                        icon = "💪",
-                        goal = "1",
-                        colorHex = "#FF4285F4",
-                        reminderTime = "17:00",
-                        date = _selectedDate.value.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                    )
-                    _aiState.value = AiState.Drafting(listOf(draft))
+                val draftHabits = mutableListOf<Habit>()
+                for (i in 0 until results.length()) {
+                    val item = results.getJSONObject(i)
+                    val action = item.optString("action", "ADD")
+                    if (action == "ADD") {
+                        draftHabits.add(Habit(
+                            id = "ai_${System.currentTimeMillis()}_$i",
+                            name = item.optString("name", "Thói quen mới"),
+                            icon = item.optString("icon", "✨"),
+                            goal = "1",
+                            colorHex = "#FF007AFF", 
+                            reminderTime = item.optString("time", "08:00"),
+                            reminderMinutesBefore = item.optInt("minsBefore", 5),
+                            date = item.optString("date", LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))
+                        ))
+                    }
+                }
+
+                if (draftHabits.isNotEmpty()) {
+                    _aiState.value = AiState.Drafting(draftHabits)
                 } else {
-                    _aiState.value = AiState.Error("Xin lỗi, tôi chưa hiểu yêu cầu này.")
+                    _aiState.value = AiState.Error("Xin lỗi, tôi không tìm thấy thói quen nào trong câu lệnh của bạn.")
                 }
             } catch (e: Exception) {
-                _aiState.value = AiState.Error("Đã có lỗi xảy ra: ${e.message}")
+                android.util.Log.e("HabitsViewModel", "AI Error: ${e.message}")
+                _aiState.value = AiState.Error("Lỗi xử lý AI: ${e.localizedMessage}")
             }
         }
     }

@@ -38,12 +38,19 @@ class MainViewModel @Inject constructor(
     private val _editingHabit = MutableStateFlow<Habit?>(null)
     val editingHabit: StateFlow<Habit?> = _editingHabit.asStateFlow()
 
+    private val _showJournalSheet = MutableStateFlow(false)
+    val showJournalSheet: StateFlow<Boolean> = _showJournalSheet.asStateFlow()
+
     fun onHabitDateSelected(date: LocalDate) {
         _selectedHabitDate.value = date
     }
 
     fun startEditingHabit(habit: Habit?) {
         _editingHabit.value = habit
+    }
+
+    fun setShowJournalSheet(show: Boolean) {
+        _showJournalSheet.value = show
     }
 
     private val _isUploading = MutableStateFlow(false)
@@ -93,6 +100,13 @@ class MainViewModel @Inject constructor(
             initialValue = listOf(25, 40, 60, 180)
         )
 
+    val isJournalPromptEnabled: StateFlow<Boolean> = userPreferencesRepository.isJournalPromptEnabledFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
     val avatarUri: StateFlow<Uri?> = currentUser
         .map { user -> 
             user?.avatarUrl?.let { Uri.parse(it) } 
@@ -115,6 +129,12 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun setJournalPromptEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setJournalPromptEnabled(enabled)
+        }
+    }
+
     fun addCommonPomoTime(minutes: Int) {
         viewModelScope.launch {
             val currentTimes = commonPomoTimes.value.toMutableList()
@@ -130,6 +150,19 @@ class MainViewModel @Inject constructor(
             val currentTimes = commonPomoTimes.value.toMutableList()
             if (currentTimes.contains(minutes)) {
                 currentTimes.remove(minutes)
+                userPreferencesRepository.setCommonPomoTimes(currentTimes.sorted())
+            }
+        }
+    }
+
+    fun updateCommonPomoTime(oldMinutes: Int, newMinutes: Int) {
+        viewModelScope.launch {
+            val currentTimes = commonPomoTimes.value.toMutableList()
+            if (currentTimes.contains(oldMinutes)) {
+                currentTimes.remove(oldMinutes)
+                if (!currentTimes.contains(newMinutes)) {
+                    currentTimes.add(newMinutes)
+                }
                 userPreferencesRepository.setCommonPomoTimes(currentTimes.sorted())
             }
         }

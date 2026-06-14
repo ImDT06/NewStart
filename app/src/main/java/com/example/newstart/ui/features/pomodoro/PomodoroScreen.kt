@@ -119,7 +119,7 @@ fun PomodoroScreen(
                         modifier = Modifier.fillMaxSize(),
                         strokeWidth = 2.dp,
                         color = if (isFocusMode) MaterialTheme.colorScheme.primary else Color(0xFF4CAF50),
-                        trackColor = Color.White.copy(alpha = 0.1f)
+                        trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                     )
                     
                     Crossfade(
@@ -133,17 +133,22 @@ fun PomodoroScreen(
                                 modifier = Modifier.fillMaxSize()
                             ) {
                                 val timeValues = remember { (5..180).toList() }
+                                val timeTexts = remember { timeValues.map { it.toString() } }
+                                val initialIndex = remember { (focusTime - 5).coerceAtLeast(0) }
+                                
                                 WheelTextPicker(
-                                    startIndex = (focusTime - 5).coerceAtLeast(0),
-                                    texts = timeValues.map { it.toString() },
+                                    startIndex = initialIndex,
+                                    texts = timeTexts,
                                     onScrollFinished = { snappedIndex ->
-                                        mainViewModel.setFocusTime(timeValues[snappedIndex])
+                                        if (snappedIndex in timeValues.indices) {
+                                            mainViewModel.setFocusTime(timeValues[snappedIndex])
+                                        }
                                         null
                                     },
                                     selectorProperties = WheelPickerDefaults.selectorProperties(enabled = false),
                                     style = MaterialTheme.typography.titleLarge.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         fontSize = 32.sp
                                     ),
                                     rowCount = 3,
@@ -287,14 +292,12 @@ fun PomodoroScreen(
                     },
                     onConfirm = { newTime ->
                         if (isEditingExisting) {
-                            // Update logic: remove old, add new
                             if (newTime == scrollerStartingTime) {
                                 showScrollerPopup = false
                             } else if (commonTimes.contains(newTime)) {
                                 Toast.makeText(context, "Bạn đã đặt Pomo thường dùng này.", Toast.LENGTH_SHORT).show()
                             } else {
-                                mainViewModel.removeCommonPomoTime(scrollerStartingTime)
-                                mainViewModel.addCommonPomoTime(newTime)
+                                mainViewModel.updateCommonPomoTime(scrollerStartingTime, newTime)
                                 showScrollerPopup = false
                             }
                         } else {
@@ -354,10 +357,10 @@ fun QuickTimeMenu(
                                 .height(56.dp)
                                 .clickable { onOpenScroller(25, false) },
                             shape = RoundedCornerShape(16.dp),
-                            color = Color(0xFF3A3A3C)
+                            color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Add, null, tint = Color.White)
+                                Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         Spacer(modifier = Modifier.weight(0.5f))
@@ -373,7 +376,8 @@ fun QuickTimeMenu(
             }
         },
         shape = RoundedCornerShape(28.dp),
-        containerColor = Color(0xFF1C1C1E)
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp
     )
 }
 
@@ -393,14 +397,14 @@ private fun TimeMenuItem(
                 onLongClick = onLongClick
             ),
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF3A3A3C)
+        color = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = String.format(Locale.getDefault(), "%02d:00", mins),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
-                color = Color.White
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -422,7 +426,7 @@ fun ScrollerTimePopup(
                 .width(280.dp)
                 .wrapContentHeight(),
             shape = RoundedCornerShape(28.dp),
-            color = Color(0xFF2C2C2E),
+            color = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp
         ) {
             Column(
@@ -433,29 +437,35 @@ fun ScrollerTimePopup(
                     "Pomo thường dùng của bạn",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 
                 Box(
-                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    modifier = Modifier.fillMaxWidth().height(160.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     val timeValues = remember { (5..180).toList() }
+                    val timeTexts = remember { timeValues.map { it.toString() } }
+                    val initialIndex = remember(initialMinutes) { (initialMinutes - 5).coerceAtLeast(0) }
+                    
                     WheelTextPicker(
-                        startIndex = (initialMinutes - 5).coerceAtLeast(0),
-                        texts = timeValues.map { it.toString() },
+                        startIndex = initialIndex,
+                        texts = timeTexts,
                         onScrollFinished = { snappedIndex ->
-                            selectedMinutes = timeValues[snappedIndex]
+                            // Hiệu chỉnh riêng cho Dialog vì thư viện trả về lệch +1 ở đây
+                            val correctedIndex = (snappedIndex - 1).coerceIn(0, timeValues.lastIndex)
+                            selectedMinutes = timeValues[correctedIndex]
                             null
                         },
                         selectorProperties = WheelPickerDefaults.selectorProperties(enabled = false),
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            fontSize = 18.sp
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 36.sp
                         ),
-                        rowCount = 3
+                        rowCount = 3,
+                        modifier = Modifier.width(100.dp)
                     )
                 }
 

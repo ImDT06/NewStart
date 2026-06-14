@@ -186,6 +186,7 @@ fun SettingsScreen(
     val currentUser by mainViewModel.currentUser.collectAsStateWithLifecycle()
     val journalCount by mainViewModel.journalCount.collectAsStateWithLifecycle()
     val habitStats by mainViewModel.habitStats.collectAsStateWithLifecycle()
+    val isJournalPromptEnabled by mainViewModel.isJournalPromptEnabled.collectAsStateWithLifecycle()
 
     val isDark = when (themeMode) {
         ThemeMode.LIGHT -> false
@@ -350,10 +351,10 @@ fun SettingsScreen(
                         )
                         SettingsDivider()
                         SettingsToggleItem(
-                            icon = Icons.Default.Notifications,
-                            titleRes = R.string.settings_notifications,
-                            checked = true,
-                            onCheckedChange = {}
+                            icon = Icons.Default.EditNote,
+                            title = "Gợi ý viết nhật ký",
+                            checked = isJournalPromptEnabled,
+                            onCheckedChange = { mainViewModel.setJournalPromptEnabled(it) }
                         )
                     }
                 }
@@ -719,7 +720,7 @@ fun SettingsItem(
 @Composable
 fun SettingsToggleItem(
     icon: ImageVector,
-    titleRes: Int,
+    title: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
@@ -745,7 +746,7 @@ fun SettingsToggleItem(
         }
         Spacer(modifier = Modifier.width(16.dp))
         Text(
-            text = stringResource(id = titleRes),
+            text = title,
             fontSize = 16.sp,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
@@ -759,6 +760,21 @@ fun SettingsToggleItem(
             )
         )
     }
+}
+
+@Composable
+fun SettingsToggleItem(
+    icon: ImageVector,
+    titleRes: Int,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    SettingsToggleItem(
+        icon = icon,
+        title = stringResource(id = titleRes),
+        checked = checked,
+        onCheckedChange = onCheckedChange
+    )
 }
 
 @Composable

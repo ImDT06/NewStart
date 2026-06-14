@@ -506,7 +506,7 @@ private fun JournalList(
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) },
-                contentPadding = PaddingValues(top = 4.dp, bottom = 100.dp, start = 12.dp, end = 12.dp)
+                contentPadding = PaddingValues(top = 2.dp, bottom = 100.dp, start = 12.dp, end = 12.dp)
             ) {
                 groupedEntries.forEach { (date, entriesInDate) ->
                     stickyHeader {
@@ -519,7 +519,7 @@ private fun JournalList(
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                modifier = Modifier.padding(vertical = 4.dp, horizontal = 12.dp)
+                                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp, start = 12.dp, end = 12.dp)
                             )
                         }
                     }

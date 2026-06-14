@@ -167,7 +167,7 @@ fun RegisterContent(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -190,7 +190,7 @@ fun RegisterContent(
                 ) {
                     Text(
                         text = stringResource(id = R.string.register_title),
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = Color.White,
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp

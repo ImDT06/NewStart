@@ -11,9 +11,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,12 +31,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -70,9 +75,12 @@ fun HabitsScreen(
     val selectedDate by mainViewModel.selectedHabitDate.collectAsStateWithLifecycle()
     val aiState by viewModel.aiState.collectAsStateWithLifecycle()
     val completedHabitForJournal by viewModel.completedHabitForJournal.collectAsStateWithLifecycle()
+    val isJournalPromptEnabled by mainViewModel.isJournalPromptEnabled.collectAsStateWithLifecycle()
     
     val scope = rememberCoroutineScope()
-    var habitToDelete by remember { mutableStateOf<Habit?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val haptic = LocalHapticFeedback.current
+    
     var showMonthPicker by remember { mutableStateOf(false) }
     var showAiDialog by remember { mutableStateOf(false) }
     var aiCommand by remember { mutableStateOf("") }
@@ -126,7 +134,6 @@ fun HabitsScreen(
         onDispose { speechRecognizer.destroy() }
     }
 
-    var aiButtonOffset by remember { mutableStateOf(Offset.Zero) }
     val today = LocalDate.now()
     val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500)
     val locale = context.resources.configuration.locales[0]
@@ -134,6 +141,12 @@ fun HabitsScreen(
 
     LaunchedEffect(selectedDate) {
         viewModel.onDateSelected(selectedDate)
+    }
+
+    LaunchedEffect(completedHabitForJournal, isJournalPromptEnabled) {
+        if (completedHabitForJournal != null && !isJournalPromptEnabled) {
+            viewModel.clearJournalPrompt()
+        }
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -172,11 +185,29 @@ fun HabitsScreen(
 
             HabitList(
                 habits = habits,
-                onDeleteRequest = { habitToDelete = it },
+                onDelete = { habit ->
+                    scope.launch {
+                        viewModel.deleteHabit(habit.id)
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Đã xóa ${habit.name}",
+                            actionLabel = "Hoàn tác",
+                            duration = SnackbarDuration.Short
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            viewModel.restoreHabit(habit)
+                        }
+                    }
+                },
                 onToggle = { h, c -> viewModel.toggleHabit(h, c) },
                 onEdit = { mainViewModel.startEditingHabit(it) }
             )
         }
+
+        // Snackbar Host cho Undo
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 90.dp)
+        )
 
         AiFloatingButton(
             maxWidth = maxWidth,
@@ -217,17 +248,6 @@ fun HabitsScreen(
             )
         }
 
-        if (habitToDelete != null) {
-            DeleteHabitDialog(
-                habit = habitToDelete!!,
-                onDismiss = { habitToDelete = null },
-                onConfirm = {
-                    viewModel.deleteHabit(habitToDelete!!.id)
-                    habitToDelete = null
-                }
-            )
-        }
-
         if (showMonthPicker) {
             MonthPickerDialog(
                 selectedDate = selectedDate,
@@ -241,15 +261,25 @@ fun HabitsScreen(
             )
         }
 
-        if (completedHabitForJournal != null) {
-            JournalPromptDialog(
-                habitName = completedHabitForJournal!!.name,
-                onDismiss = { viewModel.clearJournalPrompt() },
-                onConfirm = {
-                    viewModel.clearJournalPrompt()
-                    navController.navigate(Screen.Journal.route)
-                }
-            )
+        if (isJournalPromptEnabled && completedHabitForJournal != null) {
+            val habit = completedHabitForJournal
+            if (habit != null) {
+                JournalPromptDialog(
+                    habitName = habit.name,
+                    onDismiss = { viewModel.clearJournalPrompt() },
+                    onConfirm = {
+                        viewModel.clearJournalPrompt()
+                        mainViewModel.setShowJournalSheet(true)
+                        navController.navigate(Screen.Journal.route) {
+                            popUpTo(Screen.Home.route) { 
+                                saveState = true 
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -350,7 +380,7 @@ private fun HorizontalDatePicker(
 @Composable
 private fun HabitList(
     habits: List<Habit>,
-    onDeleteRequest: (Habit) -> Unit,
+    onDelete: (Habit) -> Unit,
     onToggle: (Habit, Boolean) -> Unit,
     onEdit: (Habit) -> Unit
 ) {
@@ -365,45 +395,99 @@ private fun HabitList(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(items = habits, key = { it.id }) { habit ->
-                HabitSwipeableItem(habit = habit, onDeleteRequest = onDeleteRequest, onToggle = onToggle, onEdit = onEdit)
+                HabitSwipeableItem(
+                    modifier = Modifier.animateItem(),
+                    habit = habit, 
+                    onDelete = { onDelete(habit) }, 
+                    onToggle = onToggle, 
+                    onEdit = onEdit
+                )
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HabitSwipeableItem(
+    modifier: Modifier = Modifier,
     habit: Habit,
-    onDeleteRequest: (Habit) -> Unit,
+    onDelete: () -> Unit,
     onToggle: (Habit, Boolean) -> Unit,
     onEdit: (Habit) -> Unit
 ) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = {
-            if (it == SwipeToDismissBoxValue.EndToStart) {
-                onDeleteRequest(habit)
-                false
-            } else false
-        }
-    )
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val anchorWidth = with(density) { 80.dp.toPx() }
+    val dismissThreshold = with(density) { 180.dp.toPx() }
+    
+    val offsetX = remember { Animatable(0f) }
 
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = false,
-        backgroundContent = {
-            val isSwiping = dismissState.targetValue != SwipeToDismissBoxValue.Settled
-            val backgroundColor = if (isSwiping && dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Color.Red.copy(alpha = 0.8f) else Color.Transparent
-            Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(backgroundColor), contentAlignment = Alignment.CenterEnd) {
-                if (isSwiping && dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
-                    Icon(Icons.Default.Delete, null, tint = Color.White, modifier = Modifier.padding(end = 16.dp))
-                }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        // Nền đỏ và icon thùng rác (Lớp dưới)
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFFFF4444))
+                .clickable { 
+                    scope.launch {
+                        offsetX.animateTo(-1500f, spring(stiffness = Spring.StiffnessMedium))
+                        onDelete()
+                    }
+                },
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            Box(
+                modifier = Modifier.width(80.dp).fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
             }
-        },
-        content = {
-            HabitItem(habit = habit, onToggle = { onToggle(habit, !habit.isCompleted) }, onEdit = { onEdit(habit) })
         }
-    )
+
+        // Lớp thẻ Habit (Lớp trên - Phải đặc hoàn toàn để che lớp đỏ)
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .fillMaxWidth()
+                .pointerInput(habit.id) {
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { change, dragAmount ->
+                            val newOffset = (offsetX.value + dragAmount).coerceAtMost(0f)
+                            scope.launch { offsetX.snapTo(newOffset) }
+                            change.consume()
+                        },
+                        onDragEnd = {
+                            scope.launch {
+                                if (offsetX.value < -dismissThreshold) {
+                                    offsetX.animateTo(-1500f, spring(stiffness = Spring.StiffnessMedium))
+                                    onDelete()
+                                } else if (offsetX.value < -anchorWidth / 2) {
+                                    offsetX.animateTo(-anchorWidth, spring(dampingRatio = Spring.DampingRatioNoBouncy))
+                                } else {
+                                    offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy))
+                                }
+                            }
+                        }
+                    )
+                }
+        ) {
+            HabitItem(
+                habit = habit, 
+                onToggle = { onToggle(habit, !habit.isCompleted) }, 
+                onEdit = { onEdit(habit) }
+            )
+        }
+    }
 }
 
 @Composable
@@ -421,36 +505,21 @@ private fun AiFloatingButton(
     val offsetY = remember { Animatable(maxHeight - buttonSizePx - paddingPx - 200f) }
 
     Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp,
         modifier = Modifier
-            .size(56.dp)
+            .size(52.dp)
             .offset { IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt()) }
             .pointerInput(maxWidth, maxHeight) {
                 detectDragGestures(
                     onDragEnd = {
-                        // Hiệu ứng hút về 2 phía dựa trên tâm của nút
                         val centerX = offsetX.value + buttonSizePx / 2
-                        val targetX = if (centerX < maxWidth / 2) {
-                            paddingPx // Hút về bên trái
-                        } else {
-                            maxWidth - buttonSizePx - paddingPx // Hút về bên phải
-                        }
+                        val targetX = if (centerX < maxWidth / 2) paddingPx else maxWidth - buttonSizePx - paddingPx
                         scope.launch {
-                            offsetX.animateTo(
-                                targetValue = targetX,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioLowBouncy,
-                                    stiffness = Spring.StiffnessLow
-                                )
-                            )
+                            offsetX.animateTo(targetX, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow))
                         }
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
                         scope.launch {
-                            // Cập nhật vị trí và giới hạn biên (clamping) trong vùng an toàn
                             val newX = (offsetX.value + dragAmount.x).coerceIn(paddingPx, maxWidth - buttonSizePx - paddingPx)
                             val newY = (offsetY.value + dragAmount.y).coerceIn(paddingPx, maxHeight - buttonSizePx - paddingPx)
                             offsetX.snapTo(newX)
@@ -458,12 +527,21 @@ private fun AiFloatingButton(
                         }
                     }
                 )
-            }
-            .border(2.dp, Brush.linearGradient(listOf(Color(0xFF4285F4), Color(0xFF9B72CB))), CircleShape),
+            },
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp,
+        shadowElevation = 6.dp,
+        border = BorderStroke(0.5.dp, Brush.linearGradient(listOf(Color(0xFF007AFF).copy(alpha = 0.5f), Color(0xFF00C851).copy(alpha = 0.5f)))),
         onClick = onClick
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.AutoAwesome, "AI Assistant", modifier = Modifier.size(28.dp), tint = Color(0xFF9B72CB))
+            Icon(
+                imageVector = Icons.Default.AutoAwesome, 
+                contentDescription = "AI Assistant", 
+                modifier = Modifier.size(24.dp), 
+                tint = Color(0xFF007AFF) // Màu xanh dương chủ đạo
+            )
         }
     }
 }
@@ -482,7 +560,11 @@ private fun AiInteractionSheet(
     isListening: Boolean,
     onToggleListening: () -> Unit
 ) {
-    val aiGradient = Brush.linearGradient(listOf(Color(0xFF4285F4), Color(0xFF9B72CB)))
+    // Gradient Xanh dương - Xanh lá (Xanh dương chủ đạo)
+    val aiGradient = Brush.linearGradient(
+        colors = listOf(Color(0xFF007AFF), Color(0xFF007AFF), Color(0xFF00C851))
+    )
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = aiSheetState,
@@ -542,7 +624,7 @@ private fun AiInputView(
 ) {
     Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(start = 24.dp, end = 24.dp, bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.AutoAwesome, null, tint = Color(0xFF9B72CB), modifier = Modifier.size(24.dp))
+            Icon(Icons.Default.AutoAwesome, null, tint = Color(0xFF007AFF), modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
             Text("NewStart AI", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold, brush = gradient))
         }
@@ -556,16 +638,43 @@ private fun AiInputView(
             shape = RoundedCornerShape(16.dp),
             leadingIcon = {
                 IconButton(onClick = onToggleListening) {
-                    Icon(imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicNone, contentDescription = "Voice", tint = if (isListening) Color.Red else Color(0xFF9B72CB))
+                    Icon(imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicNone, contentDescription = "Voice", tint = if (isListening) Color.Red else Color(0xFF007AFF))
                 }
             },
             trailingIcon = {
                 IconButton(onClick = { if (command.isNotBlank()) onSend(command) }, enabled = command.isNotBlank() && state !is AiState.Loading) {
-                    Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = if (command.isNotBlank()) Color(0xFF9B72CB) else Color.Gray)
+                    Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = if (command.isNotBlank()) Color(0xFF007AFF) else Color.Gray)
                 }
             }
         )
-        if (state is AiState.Loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(2.dp).clip(CircleShape), color = Color(0xFF9B72CB))
+        if (state is AiState.Loading) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+                    .height(2.dp)
+                    .clip(CircleShape), 
+                color = Color(0xFF007AFF)
+            )
+        }
+        
+        if (state is AiState.Error) {
+            Text(
+                text = state.message,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        if (state is AiState.Success) {
+            Text(
+                text = state.message,
+                color = Color(0xFF00C851),
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
     }
 }
 
@@ -584,23 +693,6 @@ private fun JournalPromptDialog(habitName: String, onDismiss: () -> Unit, onConf
             TextButton(onClick = onDismiss) {
                 Text("Để sau")
             }
-        }
-    )
-}
-
-@Composable
-private fun DeleteHabitDialog(habit: Habit, onDismiss: () -> Unit, onConfirm: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.habits_delete_title)) },
-        text = { Text(stringResource(R.string.habits_delete_msg, habit.name)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-                Text(stringResource(R.string.habits_delete_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.habits_cancel)) }
         }
     )
 }

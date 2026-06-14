@@ -103,10 +103,18 @@ class MainActivity : AppCompatActivity() {
                 var sheetContentType by remember { mutableStateOf(SheetContent.None) }
 
                 val editingHabit by mainViewModel.editingHabit.collectAsStateWithLifecycle()
+                val showJournalSheetState by mainViewModel.showJournalSheet.collectAsStateWithLifecycle()
                 
                 LaunchedEffect(editingHabit) {
                     if (editingHabit != null) {
                         sheetContentType = SheetContent.HabitSelection
+                        showBottomSheet = true
+                    }
+                }
+
+                LaunchedEffect(showJournalSheetState) {
+                    if (showJournalSheetState) {
+                        sheetContentType = SheetContent.JournalEntry
                         showBottomSheet = true
                     }
                 }
@@ -364,6 +372,7 @@ class MainActivity : AppCompatActivity() {
                                         showBottomSheet = false
                                         sheetContentType = SheetContent.None
                                         mainViewModel.startEditingHabit(null)
+                                        mainViewModel.setShowJournalSheet(false)
                                     },
                                     sheetState = sheetState,
                                     dragHandle = { BottomSheetDefaults.DragHandle() },
@@ -374,10 +383,14 @@ class MainActivity : AppCompatActivity() {
                                         SheetContent.JournalEntry -> {
                                             val isUploading by mainViewModel.isUploading.collectAsStateWithLifecycle()
                                             JournalEntryPanel(
-                                                onDismiss = { showBottomSheet = false },
+                                                onDismiss = { 
+                                                    showBottomSheet = false
+                                                    mainViewModel.setShowJournalSheet(false)
+                                                },
                                                 onPost = { emoji, text, uri ->
                                                     mainViewModel.saveJournalEntry(emoji, text, uri) {
                                                         showBottomSheet = false
+                                                        mainViewModel.setShowJournalSheet(false)
                                                     }
                                                 },
                                                 isUploading = isUploading

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -23,6 +25,15 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Đọc API Key từ local.properties
+        val localProperties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localProperties.load(localPropertiesFile.inputStream())
+        }
+        val geminiKey = localProperties.getProperty("GEMINI_API_KEY") ?: ""
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
     }
 
     buildTypes {
@@ -41,6 +52,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -99,6 +111,7 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
+    implementation(libs.firebase.functions)
     implementation(libs.googleid)
 
     // Hilt

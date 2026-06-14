@@ -237,7 +237,7 @@ fun LoginContent(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -251,9 +251,21 @@ fun LoginContent(
                     LanguagePickerDialog(onDismiss = { onToggleLanguagePicker(false) })
                 }
 
-                HeaderTitle(
-                    title = stringResource(id = R.string.login_title)
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+                    verticalArrangement = Arrangement.Bottom
+                ) {
+                    Text(
+                        text = stringResource(id = R.string.login_title),
+                        color = Color.White,
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                }
             }
 
             // Form Section
@@ -516,24 +528,6 @@ fun AuthInputField(
                 modifier = Modifier.padding(start = 12.dp, top = 2.dp)
             )
         }
-    }
-}
-
-@Composable
-private fun HeaderTitle(title: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
-        verticalArrangement = Arrangement.Bottom
-    ) {
-        Text(
-            text = title,
-            color = MaterialTheme.colorScheme.onPrimary,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
-        )
     }
 }
 
