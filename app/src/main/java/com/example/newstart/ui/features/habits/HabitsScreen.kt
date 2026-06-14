@@ -500,9 +500,12 @@ private fun AiFloatingButton(
 ) {
     val scope = rememberCoroutineScope()
     
-    // Khởi tạo vị trí mặc định (Góc dưới bên phải)
+    // Khởi tạo vị trí mặc định (Góc dưới bên phải, trừ đi chiều cao navbar)
+    val density = LocalDensity.current
+    val navBarHeightPx = with(density) { 56.dp.toPx() } // Giảm xuống để sát navbar hơn
+    
     val offsetX = remember { Animatable(maxWidth - buttonSizePx - paddingPx) }
-    val offsetY = remember { Animatable(maxHeight - buttonSizePx - paddingPx - 200f) }
+    val offsetY = remember { Animatable(maxHeight - buttonSizePx - paddingPx - navBarHeightPx) }
 
     Surface(
         modifier = Modifier
@@ -521,7 +524,7 @@ private fun AiFloatingButton(
                         change.consume()
                         scope.launch {
                             val newX = (offsetX.value + dragAmount.x).coerceIn(paddingPx, maxWidth - buttonSizePx - paddingPx)
-                            val newY = (offsetY.value + dragAmount.y).coerceIn(paddingPx, maxHeight - buttonSizePx - paddingPx)
+                            val newY = (offsetY.value + dragAmount.y).coerceIn(paddingPx, maxHeight - buttonSizePx - paddingPx - navBarHeightPx)
                             offsetX.snapTo(newX)
                             offsetY.snapTo(newY)
                         }
