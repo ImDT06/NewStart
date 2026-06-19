@@ -30,6 +30,7 @@ class MainViewModel @Inject constructor(
     private val journalRepository: JournalRepository,
     private val userRepository: UserRepository,
     private val habitRepository: HabitRepository,
+    private val socialRepository: com.example.newstart.domain.repository.SocialRepository,
     private val database: com.example.newstart.data.local.NewStartDatabase
 ) : ViewModel() {
 
@@ -116,6 +117,13 @@ class MainViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = null
+        )
+
+    val squads: StateFlow<List<com.example.newstart.domain.model.Squad>> = socialRepository.getSquads()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
         )
 
     fun setThemeMode(mode: ThemeMode) {
@@ -216,6 +224,7 @@ class MainViewModel @Inject constructor(
         reminderTime: String? = null,
         reminderMinutesBefore: Int = 0,
         date: LocalDate? = null,
+        squadId: String? = null,
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
@@ -228,7 +237,8 @@ class MainViewModel @Inject constructor(
                 colorHex = colorHex,
                 date = finalDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
                 reminderTime = reminderTime,
-                reminderMinutesBefore = reminderMinutesBefore
+                reminderMinutesBefore = reminderMinutesBefore,
+                squadId = squadId
             )
             val result = habitRepository.saveHabit(newHabit)
             if (result.isSuccess) {

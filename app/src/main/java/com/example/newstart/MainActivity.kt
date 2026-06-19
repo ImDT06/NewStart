@@ -120,7 +120,18 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 val isAuthRoute = listOf(Screen.Welcome.route, Screen.Login.route, Screen.Register.route, Screen.Pomodoro.route).contains(currentRoute)
+                
+                // Xác định các trang chính có hiển thị Bottom Bar
+                val isMainRoute = listOf(
+                    Screen.Home.route,
+                    Screen.Journal.route,
+                    Screen.Habits.route,
+                    Screen.Profile.route,
+                    Screen.Social.route
+                ).contains(currentRoute)
+
                 val showShell = authState == AuthState.Authenticated && !isAuthRoute
+                val showFab = showShell && isMainRoute
 
                 // Tối ưu hóa Navbar nổi: Hide on Scroll
                 var isBottomBarVisible by remember { mutableStateOf(true) }
@@ -238,7 +249,7 @@ class MainActivity : AppCompatActivity() {
 
                                     // Hiệu ứng ẩn hiện cả cụm Menu + FAB khi scroll
                                     AnimatedVisibility(
-                                        visible = isBottomBarVisible || showMenu, // Luôn hiện nếu menu đang mở
+                                        visible = (isBottomBarVisible && showFab) || showMenu, // Luôn hiện nếu menu đang mở
                                         enter = scaleIn() + fadeIn(),
                                         exit = scaleOut() + fadeOut()
                                     ) {
@@ -399,14 +410,17 @@ class MainActivity : AppCompatActivity() {
                                         SheetContent.HabitSelection -> {
                                             val selectedHabitDate by mainViewModel.selectedHabitDate.collectAsStateWithLifecycle()
                                             val editingHabitData by mainViewModel.editingHabit.collectAsStateWithLifecycle()
+                                            val squads by mainViewModel.squads.collectAsStateWithLifecycle()
+                                            
                                             NewHabitSheet(
                                                 initialDate = selectedHabitDate,
                                                 editingHabit = editingHabitData,
+                                                squads = squads,
                                                 onDismiss = { 
                                                     showBottomSheet = false
                                                     mainViewModel.startEditingHabit(null)
                                                 },
-                                                onHabitSelected = { name, icon, time, mins, color, date ->
+                                                onHabitSelected = { name, icon, time, mins, color, date, squadId ->
                                                     val colorInt = (color.red * 255).toInt() shl 16 or
                                                                   (color.green * 255).toInt() shl 8 or
                                                                   (color.blue * 255).toInt()
@@ -420,7 +434,8 @@ class MainActivity : AppCompatActivity() {
                                                         colorHex = colorHex,
                                                         reminderTime = time,
                                                         reminderMinutesBefore = mins,
-                                                        date = date
+                                                        date = date,
+                                                        squadId = squadId
                                                     ) {
                                                         showBottomSheet = false
                                                         mainViewModel.startEditingHabit(null)

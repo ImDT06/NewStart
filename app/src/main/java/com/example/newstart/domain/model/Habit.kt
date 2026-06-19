@@ -30,5 +30,6 @@ data class Habit(
     val date: String = "", // Định dạng "yyyy-MM-dd"
     val reminderTime: String? = null, // Định dạng "HH:mm"
     val reminderMinutesBefore: Int = 0,
+    val squadId: String? = null, // ID của nhóm nếu là thói quen chung
     val createdAt: Date = Date()
 )

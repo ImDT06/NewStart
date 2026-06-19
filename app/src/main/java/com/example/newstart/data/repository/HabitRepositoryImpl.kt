@@ -160,18 +160,40 @@ class HabitRepositoryImpl @Inject constructor(
 
     private suspend fun syncHabitsFromNetwork(userId: String, date: String) {
         try {
-            val snapshot = firestore.collection("habits")
+            // 1. Fetch personal habits
+            val personalSnapshot = firestore.collection("habits")
                 .whereEqualTo("userId", userId)
                 .whereEqualTo("date", date)
                 .get()
                 .await()
             
-            val remoteHabits = snapshot.documents.mapNotNull { doc ->
+            val personalHabits = personalSnapshot.documents.mapNotNull { doc ->
                 doc.toObject(Habit::class.java)?.copy(id = doc.id)
             }
 
-            if (remoteHabits.isNotEmpty()) {
-                habitDao.insertHabits(remoteHabits.map { it.toEntity(isSynced = true) })
+            // 2. Fetch squad habits (shared)
+            val squadSnapshot = firestore.collection("habits")
+                .whereEqualTo("date", date)
+                .whereNotEqualTo("squadId", null)
+                .get()
+                .await()
+            
+            // Lọc lại những squad mà user tham gia (Firestore query whereIn có giới hạn, nên có thể lọc client-side nếu số lượng ít)
+            val userSquads = firestore.collection("squads")
+                .whereArrayContains("members", userId)
+                .get()
+                .await()
+                .documents.map { it.id }
+
+            val squadHabits = squadSnapshot.documents.mapNotNull { doc ->
+                val habit = doc.toObject(Habit::class.java)?.copy(id = doc.id)
+                if (habit?.squadId != null && userSquads.contains(habit.squadId)) habit else null
+            }
+
+            val allRemoteHabits = personalHabits + squadHabits
+
+            if (allRemoteHabits.isNotEmpty()) {
+                habitDao.insertHabits(allRemoteHabits.map { it.toEntity(isSynced = true) })
             }
         } catch (e: Exception) {
             android.util.Log.e("HabitRepository", "Sync failed: ${e.message}")

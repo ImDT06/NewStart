@@ -61,7 +61,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HabitsScreen(
     mainViewModel: MainViewModel,
@@ -738,14 +738,14 @@ private fun AiFloatingButton(
     val scope = rememberCoroutineScope()
 
     val density = LocalDensity.current
-    val navBarHeightPx = with(density) { 56.dp.toPx() }
+    val navBarHeightPx = with(density) { 80.dp.toPx() } // Tăng lên để tránh đè lên Navbar
     
-    val offsetX = remember { Animatable(maxWidth - buttonSizePx - paddingPx) }
-    val offsetY = remember { Animatable(maxHeight - buttonSizePx - paddingPx - navBarHeightPx) }
+    val offsetX = remember(maxWidth) { Animatable(maxWidth - buttonSizePx - paddingPx) }
+    val offsetY = remember(maxHeight) { Animatable(maxHeight - buttonSizePx - paddingPx - navBarHeightPx) }
 
     Surface(
         modifier = Modifier
-            .size(52.dp)
+            .size(56.dp) // Đồng bộ với buttonSizePx (56.dp)
             .offset { IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt()) }
             .pointerInput(maxWidth, maxHeight) {
                 detectDragGestures(
@@ -821,7 +821,13 @@ private fun AiInteractionSheet(
 
 @Composable
 private fun AiDraftingView(habits: List<Habit>, onConfirm: (List<Habit>) -> Unit, onCancel: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 24.dp, end = 24.dp, bottom = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Text("Xác nhận thói quen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Text("AI đã đề xuất ${habits.size} mục mới cho bạn", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))

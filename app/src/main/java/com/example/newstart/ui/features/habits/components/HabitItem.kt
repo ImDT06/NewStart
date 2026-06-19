@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -104,6 +105,15 @@ fun HabitItem(
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1
                         )
+                        if (habit.squadId != null) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                Icons.Default.Group,
+                                null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                         if (habit.streak > 0) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Surface(
