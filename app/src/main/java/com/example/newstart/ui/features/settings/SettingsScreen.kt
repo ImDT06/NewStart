@@ -180,6 +180,7 @@ fun SettingsScreen(
     var showThemePicker by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showEditProfileDialog by remember { mutableStateOf(false) }
     
     val themeMode by mainViewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by mainViewModel.themeColor.collectAsStateWithLifecycle()
@@ -311,7 +312,7 @@ fun SettingsScreen(
                         SettingsItem(
                             icon = Icons.Default.Person,
                             titleRes = R.string.settings_profile,
-                            onClick = {}
+                            onClick = { showEditProfileDialog = true }
                         )
                         SettingsDivider()
                         SettingsItem(
@@ -411,6 +412,56 @@ fun SettingsScreen(
             onDismiss = { showColorPicker = false }
         )
     }
+
+    if (showEditProfileDialog) {
+        EditProfileDialog(
+            currentName = currentUser?.name ?: "",
+            onConfirm = { 
+                mainViewModel.updateProfileName(it)
+                showEditProfileDialog = false 
+            },
+            onDismiss = { showEditProfileDialog = false }
+        )
+    }
+}
+
+@Composable
+fun EditProfileDialog(
+    currentName: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf(currentName) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Chỉnh sửa hồ sơ", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Tên hiển thị") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(name) },
+                enabled = name.isNotBlank() && name != currentName
+            ) {
+                Text("Lưu thay đổi")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Hủy")
+            }
+        }
+    )
 }
 
 @Composable

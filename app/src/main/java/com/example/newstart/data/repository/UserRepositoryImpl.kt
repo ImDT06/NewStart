@@ -127,6 +127,28 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updateProfile(userId: String, name: String): Result<Unit> {
+        if (userId.isBlank()) return Result.failure(Exception("User ID is empty"))
+        
+        return try {
+            val firebaseUser = auth.currentUser
+            val userDocument = firestore.collection("users").document(userId)
+            
+            val updates = mapOf("name" to name)
+            userDocument.set(updates, SetOptions.merge()).await()
+
+            val profileUpdates = UserProfileChangeRequest.Builder()
+                .setDisplayName(name)
+                .build()
+            firebaseUser?.updateProfile(profileUpdates)?.await()
+            firebaseUser?.reload()?.await()
+            
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun searchUsers(query: String): List<User> {
         return try {
             val snapshot = firestore.collection("users")

@@ -187,6 +187,13 @@ class MainViewModel @Inject constructor(
             _isUploading.value = false
         }
     }
+
+    fun updateProfileName(newName: String) {
+        val userId = currentUser.value?.id ?: return
+        viewModelScope.launch {
+            userRepository.updateProfile(userId, newName)
+        }
+    }
     
     fun logout() {
         viewModelScope.launch {
