@@ -42,7 +42,8 @@ import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.theme.authHeaderGradient
 import com.example.newstart.ui.util.AppCombinedPreviews
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.newstart.util.Resource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.TransparentLanguageSwitcher
 
@@ -53,42 +54,49 @@ fun RegisterScreen(
     onNavigateToLogin: () -> Unit = {},
     onRegisterSuccess: () -> Unit = {},
     viewModel: RegisterViewModel = hiltViewModel(),
-    mainViewModel: MainViewModel = viewModel()
+    mainViewModel: MainViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showLanguagePicker by remember { mutableStateOf(false) }
 
+    // Xử lý kết quả Đăng ký
+    LaunchedEffect(uiState.registerResult) {
+        when (val result = uiState.registerResult) {
+            is Resource.Success -> {
+                Toast.makeText(context, "Đăng ký thành công! Vui lòng kiểm tra Email để xác thực tài khoản.", Toast.LENGTH_LONG).show()
+                onRegisterSuccess()
+                viewModel.clearRegisterResult()
+            }
+            is Resource.Error -> {
+                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                viewModel.clearRegisterResult()
+            }
+            else -> {}
+        }
+    }
+
     RegisterContent(
-        fullName = viewModel.fullName,
+        fullName = uiState.fullName,
         onFullNameChange = viewModel::onFullNameChange,
-        email = viewModel.email,
+        email = uiState.email,
         onEmailChange = viewModel::onEmailChange,
-        password = viewModel.password,
+        password = uiState.password,
         onPasswordChange = viewModel::onPasswordChange,
-        passwordVisible = viewModel.passwordVisible,
+        passwordVisible = uiState.passwordVisible,
         onPasswordVisibleChange = viewModel::togglePasswordVisibility,
-        confirmPassword = viewModel.confirmPassword,
+        confirmPassword = uiState.confirmPassword,
         onConfirmPasswordChange = viewModel::onConfirmPasswordChange,
-        confirmPasswordVisible = viewModel.confirmPasswordVisible,
+        confirmPasswordVisible = uiState.confirmPasswordVisible,
         onConfirmPasswordVisibleChange = viewModel::toggleConfirmPasswordVisibility,
-        acceptTerms = viewModel.acceptTerms,
+        acceptTerms = uiState.acceptTerms,
         onAcceptTermsChange = viewModel::onAcceptTermsChange,
-        fullNameError = viewModel.fullNameError,
-        emailError = viewModel.emailError,
-        passwordError = viewModel.passwordError,
-        confirmPasswordError = viewModel.confirmPasswordError,
-        isLoading = viewModel.isLoading,
-        onSignUpClick = {
-            viewModel.register(
-                onSuccess = {
-                    Toast.makeText(context, "Đăng ký thành công! Vui lòng kiểm tra Email để xác thực tài khoản.", Toast.LENGTH_LONG).show()
-                    onRegisterSuccess()
-                },
-                onError = { error ->
-                    Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-                }
-            )
-        },
+        fullNameError = uiState.fullNameError,
+        emailError = uiState.emailError,
+        passwordError = uiState.passwordError,
+        confirmPasswordError = uiState.confirmPasswordError,
+        isLoading = uiState.isLoading,
+        onSignUpClick = viewModel::register,
         onLoginNowClick = onNavigateToLogin,
         onBackClick = onNavigateBack,
         showLanguagePicker = showLanguagePicker,

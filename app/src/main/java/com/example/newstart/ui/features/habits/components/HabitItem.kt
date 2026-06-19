@@ -1,6 +1,8 @@
 package com.example.newstart.ui.features.habits.components
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,12 +15,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -104,62 +106,73 @@ fun HabitItem(
                         )
                         if (habit.streak > 0) {
                             Spacer(modifier = Modifier.width(6.dp))
-                            Icon(
-                                Icons.Default.LocalFireDepartment,
-                                null,
-                                tint = Color(0xFFFFA500),
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Text(
-                                "${habit.streak}",
-                                color = Color(0xFFFFA500),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Surface(
+                                color = Color(0xFFFFF4E5),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.LocalFireDepartment,
+                                        null,
+                                        tint = Color(0xFFFFA500),
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Text(
+                                        "${habit.streak}",
+                                        color = Color(0xFFFFA500),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val reminder = habit.reminderTime
-                        if (reminder != null) {
-                            Icon(
-                                imageVector = Icons.Default.NotificationsActive,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = reminder,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                            Text(
-                                text = " • ",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            )
-                        }
+                    // Thay thế Row text bằng Progress Bar mini
+                    val progressValue = (habit.progress.toFloatOrNull() ?: 0f) / (habit.goal.toFloatOrNull() ?: 1f)
+                    val animatedProgress by animateFloatAsState(targetValue = progressValue.coerceIn(0f, 1f), label = "item_progress")
+                    
+                    Column {
+                        LinearProgressIndicator(
+                            progress = { animatedProgress },
+                            modifier = Modifier
+                                .fillMaxWidth(0.8f)
+                                .height(4.dp)
+                                .clip(CircleShape),
+                            color = habitColor,
+                            trackColor = habitColor.copy(alpha = 0.1f)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "${habit.progress}/${habit.goal}",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = habitColor
+                            color = habitColor.copy(alpha = 0.8f)
                         )
                     }
                 }
 
                 // Nút hoàn thành
+                val scaleCheck by animateFloatAsState(
+                    targetValue = if (habit.isCompleted) 1.1f else 1f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                    label = "check_scale"
+                )
+
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(34.dp)
+                        .scale(scaleCheck)
                         .clip(CircleShape)
                         .background(if (habit.isCompleted) habitColor else Color.Transparent)
                         .border(
                             width = 1.5.dp,
-                            color = if (habit.isCompleted) habitColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                            color = if (habit.isCompleted) habitColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
                             shape = CircleShape
                         )
                         .clickable { onToggle() },

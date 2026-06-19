@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.google.gms.google.services)
     alias(libs.plugins.androidx.baselineprofile)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -59,6 +60,9 @@ android {
 dependencies {
     baselineProfile(project(":baselineprofile"))
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.security.crypto)
+    implementation(libs.tink.android)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)

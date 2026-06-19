@@ -29,7 +29,8 @@ class MainViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val journalRepository: JournalRepository,
     private val userRepository: UserRepository,
-    private val habitRepository: HabitRepository
+    private val habitRepository: HabitRepository,
+    private val database: com.example.newstart.data.local.NewStartDatabase
 ) : ViewModel() {
 
     private val _selectedHabitDate = MutableStateFlow(LocalDate.now())
@@ -181,7 +182,17 @@ class MainViewModel @Inject constructor(
     
     fun logout() {
         viewModelScope.launch {
-            authRepository.logout()
+            try {
+                // 1. Clear database
+                database.clearAllTables()
+                
+                // 2. Clear Auth
+                authRepository.logout()
+                
+                // Lưu ý: Navigation được xử lý tự động trong MainActivity thông qua authState
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Lỗi khi logout: ${e.message}")
+            }
         }
     }
 

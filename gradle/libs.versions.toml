@@ -36,6 +36,9 @@ generativeai = "0.9.0"
 glance = "1.1.1"
 room = "2.8.4"
 wheelPicker = "1.1.11"
+security-crypto = "1.1.0"
+tink-android = "1.15.0"
+kotlinx-serialization = "1.7.3"
 androidx-baselineprofile = "1.5.0-alpha06"
 androidx-uiautomator = "2.3.0"
 androidx-benchmark = "1.5.0-alpha06"
@@ -97,6 +100,9 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 androidx-test-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "androidx-uiautomator" }
 androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "androidx-benchmark" }
 wheelPicker = { group = "com.github.commandiron", name = "WheelPickerCompose", version.ref = "wheelPicker" }
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "security-crypto" }
+tink-android = { group = "com.google.crypto.tink", name = "tink-android", version.ref = "tink-android" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -107,3 +113,4 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 google-gms-google-services = { id = "com.google.gms.google-services", version.ref = "googleGmsGoogleServices" }
 android-test = { id = "com.android.test", version.ref = "agp" }
 androidx-baselineprofile = { id = "androidx.baselineprofile", version.ref = "androidx-baselineprofile" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

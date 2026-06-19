@@ -31,8 +31,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -69,7 +67,7 @@ fun HabitsScreen(
     mainViewModel: MainViewModel,
     navController: NavController,
     modifier: Modifier = Modifier,
-    viewModel: HabitsViewModel = hiltViewModel()
+    viewModel: HabitsViewModel = hiltViewModel(),
 ) {
     val habits by viewModel.habits.collectAsStateWithLifecycle()
     val selectedDate by mainViewModel.selectedHabitDate.collectAsStateWithLifecycle()
@@ -85,6 +83,20 @@ fun HabitsScreen(
     var showAiDialog by remember { mutableStateOf(false) }
     var aiCommand by remember { mutableStateOf("") }
     val aiSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Celebration State
+    var showCelebration by remember { mutableStateOf(false) }
+    val totalCount = habits.size
+    val completedCount = habits.count { it.isCompleted }
+
+    LaunchedEffect(completedCount, totalCount) {
+        if (totalCount > 0 && (completedCount == totalCount)) {
+            showCelebration = true
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        } else {
+            showCelebration = false
+        }
+    }
 
     val context = LocalContext.current
     var isListening by remember { mutableStateOf(false) }
@@ -173,6 +185,8 @@ fun HabitsScreen(
                 },
                 onShowMonthPicker = { showMonthPicker = true }
             )
+            
+            HabitProgressDashboard(habits = habits)
 
             HorizontalDatePicker(
                 pagerState = pagerState,
@@ -182,6 +196,8 @@ fun HabitsScreen(
                 locale = locale,
                 onDateClick = { mainViewModel.onHabitDateSelected(it) }
             )
+            
+            Spacer(modifier = Modifier.height(8.dp))
 
             HabitList(
                 habits = habits,
@@ -203,7 +219,6 @@ fun HabitsScreen(
             )
         }
 
-        // Snackbar Host cho Undo
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 90.dp)
@@ -261,24 +276,190 @@ fun HabitsScreen(
             )
         }
 
-        if (isJournalPromptEnabled && completedHabitForJournal != null) {
-            val habit = completedHabitForJournal
-            if (habit != null) {
-                JournalPromptDialog(
-                    habitName = habit.name,
-                    onDismiss = { viewModel.clearJournalPrompt() },
-                    onConfirm = {
-                        viewModel.clearJournalPrompt()
-                        mainViewModel.setShowJournalSheet(true)
-                        navController.navigate(Screen.Journal.route) {
-                            popUpTo(Screen.Home.route) { 
-                                saveState = true 
-                            }
-                            launchSingleTop = true
-                            restoreState = true
+        val currentHabit = completedHabitForJournal
+        if (isJournalPromptEnabled && currentHabit != null) {
+            JournalPromptDialog(
+                habitName = currentHabit.name,
+                onDismiss = { viewModel.clearJournalPrompt() },
+                onConfirm = {
+                    viewModel.clearJournalPrompt()
+                    mainViewModel.setShowJournalSheet(true)
+                    navController.navigate(Screen.Journal.route) {
+                        popUpTo(Screen.Home.route) { 
+                            saveState = true 
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            )
+        }
+
+        // Celebration Overlay
+        AnimatedVisibility(
+            visible = showCelebration,
+            enter = fadeIn() + scaleIn(initialScale = 0.8f),
+            exit = fadeOut() + scaleOut(targetScale = 0.8f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f))
+                    .clickable { showCelebration = false },
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    shape = RoundedCornerShape(32.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+                    modifier = Modifier.padding(32.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(text = "🎉", fontSize = 64.sp)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Thật xuất sắc!",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = "Bạn đã hoàn thành tất cả thói quen của ngày hôm nay.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = { showCelebration = false },
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text("Tiếp tục duy trì!")
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HabitProgressDashboard(habits: List<Habit>) {
+    val completedCount = habits.count { it.isCompleted }
+    val totalCount = habits.size
+    val progress = if (totalCount > 0) completedCount.toFloat() / totalCount else 0f
+    val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
+
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(60.dp)) {
+                    CircularProgressIndicator(
+                        progress = { 1f },
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        strokeWidth = 6.dp,
+                        strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                    CircularProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 6.dp,
+                        strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                    Text(
+                        text = "${(progress * 100).toInt()}%",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column {
+                    Text(
+                        text = when {
+                            totalCount == 0 -> "Bắt đầu ngày mới!"
+                            progress == 1f -> "Hoàn hảo! 🏆"
+                            progress > 0.5f -> "Sắp xong rồi!"
+                            else -> "Tiến độ hôm nay"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = if (totalCount == 0) "Thêm thói quen để bắt đầu"
+                        else if (progress == 1f) "Bạn đã hoàn thành tất cả!"
+                        else "Cố lên, còn ${totalCount - completedCount} mục tiêu nữa",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        if (totalCount > 0) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                val longestStreak = habits.maxOfOrNull { it.streak } ?: 0
+                QuickStatItem(
+                    label = "Chuỗi cao nhất",
+                    value = "$longestStreak ngày",
+                    icon = Icons.Default.Whatshot,
+                    color = Color(0xFFFFA500),
+                    modifier = Modifier.weight(1f)
                 )
+                QuickStatItem(
+                    label = "Đã hoàn thành",
+                    value = "$completedCount/$totalCount",
+                    icon = Icons.Default.CheckCircle,
+                    color = Color(0xFF00C851),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickStatItem(
+    label: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text(text = value, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                Text(text = label, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -291,7 +472,7 @@ private fun HabitsHeader(
     isVietnamese: Boolean,
     locale: java.util.Locale,
     onTodayClick: () -> Unit,
-    onShowMonthPicker: () -> Unit
+    onShowMonthPicker: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -386,22 +567,74 @@ private fun HabitList(
 ) {
     if (habits.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(stringResource(R.string.habits_empty), color = Color.Gray, fontSize = 14.sp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ListAlt,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.outlineVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.habits_empty),
+                    color = MaterialTheme.colorScheme.outline,
+                    fontSize = 14.sp
+                )
+            }
         }
     } else {
+        val groupedHabits = remember(habits) {
+            val morning = mutableListOf<Habit>()
+            val afternoon = mutableListOf<Habit>()
+            val evening = mutableListOf<Habit>()
+            val other = mutableListOf<Habit>()
+
+            habits.forEach { habit ->
+                val time = habit.reminderTime
+                if (time == null) {
+                    other.add(habit)
+                } else {
+                    val hour = time.split(":").firstOrNull()?.toIntOrNull() ?: -1
+                    when (hour) {
+                        in 0..11 -> morning.add(habit)
+                        in 12..17 -> afternoon.add(habit)
+                        in 18..23 -> evening.add(habit)
+                        else -> other.add(habit)
+                    }
+                }
+            }
+            listOf(
+                "Buổi sáng" to morning,
+                "Buổi chiều" to afternoon,
+                "Buổi tối" to evening,
+                "Khác" to other
+            ).filter { it.second.isNotEmpty() }
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(items = habits, key = { it.id }) { habit ->
-                HabitSwipeableItem(
-                    modifier = Modifier.animateItem(),
-                    habit = habit, 
-                    onDelete = { onDelete(habit) }, 
-                    onToggle = onToggle, 
-                    onEdit = onEdit
-                )
+            groupedHabits.forEach { (title, habitsInGroup) ->
+                item {
+                    Text(
+                        text = title.uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 8.dp, top = 8.dp)
+                    )
+                }
+                items(items = habitsInGroup, key = { it.id }) { habit ->
+                    HabitSwipeableItem(
+                        modifier = Modifier.animateItem(),
+                        habit = habit,
+                        onDelete = { onDelete(habit) },
+                        onToggle = onToggle,
+                        onEdit = onEdit
+                    )
+                }
             }
         }
     }
@@ -427,7 +660,6 @@ private fun HabitSwipeableItem(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
     ) {
-        // Nền đỏ và icon thùng rác (Lớp dưới)
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -454,7 +686,6 @@ private fun HabitSwipeableItem(
             }
         }
 
-        // Lớp thẻ Habit (Lớp trên - Phải đặc hoàn toàn để che lớp đỏ)
         Box(
             modifier = Modifier
                 .offset { IntOffset(offsetX.value.roundToInt(), 0) }
@@ -499,10 +730,9 @@ private fun AiFloatingButton(
     onClick: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    
-    // Khởi tạo vị trí mặc định (Góc dưới bên phải, trừ đi chiều cao navbar)
+
     val density = LocalDensity.current
-    val navBarHeightPx = with(density) { 56.dp.toPx() } // Giảm xuống để sát navbar hơn
+    val navBarHeightPx = with(density) { 56.dp.toPx() }
     
     val offsetX = remember { Animatable(maxWidth - buttonSizePx - paddingPx) }
     val offsetY = remember { Animatable(maxHeight - buttonSizePx - paddingPx - navBarHeightPx) }
@@ -543,7 +773,7 @@ private fun AiFloatingButton(
                 imageVector = Icons.Default.AutoAwesome, 
                 contentDescription = "AI Assistant", 
                 modifier = Modifier.size(24.dp), 
-                tint = Color(0xFF007AFF) // Màu xanh dương chủ đạo
+                tint = Color(0xFF007AFF)
             )
         }
     }
@@ -563,7 +793,6 @@ private fun AiInteractionSheet(
     isListening: Boolean,
     onToggleListening: () -> Unit
 ) {
-    // Gradient Xanh dương - Xanh lá (Xanh dương chủ đạo)
     val aiGradient = Brush.linearGradient(
         colors = listOf(Color(0xFF007AFF), Color(0xFF007AFF), Color(0xFF00C851))
     )
@@ -640,7 +869,7 @@ private fun AiInputView(
             modifier = Modifier.fillMaxWidth().border(width = 1.dp, brush = if (command.isNotBlank() || isListening) gradient else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)), shape = RoundedCornerShape(16.dp)),
             shape = RoundedCornerShape(16.dp),
             leadingIcon = {
-                IconButton(onClick = onToggleListening) {
+                IconButton(onClick = { onToggleListening() }) {
                     Icon(imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicNone, contentDescription = "Voice", tint = if (isListening) Color.Red else Color(0xFF007AFF))
                 }
             },
