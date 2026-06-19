@@ -179,6 +179,7 @@ fun HabitsScreen(
                 today = today,
                 isVietnamese = isVietnamese,
                 locale = locale,
+                navController = navController,
                 onTodayClick = {
                     mainViewModel.onHabitDateSelected(today)
                     scope.launch { pagerState.animateScrollToPage(500) }
@@ -471,6 +472,7 @@ private fun HabitsHeader(
     today: LocalDate,
     isVietnamese: Boolean,
     locale: java.util.Locale,
+    navController: NavController,
     onTodayClick: () -> Unit,
     onShowMonthPicker: () -> Unit,
 ) {
@@ -501,6 +503,10 @@ private fun HabitsHeader(
 
         IconButton(onClick = onShowMonthPicker) {
             Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+        }
+
+        IconButton(onClick = { navController.navigate(Screen.Statistics.route) }) {
+            Icon(Icons.Default.AutoGraph, null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
         }
     }
 }
