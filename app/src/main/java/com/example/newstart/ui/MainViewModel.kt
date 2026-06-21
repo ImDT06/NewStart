@@ -211,10 +211,10 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?, onSuccess: () -> Unit) {
+    fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?, imageSource: String? = null, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _isUploading.value = true
-            val result = journalRepository.saveJournalEntry(emoji, text, imageUri)
+            val result = journalRepository.saveJournalEntry(emoji, text, imageUri, imageSource)
             _isUploading.value = false
             if (result.isSuccess) {
                 onSuccess()

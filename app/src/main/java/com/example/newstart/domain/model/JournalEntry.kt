@@ -11,6 +11,7 @@ data class JournalEntry(
     val emoji: String = "",
     val text: String = "",
     val imageUrl: String? = null,
+    val imageSource: String? = null, // "CAMERA" hoặc "GALLERY"
     val linkedHabitId: String? = null, // ID của thói quen liên kết
     val linkedTodoId: String? = null,  // ID của tác vụ liên kết
     val privacy: JournalPrivacy = JournalPrivacy.PRIVATE, // Quyền riêng tư

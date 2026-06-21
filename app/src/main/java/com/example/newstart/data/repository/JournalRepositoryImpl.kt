@@ -38,7 +38,7 @@ class JournalRepositoryImpl @Inject constructor(
 
     private val client = OkHttpClient()
 
-    override suspend fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?): Result<Unit> {
+    override suspend fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?, imageSource: String?): Result<Unit> {
         return try {
             val userId = auth.currentUser?.uid ?: throw Exception("User not logged in")
             var imageUrl: String? = null
@@ -56,6 +56,7 @@ class JournalRepositoryImpl @Inject constructor(
                 emoji = emoji,
                 text = text,
                 imageUrl = imageUrl,
+                imageSource = imageSource,
                 timestamp = Date()
             )
 

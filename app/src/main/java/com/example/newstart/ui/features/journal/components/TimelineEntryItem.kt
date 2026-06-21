@@ -112,8 +112,8 @@ fun TimelineEntryItem(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
-                            .heightIn(min = 160.dp, max = 300.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(24.dp))
                             .clickable { onImageClick(entry.imageUrl) },
                         contentScale = ContentScale.Crop
                     )

@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -71,12 +72,13 @@ import java.util.concurrent.Executors
 @Composable
 fun JournalEntryPanel(
     onDismiss: () -> Unit,
-    onPost: (String, String, Uri?) -> Unit,
+    onPost: (String, String, Uri?, String?) -> Unit,
     isUploading: Boolean = false
 ) {
     var text by remember { mutableStateOf("") }
     var selectedEmoji by remember { mutableStateOf("😊") }
     var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var isCapturedImage by remember { mutableStateOf(false) } // Theo dõi nguồn gốc ảnh
     var isTextOnlyMode by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
@@ -85,6 +87,19 @@ fun JournalEntryPanel(
     val mediaActionSound = remember { MediaActionSound() }
     val executor = remember { Executors.newSingleThreadExecutor() }
     val imageCapture = remember { ImageCapture.Builder().build() }
+    
+    var showFullEmojiPicker by remember { mutableStateOf(false) }
+    
+    val emojiCategories = remember {
+        mapOf(
+            "Cảm xúc" to listOf("😊", "🥰", "😍", "😎", "🤩", "🥳", "😂", "😇", "🤔", "🤫", "😴", "😫", "😭", "😤", "🤯"),
+            "Hoạt động" to listOf("🚵", "🏃", "🧘", "📚", "🎨", "🎮", "🍳", "💼", "✈️", "🏀", "⚽", "🏋️", "🚶", "🎤", "🎧"),
+            "Thiên nhiên" to listOf("🔥", "✨", "🌈", "☀️", "🌙", "🌧️", "❄️", "🍀", "🌸", "🌊", "🍃", "🌦️", "🌌", "🌍", "🪐"),
+            "Khác" to listOf("🎉", "🎁", "💡", "❤️", "💯", "✅", "📍", "🔔", "⭐", "☕", "🍕", "🍦", "🍷", "🏠", "📱")
+        )
+    }
+    
+    val quickEmojis = listOf("😊", "🥰", "🚵", "🏃", "🔥", "✨", "🎉", "❤️")
     
     LaunchedEffect(Unit) {
         mediaActionSound.load(MediaActionSound.SHUTTER_CLICK)
@@ -105,6 +120,7 @@ fun JournalEntryPanel(
     ) { uri: Uri? ->
         if (uri != null) {
             capturedImageUri = uri
+            isCapturedImage = false // Ảnh từ thư viện
             isTextOnlyMode = false
         }
     }
@@ -171,7 +187,7 @@ fun JournalEntryPanel(
             Spacer(modifier = Modifier.size(48.dp))
         }
 
-        // Camera Preview
+        // Camera Preview / Selected Image
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -186,11 +202,10 @@ fun JournalEntryPanel(
                     model = coil.request.ImageRequest.Builder(LocalContext.current)
                         .data(capturedImageUri)
                         .crossfade(true)
-                        .size(coil.size.Size.ORIGINAL) 
                         .build(),
-                    contentDescription = "Captured Image",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    contentDescription = "Selected Image",
+                    modifier = Modifier.fillMaxWidth(),
+                    contentScale = if (isCapturedImage) ContentScale.Crop else ContentScale.Fit
                 )
             } else if (isTextOnlyMode) {
                 Icon(
@@ -353,7 +368,10 @@ fun JournalEntryPanel(
                 FilledIconButton(
                     onClick = { 
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onPost(selectedEmoji, text, capturedImageUri) 
+                        val source = if (capturedImageUri != null) {
+                            if (isCapturedImage) "CAMERA" else "GALLERY"
+                        } else null
+                        onPost(selectedEmoji, text, capturedImageUri, source)
                     },
                     enabled = hasContent && !isUploading,
                     modifier = Modifier.size(88.dp), 
@@ -402,6 +420,7 @@ fun JournalEntryPanel(
                                         executor = executor,
                                         onImageCaptured = { 
                                             capturedImageUri = it 
+                                            isCapturedImage = true // Đánh dấu là ảnh vừa chụp
                                             isTextOnlyMode = false
                                         },
                                         onError = { Log.e("Camera", "Capture failed", it) }
@@ -469,9 +488,21 @@ fun JournalEntryPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(emojis) { emoji ->
+            item {
+                IconButton(
+                    onClick = { showFullEmojiPicker = true },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), CircleShape)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "More Emojis", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+            
+            items(quickEmojis) { emoji ->
                 val isSelected = selectedEmoji == emoji
                 Box(
                     modifier = Modifier
@@ -498,6 +529,99 @@ fun JournalEntryPanel(
         }
         
         Spacer(modifier = Modifier.height(32.dp))
+    }
+
+    if (showFullEmojiPicker) {
+        FullEmojiPickerSheet(
+            categories = emojiCategories,
+            selectedEmoji = selectedEmoji,
+            onEmojiSelected = { 
+                selectedEmoji = it
+                showFullEmojiPicker = false
+            },
+            onDismiss = { showFullEmojiPicker = false }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FullEmojiPickerSheet(
+    categories: Map<String, List<String>>,
+    selectedEmoji: String,
+    onEmojiSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 40.dp)
+                .heightIn(max = 400.dp)
+        ) {
+            Text(
+                "Chọn cảm xúc",
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            var currentCategory by remember { mutableStateOf(categories.keys.first()) }
+            
+            ScrollableTabRow(
+                selectedTabIndex = categories.keys.toList().indexOf(currentCategory),
+                containerColor = Color.Transparent,
+                edgePadding = 24.dp,
+                divider = {},
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator(
+                        Modifier.tabIndicatorOffset(tabPositions[categories.keys.toList().indexOf(currentCategory)]),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            ) {
+                categories.keys.forEach { category ->
+                    Tab(
+                        selected = currentCategory == category,
+                        onClick = { currentCategory = category },
+                        text = { Text(category, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                    )
+                }
+            }
+
+            androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(minSize = 56.dp),
+                contentPadding = PaddingValues(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val emojis = categories[currentCategory] ?: emptyList()
+                items(emojis.size) { index ->
+                    val emoji = emojis[index]
+                    val isSelected = selectedEmoji == emoji
+                    Box(
+                        modifier = Modifier
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent)
+                            .border(
+                                width = if (isSelected) 2.dp else 0.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .clickable { onEmojiSelected(emoji) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(emoji, fontSize = 28.sp)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -707,7 +831,7 @@ private fun takePhoto(
             }
 
             override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                // Xử lý cắt ảnh vuông sau khi lưu thành công
+                // Xử lý cắt ảnh vuông 1:1 cho camera như yêu cầu
                 processImageToSquare(photoFile)
                 val savedUri = Uri.fromFile(photoFile)
                 onImageCaptured(savedUri)
@@ -720,7 +844,6 @@ private fun processImageToSquare(file: File) {
     try {
         val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return
         
-        // Đọc thông tin xoay từ EXIF
         val exif = ExifInterface(file.absolutePath)
         val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
         
@@ -731,10 +854,8 @@ private fun processImageToSquare(file: File) {
             ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
         }
 
-        // Tạo bitmap đã xoay đúng chiều
         val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
         
-        // Cắt vuông (Center Crop)
         val width = rotatedBitmap.width
         val height = rotatedBitmap.height
         val newDimension = if (width < height) width else height
@@ -744,12 +865,10 @@ private fun processImageToSquare(file: File) {
         
         val squareBitmap = Bitmap.createBitmap(rotatedBitmap, xOffset, yOffset, newDimension, newDimension)
         
-        // Lưu đè lại file cũ
         java.io.FileOutputStream(file).use { out ->
             squareBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
         }
         
-        // Giải phóng bộ nhớ
         if (bitmap != rotatedBitmap) bitmap.recycle()
         rotatedBitmap.recycle()
         squareBitmap.recycle()
@@ -772,7 +891,7 @@ fun JournalEntryPanelPreview() {
         Surface(color = MaterialTheme.colorScheme.background) {
             JournalEntryPanel(
                 onDismiss = {},
-                onPost = { _, _, _ -> }
+                onPost = { _, _, _, _ -> }
             )
         }
     }

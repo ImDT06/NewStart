@@ -3,11 +3,14 @@ package com.example.newstart.ui.features.journal
 import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -25,13 +28,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import android.content.Intent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -43,8 +51,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalView
+import android.view.WindowManager
+import android.graphics.Color as AndroidColor
 import coil.compose.AsyncImage
 import com.example.newstart.R
 import com.example.newstart.domain.model.JournalEntry
@@ -611,26 +626,235 @@ private fun DeleteConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
 
 @Composable
 private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val view = LocalView.current
+
+    // Thiết lập Edge-to-Edge cực đoan cho Dialog Window
+    SideEffect {
+        val window = (view.parent as? DialogWindowProvider)?.window
+        window?.let {
+            // Cho phép vẽ tràn ra ngoài mọi giới hạn hệ thống
+            it.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+            
+            // Ép vẽ vào cả vùng tai thỏ (API 28+)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                it.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+            
+            // Xóa bỏ hiệu ứng làm mờ nền của Dialog (dim)
+            it.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            
+            WindowCompat.setDecorFitsSystemWindows(it, false)
+            it.statusBarColor = AndroidColor.TRANSPARENT
+            it.navigationBarColor = AndroidColor.TRANSPARENT
+            it.setBackgroundDrawableResource(android.R.color.transparent)
+            
+            it.setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT
+            )
+
+            WindowCompat.getInsetsController(it, view).isAppearanceLightStatusBars = false
+        }
+    }
+
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    var isUiVisible by remember { mutableStateOf(true) }
+
+    // Tự động ẩn/hiện thanh trạng thái giống Messenger
+    LaunchedEffect(isUiVisible) {
+        val window = (view.parent as? DialogWindowProvider)?.window
+        window?.let {
+            val controller = WindowCompat.getInsetsController(it, view)
+            if (isUiVisible) {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            } else {
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        }
+    }
+
+    // Tính toán độ mờ của background và độ bo góc dựa trên trạng thái Zoom/UI
+    val isZoomed = scale > 1f
+    val backgroundAlpha by animateFloatAsState(
+        targetValue = if (isUiVisible && !isZoomed) 0.4f else 0f,
+        label = "bg_alpha"
+    )
+    // Bo góc về 0 khi ẩn UI hoặc khi đang Zoom
+    val imageCornerRadius by animateDpAsState(
+        targetValue = if (isZoomed || !isUiVisible) 0.dp else 24.dp,
+        label = "corner_radius"
+    )
+    // Padding về 0 khi ẩn UI hoặc khi đang Zoom để ảnh tràn màn hình
+    val horizontalPadding by animateDpAsState(
+        targetValue = if (isZoomed || !isUiVisible) 0.dp else 16.dp,
+        label = "padding"
+    )
+
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.9f))
-                .clickable { onDismiss() },
-            contentAlignment = Alignment.Center
+                .background(Color.Black)
         ) {
+            // Blurred Background - Bây giờ sẽ tràn toàn bộ kể cả status bar
             AsyncImage(
                 model = url,
                 contentDescription = null,
                 modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(32.dp)),
-                contentScale = ContentScale.Crop
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // Tăng scale mạnh hơn để đảm bảo không bị hở viền khi blur cực nặng
+                        scaleX = 1.3f
+                        scaleY = 1.3f
+                    }
+                    .blur(40.dp),
+                contentScale = ContentScale.Crop,
+                alpha = backgroundAlpha
             )
+
+            // Main Image with Zoom and Pan
+            var containerSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onSizeChanged { containerSize = it }
+                    .pointerInput(Unit) {
+                        detectTransformGestures { centroid, pan, zoom, _ ->
+                            val oldScale = scale
+                            scale = (scale * zoom).coerceIn(1f, 5f)
+                            
+                            if (scale > 1f) {
+                                isUiVisible = false
+                                // Công thức chuẩn: Zoom vào tâm điểm ngón tay
+                                // Cần trừ đi một nửa kích thước container để đưa centroid về hệ tọa độ tâm
+                                val center = Offset(containerSize.width / 2f, containerSize.height / 2f)
+                                val relativeCentroid = centroid - center
+                                offset = (offset + pan) * (scale / oldScale) + (relativeCentroid * (1 - scale / oldScale))
+                            } else {
+                                offset = Offset.Zero
+                                isUiVisible = true
+                            }
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = { tapOffset ->
+                                if (scale > 1f) {
+                                    scale = 1f
+                                    offset = Offset.Zero
+                                    isUiVisible = true
+                                } else {
+                                    scale = 3f
+                                    val center = Offset(containerSize.width / 2f, containerSize.height / 2f)
+                                    val relativeTap = tapOffset - center
+                                    offset = relativeTap * (1 - 3f)
+                                    isUiVisible = false
+                                }
+                            },
+                            onTap = { 
+                                if (scale > 1f) {
+                                    scale = 1f
+                                    offset = Offset.Zero
+                                    isUiVisible = true
+                                } else {
+                                    isUiVisible = !isUiVisible
+                                }
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .padding(horizontal = if (isZoomed) 0.dp else 16.dp)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offset.x
+                            translationY = offset.y
+                            
+                            // Luôn áp dụng bo góc, radius sẽ tự về 0 khi zoom nhờ animateDpAsState
+                            shape = RoundedCornerShape(imageCornerRadius)
+                            clip = true
+                        },
+                    contentScale = ContentScale.Fit
+                )
+            }
+
+            // Messenger Style Top Bar
+            AnimatedVisibility(
+                visible = isUiVisible && !isZoomed,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    ImageDownloader.downloadImage(context, url)
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = "Download",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                val sendIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, "Xem khoảnh khắc từ NewStart Journal: $url")
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, null))
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -744,8 +968,8 @@ fun SocialFeedItem(
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(24.dp))
                         .clickable { onImageClick(url) },
                     contentScale = ContentScale.Crop
                 )
