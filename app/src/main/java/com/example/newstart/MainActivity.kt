@@ -104,6 +104,7 @@ class MainActivity : AppCompatActivity() {
 
                 val editingHabit by mainViewModel.editingHabit.collectAsStateWithLifecycle()
                 val showJournalSheetState by mainViewModel.showJournalSheet.collectAsStateWithLifecycle()
+                val isUploading by mainViewModel.isUploading.collectAsStateWithLifecycle()
                 
                 LaunchedEffect(editingHabit) {
                     if (editingHabit != null) {
@@ -189,7 +190,16 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                var isJournalDirty by remember { mutableStateOf(false) }
+                
+                LaunchedEffect(showBottomSheet) {
+                    if (!showBottomSheet) isJournalDirty = false
+                }
+
+                val sheetState = rememberModalBottomSheetState(
+                    skipPartiallyExpanded = true,
+                    confirmValueChange = { !isUploading && !isJournalDirty }
+                )
 
                 if (authState != AuthState.Loading) {
                     Scaffold(
@@ -380,10 +390,12 @@ class MainActivity : AppCompatActivity() {
                             if (showBottomSheet) {
                                 ModalBottomSheet(
                                     onDismissRequest = { 
-                                        showBottomSheet = false
-                                        sheetContentType = SheetContent.None
-                                        mainViewModel.startEditingHabit(null)
-                                        mainViewModel.setShowJournalSheet(false)
+                                        if (!isUploading) {
+                                            showBottomSheet = false
+                                            sheetContentType = SheetContent.None
+                                            mainViewModel.startEditingHabit(null)
+                                            mainViewModel.setShowJournalSheet(false)
+                                        }
                                     },
                                     sheetState = sheetState,
                                     dragHandle = { BottomSheetDefaults.DragHandle() },
@@ -392,7 +404,8 @@ class MainActivity : AppCompatActivity() {
                                 ) {
                                     when (sheetContentType) {
                                         SheetContent.JournalEntry -> {
-                                            val isUploading by mainViewModel.isUploading.collectAsStateWithLifecycle()
+                                            val suggestedEmojis by mainViewModel.aiSuggestedEmojis.collectAsStateWithLifecycle()
+                                            val isSuggesting by mainViewModel.isSuggestingEmojis.collectAsStateWithLifecycle()
                                             JournalEntryPanel(
                                                 onDismiss = { 
                                                     showBottomSheet = false
@@ -404,7 +417,12 @@ class MainActivity : AppCompatActivity() {
                                                         mainViewModel.setShowJournalSheet(false)
                                                     }
                                                 },
-                                                isUploading = isUploading
+                                                isUploading = isUploading,
+                                                suggestedEmojis = suggestedEmojis,
+                                                isSuggesting = isSuggesting,
+                                                onTextChanged = { mainViewModel.getEmojiSuggestions(it) },
+                                                onCancelUpload = { mainViewModel.cancelUpload() },
+                                                onDirtyStateChanged = { isJournalDirty = it }
                                             )
                                         }
                                         SheetContent.HabitSelection -> {

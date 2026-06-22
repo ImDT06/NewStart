@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.newstart.domain.model.JournalEntry
 import com.example.newstart.domain.repository.JournalRepository
+import com.example.newstart.domain.usecase.SaveJournalEntryUseCase
 import com.example.newstart.domain.repository.SocialRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +25,8 @@ import javax.inject.Inject
 @HiltViewModel
 class JournalViewModel @Inject constructor(
     private val journalRepository: JournalRepository,
-    private val socialRepository: SocialRepository
+    private val socialRepository: SocialRepository,
+    private val saveJournalEntryUseCase: SaveJournalEntryUseCase
 ) : ViewModel() {
 
     private val _selectedDateRange = MutableStateFlow<Pair<LocalDate, LocalDate?>>(LocalDate.now() to null)
@@ -125,7 +127,7 @@ class JournalViewModel @Inject constructor(
     fun addEntry(emoji: String, text: String, imageUri: Uri?, imageSource: String? = null, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _isUploading.value = true
-            val result = journalRepository.saveJournalEntry(emoji, text, imageUri, imageSource)
+            val result = saveJournalEntryUseCase(emoji, text, imageUri, imageSource)
             _isUploading.value = false
             if (result.isSuccess) {
                 onSuccess()

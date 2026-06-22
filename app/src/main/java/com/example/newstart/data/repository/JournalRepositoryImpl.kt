@@ -20,6 +20,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import java.io.IOException
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -45,9 +49,7 @@ class JournalRepositoryImpl @Inject constructor(
 
             // Upload ảnh lên Cloudinary nếu có
             if (imageUri != null) {
-                imageUrl = withContext(Dispatchers.IO) {
-                    uploadToCloudinary(imageUri)
-                }
+                imageUrl = uploadToCloudinary(imageUri)
                 if (imageUrl == null) throw Exception("Failed to upload image to Cloudinary")
             }
 
@@ -68,6 +70,7 @@ class JournalRepositoryImpl @Inject constructor(
             android.util.Log.d("JournalRepository", "Entry saved successfully with ID: ${docRef.id}")
             Result.success(Unit)
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             android.util.Log.e("JournalRepository", "Error saving entry: ${e.message}", e)
             Result.failure(e)
         }
@@ -83,9 +86,9 @@ class JournalRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun uploadToCloudinary(uri: Uri): String? {
-        return try {
-            val bytes = compressImage(uri) ?: return null
+    private suspend fun uploadToCloudinary(uri: Uri): String? = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val bytes = compressImage(uri) ?: return@withContext null
             
             val requestBody = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
@@ -99,17 +102,34 @@ class JournalRepositoryImpl @Inject constructor(
                 .post(requestBody)
                 .build()
 
-            client.newCall(request).execute().use { response ->
-                val responseData = response.body?.string()
+            val call = client.newCall(request)
+            
+            val response = suspendCancellableCoroutine<Response> { continuation ->
+                continuation.invokeOnCancellation {
+                    call.cancel()
+                }
+                call.enqueue(object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        continuation.resumeWithException(e)
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        continuation.resume(response)
+                    }
+                })
+            }
+
+            response.use { resp ->
+                val responseData = resp.body?.string()
                 
-                if (response.isSuccessful && responseData != null) {
+                if (resp.isSuccessful && responseData != null) {
                     val jsonObject = JSONObject(responseData)
-                    return jsonObject.getString("secure_url")
+                    jsonObject.getString("secure_url")
                 } else {
                     val errorMsg = try {
                         JSONObject(responseData ?: "{}").getJSONObject("error").getString("message")
                     } catch (e: Exception) {
-                        "Mã lỗi ${response.code}"
+                        "Mã lỗi ${resp.code}"
                     }
                     
                     // Hiện lỗi trực tiếp lên màn hình để bạn dễ debug
@@ -122,6 +142,7 @@ class JournalRepositoryImpl @Inject constructor(
                 }
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             android.util.Log.e("Cloudinary", "Upload failed: ${e.message}", e)
             null
         }

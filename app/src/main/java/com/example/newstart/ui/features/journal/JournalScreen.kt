@@ -60,6 +60,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalView
 import android.view.WindowManager
 import android.graphics.Color as AndroidColor
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import coil.compose.AsyncImage
 import com.example.newstart.R
 import com.example.newstart.domain.model.JournalEntry
@@ -191,7 +193,8 @@ fun JournalContent(
                     .height(56.dp)
                     .padding(horizontal = 16.dp)
             ) {
-                val availableWidth = maxWidth
+                val constraintsScope = this
+                val availableWidth = constraintsScope.maxWidth
                 val searchIconSize = 44.dp
 
                 // Vị trí bắt đầu (bên phải, trước icon lịch) và kết thúc (bên trái)
@@ -949,7 +952,27 @@ fun SocialFeedItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }
-                Text(entry.emoji, fontSize = 24.sp)
+                
+                val moodIcon = remember(entry.emoji) {
+                    when (entry.emoji) {
+                        "😫" -> R.drawable.ic_mood_very_bad
+                        "😔" -> R.drawable.ic_mood_bad
+                        "😐" -> R.drawable.ic_mood_neutral
+                        "😊" -> R.drawable.ic_mood_good
+                        "🥰" -> R.drawable.ic_mood_very_good
+                        else -> null
+                    }
+                }
+                
+                if (moodIcon != null) {
+                    androidx.compose.foundation.Image(
+                        painter = painterResource(id = moodIcon),
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp)
+                    )
+                } else {
+                    Text(entry.emoji, fontSize = 24.sp)
+                }
             }
             
             if (entry.text.isNotEmpty()) {

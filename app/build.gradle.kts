@@ -98,6 +98,9 @@ dependencies {
     // Gemini AI
     implementation(libs.generativeai)
 
+    // Android Emoji Picker
+    implementation(libs.emoji2.emojipicker)
+
     // Glance Widgets
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)

@@ -12,7 +12,12 @@ import com.example.newstart.domain.repository.JournalRepository
 import com.example.newstart.domain.repository.UserRepository
 import com.example.newstart.ui.theme.AppThemeColor
 import com.example.newstart.ui.theme.ThemeMode
+import com.example.newstart.domain.usecase.SaveJournalEntryUseCase
+import com.example.newstart.domain.usecase.SuggestEmojiUseCase
+import com.example.newstart.domain.usecase.SaveHabitUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -31,7 +36,10 @@ class MainViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val habitRepository: HabitRepository,
     private val socialRepository: com.example.newstart.domain.repository.SocialRepository,
-    private val database: com.example.newstart.data.local.NewStartDatabase
+    private val database: com.example.newstart.data.local.NewStartDatabase,
+    private val saveJournalEntryUseCase: SaveJournalEntryUseCase,
+    private val suggestEmojiUseCase: SuggestEmojiUseCase,
+    private val saveHabitUseCase: SaveHabitUseCase
 ) : ViewModel() {
 
     private val _selectedHabitDate = MutableStateFlow(LocalDate.now())
@@ -57,6 +65,29 @@ class MainViewModel @Inject constructor(
 
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
+
+    private val _aiSuggestedEmojis = MutableStateFlow<List<String>>(emptyList())
+    val aiSuggestedEmojis: StateFlow<List<String>> = _aiSuggestedEmojis.asStateFlow()
+
+    private val _isSuggestingEmojis = MutableStateFlow(false)
+    val isSuggestingEmojis: StateFlow<Boolean> = _isSuggestingEmojis.asStateFlow()
+
+    private var suggestionJob: Job? = null
+
+    fun getEmojiSuggestions(text: String) {
+        if (text.isBlank()) {
+            _aiSuggestedEmojis.value = emptyList()
+            return
+        }
+        suggestionJob?.cancel()
+        suggestionJob = viewModelScope.launch {
+            delay(1000) // Debounce 1 giây
+            _isSuggestingEmojis.value = true
+            val emojis = suggestEmojiUseCase(text)
+            _aiSuggestedEmojis.value = emojis
+            _isSuggestingEmojis.value = false
+        }
+    }
 
     // Lấy thông tin user từ Firestore dựa trên ID của Auth
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -211,15 +242,26 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    private var uploadJob: Job? = null
+
     fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?, imageSource: String? = null, onSuccess: () -> Unit) {
-        viewModelScope.launch {
-            _isUploading.value = true
-            val result = journalRepository.saveJournalEntry(emoji, text, imageUri, imageSource)
-            _isUploading.value = false
-            if (result.isSuccess) {
-                onSuccess()
+        uploadJob?.cancel()
+        uploadJob = viewModelScope.launch {
+            try {
+                _isUploading.value = true
+                val result = saveJournalEntryUseCase(emoji, text, imageUri, imageSource)
+                if (result.isSuccess) {
+                    onSuccess()
+                }
+            } finally {
+                _isUploading.value = false
             }
         }
+    }
+
+    fun cancelUpload() {
+        uploadJob?.cancel()
+        _isUploading.value = false
     }
 
     fun saveHabit(
@@ -247,7 +289,7 @@ class MainViewModel @Inject constructor(
                 reminderMinutesBefore = reminderMinutesBefore,
                 squadId = squadId
             )
-            val result = habitRepository.saveHabit(newHabit)
+            val result = saveHabitUseCase(newHabit)
             if (result.isSuccess) {
                 onSuccess()
             } else {

@@ -42,6 +42,8 @@ kotlinx-serialization = "1.7.3"
 androidx-baselineprofile = "1.5.0-alpha06"
 androidx-uiautomator = "2.3.0"
 androidx-benchmark = "1.5.0-alpha06"
+emoji2-emojipicker = "1.6.0"
+
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -103,6 +105,8 @@ wheelPicker = { group = "com.github.commandiron", name = "WheelPickerCompose", v
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "security-crypto" }
 tink-android = { group = "com.google.crypto.tink", name = "tink-android", version.ref = "tink-android" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+emoji2-emojipicker = { group = "androidx.emoji2", name = "emoji2-emojipicker", version.ref = "emoji2-emojipicker" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
