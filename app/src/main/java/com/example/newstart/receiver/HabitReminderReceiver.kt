@@ -21,11 +21,23 @@ class HabitReminderReceiver : BroadcastReceiver() {
         
         Log.d("HabitReminderReceiver", "Nhận được tín hiệu báo thức cho: $habitName (isEarly: $isEarlyReminder)")
 
-        val title = if (isEarlyReminder) "Sắp đến giờ rồi!" else "Đã đến lúc!"
+        val quotes = listOf(
+            "Hành trình ngàn dặm bắt đầu từ một bước chân.",
+            "Kỷ luật là cầu nối giữa mục tiêu và thành tựu.",
+            "Đừng dừng lại cho đến khi bạn tự hào.",
+            "Thành công không phải là ngẫu nhiên, đó là sự lựa chọn.",
+            "Mỗi ngày là một cơ hội mới để trở nên tốt hơn.",
+            "Bí mật của sự thành công là bắt đầu.",
+            "Sự kiên trì chính là chìa khóa của mọi cánh cửa.",
+            "Hãy làm hôm nay để ngày mai bạn phải cảm ơn chính mình."
+        )
+        val randomQuote = quotes.random()
+
+        val title = if (isEarlyReminder) "Sắp đến giờ rồi! ✨" else "Đã đến lúc! 🚀"
         val message = if (isEarlyReminder) {
-            "Chỉ còn $minutesBefore phút nữa là đến giờ: $habitName"
+            "Chỉ còn $minutesBefore phút: $habitName. $randomQuote"
         } else {
-            "Đã đến lúc thực hiện thói quen: $habitName"
+            "Thực hiện ngay: $habitName. $randomQuote"
         }
 
         showNotification(context, title, message, habitId, isEarlyReminder)

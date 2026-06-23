@@ -19,6 +19,7 @@ data class HabitEntity(
     val date: String,
     val reminderTime: String?,
     val reminderMinutesBefore: Int,
+    val squadId: String?,
     val createdAt: Long,
     val lastUpdated: Long = System.currentTimeMillis(),
     val isSynced: Boolean = true
@@ -36,7 +37,8 @@ fun HabitEntity.toDomain() = Habit(
     isCompleted = isCompleted,
     date = date,
     reminderTime = reminderTime,
-    reminderMinutesBefore = reminderMinutesBefore
+    reminderMinutesBefore = reminderMinutesBefore,
+    squadId = squadId
 )
 
 fun Habit.toEntity(isSynced: Boolean = true) = HabitEntity(
@@ -52,6 +54,7 @@ fun Habit.toEntity(isSynced: Boolean = true) = HabitEntity(
     date = date,
     reminderTime = reminderTime,
     reminderMinutesBefore = reminderMinutesBefore,
+    squadId = squadId,
     createdAt = createdAt.time,
     isSynced = isSynced
 )
