@@ -47,7 +47,8 @@ import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.theme.authHeaderGradient
 import com.example.newstart.ui.util.AppCombinedPreviews
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.newstart.util.Resource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.newstart.ui.util.LanguagePickerDialog
 import com.example.newstart.ui.util.TransparentLanguageSwitcher
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
@@ -61,14 +62,31 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LoginViewModel = hiltViewModel(),
-    mainViewModel: MainViewModel = viewModel()
+    mainViewModel: MainViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val credentialManager = CredentialManager.create(context)
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    
     var showLanguagePicker by remember { mutableStateOf(false) }
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
     var resetEmail by remember { mutableStateOf("") }
+
+    // Xử lý kết quả Login (One-time Event)
+    LaunchedEffect(uiState.loginResult) {
+        when (val result = uiState.loginResult) {
+            is Resource.Success -> {
+                onLoginSuccess()
+                viewModel.clearLoginResult()
+            }
+            is Resource.Error -> {
+                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                viewModel.clearLoginResult()
+            }
+            else -> {}
+        }
+    }
 
     if (showForgotPasswordDialog) {
         AlertDialog(
@@ -115,23 +133,16 @@ fun LoginScreen(
     }
 
     LoginContent(
-        email = viewModel.email,
+        email = uiState.email,
         onEmailChange = viewModel::onEmailChange,
-        password = viewModel.password,
+        password = uiState.password,
         onPasswordChange = viewModel::onPasswordChange,
-        passwordVisible = viewModel.passwordVisible,
+        passwordVisible = uiState.passwordVisible,
         onPasswordVisibleChange = viewModel::togglePasswordVisibility,
-        emailError = viewModel.emailError,
-        passwordError = viewModel.passwordError,
-        isLoading = viewModel.isLoading,
-        onLoginClick = {
-            viewModel.login(
-                onSuccess = onLoginSuccess,
-                onError = { error ->
-                    Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-                }
-            )
-        },
+        emailError = uiState.emailError,
+        passwordError = uiState.passwordError,
+        isLoading = uiState.isLoading,
+        onLoginClick = viewModel::login,
         onGoogleLoginClick = {
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
@@ -149,13 +160,7 @@ fun LoginScreen(
                     
                     if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                         val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                        viewModel.loginWithGoogle(
-                            idToken = googleIdTokenCredential.idToken,
-                            onSuccess = onLoginSuccess,
-                            onError = { error ->
-                                Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-                            }
-                        )
+                        viewModel.loginWithGoogle(idToken = googleIdTokenCredential.idToken)
                     }
                 } catch (e: Exception) {
                     Log.e("LoginScreen", "Google login error", e)
@@ -164,7 +169,7 @@ fun LoginScreen(
             }
         },
         onForgotPasswordClick = {
-            resetEmail = viewModel.email
+            resetEmail = uiState.email
             showForgotPasswordDialog = true
         },
         onRegisterClick = onNavigateToRegister,
@@ -237,7 +242,7 @@ fun LoginContent(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -251,9 +256,21 @@ fun LoginContent(
                     LanguagePickerDialog(onDismiss = { onToggleLanguagePicker(false) })
                 }
 
-                HeaderTitle(
-                    title = stringResource(id = R.string.login_title)
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+                    verticalArrangement = Arrangement.Bottom
+                ) {
+                    Text(
+                        text = stringResource(id = R.string.login_title),
+                        color = Color.White,
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                }
             }
 
             // Form Section
@@ -516,24 +533,6 @@ fun AuthInputField(
                 modifier = Modifier.padding(start = 12.dp, top = 2.dp)
             )
         }
-    }
-}
-
-@Composable
-private fun HeaderTitle(title: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
-        verticalArrangement = Arrangement.Bottom
-    ) {
-        Text(
-            text = title,
-            color = MaterialTheme.colorScheme.onPrimary,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
-        )
     }
 }
 

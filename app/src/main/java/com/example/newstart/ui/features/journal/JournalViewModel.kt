@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.newstart.domain.model.JournalEntry
 import com.example.newstart.domain.repository.JournalRepository
+import com.example.newstart.domain.usecase.SaveJournalEntryUseCase
+import com.example.newstart.domain.repository.SocialRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,11 +24,16 @@ import javax.inject.Inject
 
 @HiltViewModel
 class JournalViewModel @Inject constructor(
-    private val journalRepository: JournalRepository
+    private val journalRepository: JournalRepository,
+    private val socialRepository: SocialRepository,
+    private val saveJournalEntryUseCase: SaveJournalEntryUseCase
 ) : ViewModel() {
 
     private val _selectedDateRange = MutableStateFlow<Pair<LocalDate, LocalDate?>>(LocalDate.now() to null)
     val selectedDateRange: StateFlow<Pair<LocalDate, LocalDate?>> = _selectedDateRange.asStateFlow()
+
+    private val _currentTab = MutableStateFlow(0) // 0: Cá nhân, 1: Cộng đồng
+    val currentTab: StateFlow<Int> = _currentTab.asStateFlow()
 
     val selectedDate: StateFlow<LocalDate> = _selectedDateRange.map { it.first }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LocalDate.now())
@@ -71,12 +78,23 @@ class JournalViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
+    val socialFeed: StateFlow<List<JournalEntry>> = socialRepository.getSocialFeed()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     fun onDateSelected(date: LocalDate) {
         _selectedDateRange.value = date to null
     }
 
     fun onDateRangeSelected(start: LocalDate, end: LocalDate?) {
         _selectedDateRange.value = start to end
+    }
+
+    fun onTabSelected(index: Int) {
+        _currentTab.value = index
     }
 
     fun setQuickFilter(filter: String) {
@@ -106,10 +124,10 @@ class JournalViewModel @Inject constructor(
         }
     }
 
-    fun addEntry(emoji: String, text: String, imageUri: Uri?, onSuccess: () -> Unit) {
+    fun addEntry(emoji: String, text: String, imageUri: Uri?, imageSource: String? = null, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _isUploading.value = true
-            val result = journalRepository.saveJournalEntry(emoji, text, imageUri)
+            val result = saveJournalEntryUseCase(emoji, text, imageUri, imageSource)
             _isUploading.value = false
             if (result.isSuccess) {
                 onSuccess()

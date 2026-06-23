@@ -19,6 +19,9 @@ import com.example.newstart.ui.features.home.HomeScreen
 import com.example.newstart.ui.features.settings.SettingsScreen
 import com.example.newstart.ui.features.journal.JournalScreen
 import com.example.newstart.ui.features.habits.HabitsScreen
+import com.example.newstart.ui.features.habits.StatisticsScreen
+import com.example.newstart.ui.features.social.SocialScreen
+import com.example.newstart.ui.features.pomodoro.PomodoroScreen
 import com.example.newstart.ui.screens.PlaceholderScreen
 
 import com.example.newstart.ui.MainViewModel
@@ -114,11 +117,39 @@ fun NavGraph(
         }
 
         composable(route = Screen.Habits.route) {
-            HabitsScreen(mainViewModel = mainViewModel)
+            HabitsScreen(
+                mainViewModel = mainViewModel,
+                navController = navController
+            )
+        }
+
+        composable(route = Screen.Statistics.route) {
+            StatisticsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
         }
 
         composable(route = Screen.Profile.route) {
-            SettingsScreen()
+            SettingsScreen(onNavigateToSocial = {
+                navController.navigate(Screen.Social.route)
+            })
+        }
+
+        composable(route = Screen.Social.route) {
+            SocialScreen(onNavigateBack = {
+                navController.popBackStack()
+            })
+        }
+
+        composable(route = Screen.Pomodoro.route) {
+            PomodoroScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                mainViewModel = mainViewModel
+            )
         }
 
         // Màn hình Detail

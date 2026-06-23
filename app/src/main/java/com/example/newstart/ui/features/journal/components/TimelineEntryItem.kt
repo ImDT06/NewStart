@@ -1,6 +1,7 @@
 package com.example.newstart.ui.features.journal.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,16 +11,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.newstart.R
 import com.example.newstart.domain.model.JournalEntry
 import com.example.newstart.ui.theme.LocalDarkTheme
 
@@ -28,10 +32,22 @@ fun TimelineEntryItem(
     entry: JournalEntry,
     timeFormatted: String,
     isLast: Boolean,
-    onImageClick: (String) -> Unit
+    onImageClick: (String) -> Unit,
+    onOptionsClick: () -> Unit
 ) {
     val timelineColor = MaterialTheme.colorScheme.primary
     val isDark = LocalDarkTheme.current
+    
+    val moodIcon = remember(entry.emoji) {
+        when (entry.emoji) {
+            "😫" -> R.drawable.ic_mood_very_bad
+            "😔" -> R.drawable.ic_mood_bad
+            "😐" -> R.drawable.ic_mood_neutral
+            "😊" -> R.drawable.ic_mood_good
+            "🥰" -> R.drawable.ic_mood_very_good
+            else -> null
+        }
+    }
 
     Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         // Timeline Column
@@ -57,7 +73,15 @@ fun TimelineEntryItem(
                     border = BorderStroke(1.dp, timelineColor.copy(alpha = 0.2f))
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text(text = entry.emoji, fontSize = 16.sp)
+                        if (moodIcon != null) {
+                            Image(
+                                painter = painterResource(id = moodIcon),
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        } else {
+                            Text(text = entry.emoji, fontSize = 16.sp)
+                        }
                     }
                 }
             }
@@ -68,11 +92,11 @@ fun TimelineEntryItem(
             modifier = Modifier.weight(1f).padding(start = 2.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isDark) MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp) 
-                                 else MaterialTheme.colorScheme.surface,
+                containerColor = if (isDark) MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp) 
+                                 else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 0.dp else 1.dp),
-            border = if (isDark) BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)) else null
+            elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 2.dp else 0.dp),
+            border = if (isDark) BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f)) else null
         ) {
             Column {
                 Column(modifier = Modifier.padding(12.dp)) {
@@ -83,7 +107,17 @@ fun TimelineEntryItem(
                             fontWeight = FontWeight.ExtraBold, 
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                         )
-                        Icon(Icons.Default.MoreHoriz, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                        IconButton(
+                            onClick = onOptionsClick,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreHoriz, 
+                                contentDescription = "Options", 
+                                modifier = Modifier.size(16.dp), 
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -101,8 +135,8 @@ fun TimelineEntryItem(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
-                            .heightIn(min = 160.dp, max = 300.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(24.dp))
                             .clickable { onImageClick(entry.imageUrl) },
                         contentScale = ContentScale.Crop
                     )

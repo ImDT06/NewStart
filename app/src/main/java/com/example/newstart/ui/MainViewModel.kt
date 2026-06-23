@@ -12,7 +12,12 @@ import com.example.newstart.domain.repository.JournalRepository
 import com.example.newstart.domain.repository.UserRepository
 import com.example.newstart.ui.theme.AppThemeColor
 import com.example.newstart.ui.theme.ThemeMode
+import com.example.newstart.domain.usecase.SaveJournalEntryUseCase
+import com.example.newstart.domain.usecase.SuggestEmojiUseCase
+import com.example.newstart.domain.usecase.SaveHabitUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -29,7 +34,12 @@ class MainViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val journalRepository: JournalRepository,
     private val userRepository: UserRepository,
-    private val habitRepository: HabitRepository
+    private val habitRepository: HabitRepository,
+    private val socialRepository: com.example.newstart.domain.repository.SocialRepository,
+    private val database: com.example.newstart.data.local.NewStartDatabase,
+    private val saveJournalEntryUseCase: SaveJournalEntryUseCase,
+    private val suggestEmojiUseCase: SuggestEmojiUseCase,
+    private val saveHabitUseCase: SaveHabitUseCase
 ) : ViewModel() {
 
     private val _selectedHabitDate = MutableStateFlow(LocalDate.now())
@@ -37,6 +47,9 @@ class MainViewModel @Inject constructor(
 
     private val _editingHabit = MutableStateFlow<Habit?>(null)
     val editingHabit: StateFlow<Habit?> = _editingHabit.asStateFlow()
+
+    private val _showJournalSheet = MutableStateFlow(false)
+    val showJournalSheet: StateFlow<Boolean> = _showJournalSheet.asStateFlow()
 
     fun onHabitDateSelected(date: LocalDate) {
         _selectedHabitDate.value = date
@@ -46,8 +59,35 @@ class MainViewModel @Inject constructor(
         _editingHabit.value = habit
     }
 
+    fun setShowJournalSheet(show: Boolean) {
+        _showJournalSheet.value = show
+    }
+
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
+
+    private val _aiSuggestedEmojis = MutableStateFlow<List<String>>(emptyList())
+    val aiSuggestedEmojis: StateFlow<List<String>> = _aiSuggestedEmojis.asStateFlow()
+
+    private val _isSuggestingEmojis = MutableStateFlow(false)
+    val isSuggestingEmojis: StateFlow<Boolean> = _isSuggestingEmojis.asStateFlow()
+
+    private var suggestionJob: Job? = null
+
+    fun getEmojiSuggestions(text: String) {
+        if (text.isBlank()) {
+            _aiSuggestedEmojis.value = emptyList()
+            return
+        }
+        suggestionJob?.cancel()
+        suggestionJob = viewModelScope.launch {
+            delay(1000) // Debounce 1 giây
+            _isSuggestingEmojis.value = true
+            val emojis = suggestEmojiUseCase(text)
+            _aiSuggestedEmojis.value = emojis
+            _isSuggestingEmojis.value = false
+        }
+    }
 
     // Lấy thông tin user từ Firestore dựa trên ID của Auth
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -83,7 +123,21 @@ class MainViewModel @Inject constructor(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = AppThemeColor.BLUE
+            initialValue = AppThemeColor.BLACK
+        )
+
+    val commonPomoTimes: StateFlow<List<Int>> = userPreferencesRepository.commonPomoTimesFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = listOf(25, 40, 60, 180)
+        )
+
+    val isJournalPromptEnabled: StateFlow<Boolean> = userPreferencesRepository.isJournalPromptEnabledFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
         )
 
     val avatarUri: StateFlow<Uri?> = currentUser
@@ -94,6 +148,13 @@ class MainViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = null
+        )
+
+    val squads: StateFlow<List<com.example.newstart.domain.model.Squad>> = socialRepository.getSquads()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
         )
 
     fun setThemeMode(mode: ThemeMode) {
@@ -108,6 +169,45 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun setJournalPromptEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setJournalPromptEnabled(enabled)
+        }
+    }
+
+    fun addCommonPomoTime(minutes: Int) {
+        viewModelScope.launch {
+            val currentTimes = commonPomoTimes.value.toMutableList()
+            if (!currentTimes.contains(minutes)) {
+                currentTimes.add(minutes)
+                userPreferencesRepository.setCommonPomoTimes(currentTimes.sorted())
+            }
+        }
+    }
+
+    fun removeCommonPomoTime(minutes: Int) {
+        viewModelScope.launch {
+            val currentTimes = commonPomoTimes.value.toMutableList()
+            if (currentTimes.contains(minutes)) {
+                currentTimes.remove(minutes)
+                userPreferencesRepository.setCommonPomoTimes(currentTimes.sorted())
+            }
+        }
+    }
+
+    fun updateCommonPomoTime(oldMinutes: Int, newMinutes: Int) {
+        viewModelScope.launch {
+            val currentTimes = commonPomoTimes.value.toMutableList()
+            if (currentTimes.contains(oldMinutes)) {
+                currentTimes.remove(oldMinutes)
+                if (!currentTimes.contains(newMinutes)) {
+                    currentTimes.add(newMinutes)
+                }
+                userPreferencesRepository.setCommonPomoTimes(currentTimes.sorted())
+            }
+        }
+    }
+
     fun setAvatarUri(uri: Uri?) {
         val userId = currentUser.value?.id ?: return
         if (uri == null) return
@@ -118,22 +218,50 @@ class MainViewModel @Inject constructor(
             _isUploading.value = false
         }
     }
+
+    fun updateProfileName(newName: String) {
+        val userId = currentUser.value?.id ?: return
+        viewModelScope.launch {
+            userRepository.updateProfile(userId, newName)
+        }
+    }
     
     fun logout() {
         viewModelScope.launch {
-            authRepository.logout()
+            try {
+                // 1. Clear database
+                database.clearAllTables()
+                
+                // 2. Clear Auth
+                authRepository.logout()
+                
+                // Lưu ý: Navigation được xử lý tự động trong MainActivity thông qua authState
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Lỗi khi logout: ${e.message}")
+            }
         }
     }
 
-    fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?, onSuccess: () -> Unit) {
-        viewModelScope.launch {
-            _isUploading.value = true
-            val result = journalRepository.saveJournalEntry(emoji, text, imageUri)
-            _isUploading.value = false
-            if (result.isSuccess) {
-                onSuccess()
+    private var uploadJob: Job? = null
+
+    fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?, imageSource: String? = null, onSuccess: () -> Unit) {
+        uploadJob?.cancel()
+        uploadJob = viewModelScope.launch {
+            try {
+                _isUploading.value = true
+                val result = saveJournalEntryUseCase(emoji, text, imageUri, imageSource)
+                if (result.isSuccess) {
+                    onSuccess()
+                }
+            } finally {
+                _isUploading.value = false
             }
         }
+    }
+
+    fun cancelUpload() {
+        uploadJob?.cancel()
+        _isUploading.value = false
     }
 
     fun saveHabit(
@@ -145,6 +273,7 @@ class MainViewModel @Inject constructor(
         reminderTime: String? = null,
         reminderMinutesBefore: Int = 0,
         date: LocalDate? = null,
+        squadId: String? = null,
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
@@ -157,9 +286,10 @@ class MainViewModel @Inject constructor(
                 colorHex = colorHex,
                 date = finalDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
                 reminderTime = reminderTime,
-                reminderMinutesBefore = reminderMinutesBefore
+                reminderMinutesBefore = reminderMinutesBefore,
+                squadId = squadId
             )
-            val result = habitRepository.saveHabit(newHabit)
+            val result = saveHabitUseCase(newHabit)
             if (result.isSuccess) {
                 onSuccess()
             } else {
@@ -168,4 +298,128 @@ class MainViewModel @Inject constructor(
             }
         }
     }
+
+    private val _timerSeconds = MutableStateFlow(25 * 60)
+    val timerSeconds: StateFlow<Int> = _timerSeconds.asStateFlow()
+
+    private val _isTimerRunning = MutableStateFlow(false)
+    val isTimerRunning: StateFlow<Boolean> = _isTimerRunning.asStateFlow()
+
+    private val _focusTime = MutableStateFlow(25)
+    val focusTime = _focusTime.asStateFlow()
+
+    private val _breakTime = MutableStateFlow(5)
+    val breakTime = _breakTime.asStateFlow()
+
+    private val _isFocusMode = MutableStateFlow(true)
+    val isFocusMode = _isFocusMode.asStateFlow()
+
+    private var timerJob: kotlinx.coroutines.Job? = null
+
+    fun setFocusTime(minutes: Int) {
+        _focusTime.value = minutes
+        if (!_isTimerRunning.value && _isFocusMode.value) {
+            _timerSeconds.value = minutes * 60
+        }
+    }
+
+    fun setBreakTime(minutes: Int) {
+        _breakTime.value = minutes
+        if (!_isTimerRunning.value && !_isFocusMode.value) {
+            _timerSeconds.value = minutes * 60
+        }
+    }
+
+    fun startTimer() {
+        if (_isTimerRunning.value) return
+        
+        if (_timerSeconds.value <= 0) {
+            _timerSeconds.value = (if (_isFocusMode.value) _focusTime.value else _breakTime.value) * 60
+        }
+        
+        _isTimerRunning.value = true
+        timerJob?.cancel()
+        timerJob = viewModelScope.launch {
+            try {
+                while (_timerSeconds.value > 0) {
+                    kotlinx.coroutines.delay(1000)
+                    _timerSeconds.value -= 1
+                }
+                onTimerFinished()
+            } catch (e: Exception) {
+                // Timer cancelled
+            }
+        }
+    }
+
+    fun pauseTimer() {
+        _isTimerRunning.value = false
+        timerJob?.cancel()
+    }
+
+    fun resetTimer() {
+        _isTimerRunning.value = false
+        timerJob?.cancel()
+        _timerSeconds.value = (if (_isFocusMode.value) _focusTime.value else _breakTime.value) * 60
+    }
+
+    private fun onTimerFinished() {
+        _isFocusMode.value = !_isFocusMode.value
+        resetTimer()
+    }
+
+    fun stopTimer() {
+        resetTimer()
+    }
+
+    // --- Thống kê người dùng (Real-time Stats) ---
+
+    val journalCount: StateFlow<Int> = journalRepository.getJournalEntries()
+        .map { it.size }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+
+    val habitStats: StateFlow<Pair<Int, Int>> = habitRepository.getAllHabits()
+        .map { habits ->
+            if (habits.isEmpty()) 0 to 0
+            else {
+                val total = habits.size
+                val completed = habits.count { it.isCompleted }
+                val percent = (completed.toFloat() / total * 100).toInt()
+                
+                // Tính toán chuỗi ngày (Streak)
+                val completedDates = habits.filter { it.isCompleted }
+                    .map { it.date }
+                    .distinct()
+                    .map { LocalDate.parse(it) }
+                    .sortedDescending()
+
+                var streak = 0
+                if (completedDates.isNotEmpty()) {
+                    var current = LocalDate.now()
+                    // Nếu hôm nay chưa hoàn thành gì, kiểm tra từ hôm qua
+                    if (!completedDates.contains(current)) {
+                        current = current.minusDays(1)
+                    }
+                    
+                    for (date in completedDates) {
+                        if (date == current) {
+                            streak++
+                            current = current.minusDays(1)
+                        } else if (date.isBefore(current)) {
+                            break
+                        }
+                    }
+                }
+                percent to streak
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0 to 0
+        )
 }

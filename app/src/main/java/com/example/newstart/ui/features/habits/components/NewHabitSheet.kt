@@ -41,8 +41,9 @@ data class HabitPreset(
 fun NewHabitSheet(
     initialDate: LocalDate,
     editingHabit: Habit? = null,
+    squads: List<com.example.newstart.domain.model.Squad> = emptyList(),
     onDismiss: () -> Unit,
-    onHabitSelected: (String, String, String?, Int, Color, LocalDate) -> Unit
+    onHabitSelected: (String, String, String?, Int, Color, LocalDate, String?) -> Unit
 ) {
     var selectedPreset by remember { mutableStateOf<HabitPreset?>(null) }
     var showConfigDialog by remember { mutableStateOf(false) }
@@ -55,7 +56,13 @@ fun NewHabitSheet(
                 Text(text = stringResource(R.string.habits_custom_dialog_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.size(48.dp))
             }
-            HabitConfigContent(initialDate = initialDate, habit = editingHabit, onConfirm = onHabitSelected, onCancel = onDismiss)
+            HabitConfigContent(
+                initialDate = initialDate, 
+                habit = editingHabit, 
+                squads = squads,
+                onConfirm = onHabitSelected, 
+                onCancel = onDismiss
+            )
         }
         return
     }
@@ -77,9 +84,10 @@ fun NewHabitSheet(
         HabitConfigDialog(
             initialDate = initialDate,
             preset = selectedPreset,
+            squads = squads,
             onDismiss = { showConfigDialog = false; selectedPreset = null },
-            onConfirm = { name, icon, time, mins, color, date ->
-                onHabitSelected(name, icon, time, mins, color, date)
+            onConfirm = { name, icon, time, mins, color, date, squadId ->
+                onHabitSelected(name, icon, time, mins, color, date, squadId)
                 showConfigDialog = false
                 selectedPreset = null
             }
@@ -121,7 +129,8 @@ fun HabitConfigContent(
     initialDate: LocalDate,
     preset: HabitPreset? = null,
     habit: Habit? = null,
-    onConfirm: (String, String, String?, Int, Color, LocalDate) -> Unit,
+    squads: List<com.example.newstart.domain.model.Squad> = emptyList(),
+    onConfirm: (String, String, String?, Int, Color, LocalDate, String?) -> Unit,
     onCancel: () -> Unit
 ) {
     var name by remember { mutableStateOf(habit?.name ?: preset?.name ?: "") }
@@ -131,6 +140,7 @@ fun HabitConfigContent(
     var selectedTime by remember { mutableStateOf(habit?.reminderTime ?: preset?.time) }
     var selectedDate by remember { mutableStateOf(if (habit != null) LocalDate.parse(habit.date) else initialDate) }
     var minsBefore by remember { mutableStateOf(habit?.reminderMinutesBefore ?: preset?.minsBefore ?: 0) }
+    var selectedSquadId by remember { mutableStateOf(habit?.squadId) }
 
     val timePickerState = rememberTimePickerState(
         initialHour = selectedTime?.split(":")?.get(0)?.toInt() ?: 0,
@@ -179,15 +189,51 @@ fun HabitConfigContent(
             }
         }
 
+        if (squads.isNotEmpty()) {
+            Text("Chia sẻ với nhóm (Squad)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item {
+                    FilterChip(
+                        selected = selectedSquadId == null,
+                        onClick = { selectedSquadId = null },
+                        label = { Text("Cá nhân", fontSize = 12.sp) }
+                    )
+                }
+                items(squads) { squad ->
+                    FilterChip(
+                        selected = selectedSquadId == squad.id,
+                        onClick = { selectedSquadId = squad.id },
+                        label = { Text(squad.name, fontSize = 12.sp) }
+                    )
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { if (name.isNotBlank() && selectedTime != null) onConfirm(name, icon, selectedTime, minsBefore, Color(0xFF1D1D1F), selectedDate) }, enabled = name.isNotBlank() && selectedTime != null, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) { Text(stringResource(R.string.habits_btn_create), fontWeight = FontWeight.Bold) }
+        Button(onClick = { if (name.isNotBlank() && selectedTime != null) onConfirm(name, icon, selectedTime, minsBefore, Color(0xFF1D1D1F), selectedDate, selectedSquadId) }, enabled = name.isNotBlank() && selectedTime != null, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) { Text(stringResource(R.string.habits_btn_create), fontWeight = FontWeight.Bold) }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HabitConfigDialog(initialDate: LocalDate, preset: HabitPreset? = null, onDismiss: () -> Unit, onConfirm: (String, String, String?, Int, Color, LocalDate) -> Unit) {
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(text = stringResource(R.string.habits_custom_dialog_title), color = MaterialTheme.colorScheme.onSurface) }, containerColor = MaterialTheme.colorScheme.surface, text = { HabitConfigContent(initialDate = initialDate, preset = preset, onConfirm = onConfirm, onCancel = onDismiss) }, confirmButton = {}, dismissButton = {})
+fun HabitConfigDialog(
+    initialDate: LocalDate, 
+    preset: HabitPreset? = null, 
+    squads: List<com.example.newstart.domain.model.Squad> = emptyList(),
+    onDismiss: () -> Unit, 
+    onConfirm: (String, String, String?, Int, Color, LocalDate, String?) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss, 
+        title = { Text(text = stringResource(R.string.habits_custom_dialog_title), color = MaterialTheme.colorScheme.onSurface) }, 
+        containerColor = MaterialTheme.colorScheme.surface, 
+        text = { HabitConfigContent(initialDate = initialDate, preset = preset, squads = squads, onConfirm = onConfirm, onCancel = onDismiss) }, 
+        confirmButton = {}, 
+        dismissButton = {}
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

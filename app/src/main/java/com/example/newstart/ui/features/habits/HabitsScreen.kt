@@ -9,8 +9,13 @@ import android.speech.SpeechRecognizer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,11 +31,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -40,9 +47,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import com.example.newstart.R
 import com.example.newstart.domain.model.Habit
 import com.example.newstart.ui.MainViewModel
+import com.example.newstart.ui.navigation.Screen
 import com.example.newstart.ui.components.MonthPickerDialog
 import com.example.newstart.ui.features.habits.components.HabitItem
 import kotlinx.coroutines.launch
@@ -52,23 +61,42 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HabitsScreen(
     mainViewModel: MainViewModel,
+    navController: NavController,
     modifier: Modifier = Modifier,
-    viewModel: HabitsViewModel = hiltViewModel()
+    viewModel: HabitsViewModel = hiltViewModel(),
 ) {
     val habits by viewModel.habits.collectAsStateWithLifecycle()
     val selectedDate by mainViewModel.selectedHabitDate.collectAsStateWithLifecycle()
     val aiState by viewModel.aiState.collectAsStateWithLifecycle()
+    val completedHabitForJournal by viewModel.completedHabitForJournal.collectAsStateWithLifecycle()
+    val isJournalPromptEnabled by mainViewModel.isJournalPromptEnabled.collectAsStateWithLifecycle()
     
     val scope = rememberCoroutineScope()
-    var habitToDelete by remember { mutableStateOf<Habit?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val haptic = LocalHapticFeedback.current
+    
     var showMonthPicker by remember { mutableStateOf(false) }
     var showAiDialog by remember { mutableStateOf(false) }
     var aiCommand by remember { mutableStateOf("") }
     val aiSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Celebration State
+    var showCelebration by remember { mutableStateOf(false) }
+    val totalCount = habits.size
+    val completedCount = habits.count { it.isCompleted }
+
+    LaunchedEffect(completedCount, totalCount) {
+        if (totalCount > 0 && (completedCount == totalCount)) {
+            showCelebration = true
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        } else {
+            showCelebration = false
+        }
+    }
 
     val context = LocalContext.current
     var isListening by remember { mutableStateOf(false) }
@@ -118,7 +146,6 @@ fun HabitsScreen(
         onDispose { speechRecognizer.destroy() }
     }
 
-    var aiButtonOffset by remember { mutableStateOf(Offset.Zero) }
     val today = LocalDate.now()
     val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500)
     val locale = context.resources.configuration.locales[0]
@@ -128,7 +155,19 @@ fun HabitsScreen(
         viewModel.onDateSelected(selectedDate)
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    LaunchedEffect(completedHabitForJournal, isJournalPromptEnabled) {
+        if (completedHabitForJournal != null && !isJournalPromptEnabled) {
+            viewModel.clearJournalPrompt()
+        }
+    }
+
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val maxWidth = constraints.maxWidth.toFloat()
+        val maxHeight = constraints.maxHeight.toFloat()
+        val density = LocalDensity.current
+        val buttonSizePx = with(density) { 56.dp.toPx() }
+        val paddingPx = with(density) { 16.dp.toPx() }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -140,12 +179,15 @@ fun HabitsScreen(
                 today = today,
                 isVietnamese = isVietnamese,
                 locale = locale,
+                navController = navController,
                 onTodayClick = {
                     mainViewModel.onHabitDateSelected(today)
                     scope.launch { pagerState.animateScrollToPage(500) }
                 },
                 onShowMonthPicker = { showMonthPicker = true }
             )
+            
+            HabitProgressDashboard(habits = habits)
 
             HorizontalDatePicker(
                 pagerState = pagerState,
@@ -155,19 +197,39 @@ fun HabitsScreen(
                 locale = locale,
                 onDateClick = { mainViewModel.onHabitDateSelected(it) }
             )
+            
+            Spacer(modifier = Modifier.height(8.dp))
 
             HabitList(
                 habits = habits,
-                onDeleteRequest = { habitToDelete = it },
+                onDelete = { habit ->
+                    scope.launch {
+                        viewModel.deleteHabit(habit.id)
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Đã xóa ${habit.name}",
+                            actionLabel = "Hoàn tác",
+                            duration = SnackbarDuration.Short
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            viewModel.restoreHabit(habit)
+                        }
+                    }
+                },
                 onToggle = { h, c -> viewModel.toggleHabit(h, c) },
                 onEdit = { mainViewModel.startEditingHabit(it) }
             )
         }
 
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 90.dp)
+        )
+
         AiFloatingButton(
-            modifier = Modifier.align(Alignment.BottomEnd),
-            offset = aiButtonOffset,
-            onOffsetChange = { aiButtonOffset = it },
+            maxWidth = maxWidth,
+            maxHeight = maxHeight,
+            buttonSizePx = buttonSizePx,
+            paddingPx = paddingPx,
             onClick = { showAiDialog = true }
         )
 
@@ -202,17 +264,6 @@ fun HabitsScreen(
             )
         }
 
-        if (habitToDelete != null) {
-            DeleteHabitDialog(
-                habit = habitToDelete!!,
-                onDismiss = { habitToDelete = null },
-                onConfirm = {
-                    viewModel.deleteHabit(habitToDelete!!.id)
-                    habitToDelete = null
-                }
-            )
-        }
-
         if (showMonthPicker) {
             MonthPickerDialog(
                 selectedDate = selectedDate,
@@ -225,6 +276,193 @@ fun HabitsScreen(
                 onDismiss = { showMonthPicker = false }
             )
         }
+
+        val currentHabit = completedHabitForJournal
+        if (isJournalPromptEnabled && currentHabit != null) {
+            JournalPromptDialog(
+                habitName = currentHabit.name,
+                onDismiss = { viewModel.clearJournalPrompt() },
+                onConfirm = {
+                    viewModel.clearJournalPrompt()
+                    mainViewModel.setShowJournalSheet(true)
+                    navController.navigate(Screen.Journal.route) {
+                        popUpTo(Screen.Home.route) { 
+                            saveState = true 
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            )
+        }
+
+        // Celebration Overlay
+        AnimatedVisibility(
+            visible = showCelebration,
+            enter = fadeIn() + scaleIn(initialScale = 0.8f),
+            exit = fadeOut() + scaleOut(targetScale = 0.8f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f))
+                    .clickable { showCelebration = false },
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    shape = RoundedCornerShape(32.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+                    modifier = Modifier.padding(32.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(text = "🎉", fontSize = 64.sp)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Thật xuất sắc!",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = "Bạn đã hoàn thành tất cả thói quen của ngày hôm nay.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = { showCelebration = false },
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text("Tiếp tục duy trì!")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HabitProgressDashboard(habits: List<Habit>) {
+    val completedCount = habits.count { it.isCompleted }
+    val totalCount = habits.size
+    val progress = if (totalCount > 0) completedCount.toFloat() / totalCount else 0f
+    val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
+
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(60.dp)) {
+                    CircularProgressIndicator(
+                        progress = { 1f },
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        strokeWidth = 6.dp,
+                        strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                    CircularProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 6.dp,
+                        strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                    Text(
+                        text = "${(progress * 100).toInt()}%",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column {
+                    Text(
+                        text = when {
+                            totalCount == 0 -> "Bắt đầu ngày mới!"
+                            progress == 1f -> "Hoàn hảo! 🏆"
+                            progress > 0.5f -> "Sắp xong rồi!"
+                            else -> "Tiến độ hôm nay"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = if (totalCount == 0) "Thêm thói quen để bắt đầu"
+                        else if (progress == 1f) "Bạn đã hoàn thành tất cả!"
+                        else "Cố lên, còn ${totalCount - completedCount} mục tiêu nữa",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        if (totalCount > 0) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                val longestStreak = habits.maxOfOrNull { it.streak } ?: 0
+                QuickStatItem(
+                    label = "Chuỗi cao nhất",
+                    value = "$longestStreak ngày",
+                    icon = Icons.Default.Whatshot,
+                    color = Color(0xFFFFA500),
+                    modifier = Modifier.weight(1f)
+                )
+                QuickStatItem(
+                    label = "Đã hoàn thành",
+                    value = "$completedCount/$totalCount",
+                    icon = Icons.Default.CheckCircle,
+                    color = Color(0xFF00C851),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickStatItem(
+    label: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text(text = value, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                Text(text = label, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 
@@ -234,18 +472,19 @@ private fun HabitsHeader(
     today: LocalDate,
     isVietnamese: Boolean,
     locale: java.util.Locale,
+    navController: NavController,
     onTodayClick: () -> Unit,
-    onShowMonthPicker: () -> Unit
+    onShowMonthPicker: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(color = MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(12.dp)) {
-            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(text = stringResource(R.string.habits_filter_all), color = MaterialTheme.colorScheme.onPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(12.dp))
+        Surface(color = MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(10.dp)) {
+            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(text = stringResource(R.string.habits_filter_all), color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(10.dp))
             }
         }
 
@@ -257,13 +496,17 @@ private fun HabitsHeader(
         Text(
             text = headerDateText ?: stringResource(R.string.habits_today),
             color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 16.sp,
+            fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onTodayClick() }.padding(horizontal = 8.dp, vertical = 4.dp)
         )
 
         IconButton(onClick = onShowMonthPicker) {
-            Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+        }
+
+        IconButton(onClick = { navController.navigate(Screen.Statistics.route) }) {
+            Icon(Icons.Default.AutoGraph, null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -278,13 +521,13 @@ private fun HorizontalDatePicker(
     locale: java.util.Locale,
     onDateClick: (LocalDate) -> Unit
 ) {
-    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) { page ->
+    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) { page ->
         val weekStart = remember(page) {
             today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks((page - 500).toLong())
         }
         val weekDays = remember(weekStart) { (0..6).map { weekStart.plusDays(it.toLong()) } }
 
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             weekDays.forEach { day ->
                 val isSelected = day == selectedDate
                 val isToday = day == today
@@ -303,16 +546,16 @@ private fun HorizontalDatePicker(
                 }
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f).clickable { onDateClick(day) }) {
-                    Text(text = dayName, color = if (isSelected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
+                    Text(text = dayName, color = if (isSelected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
                     Surface(
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(32.dp),
                         shape = CircleShape,
                         color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        border = if (!isSelected && isToday) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+                        border = if (!isSelected && isToday) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(text = day.dayOfMonth.toString(), color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal)
+                            Text(text = day.dayOfMonth.toString(), color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground, fontSize = 13.sp, fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal)
                         }
                     }
                 }
@@ -324,83 +567,220 @@ private fun HorizontalDatePicker(
 @Composable
 private fun HabitList(
     habits: List<Habit>,
-    onDeleteRequest: (Habit) -> Unit,
+    onDelete: (Habit) -> Unit,
     onToggle: (Habit, Boolean) -> Unit,
     onEdit: (Habit) -> Unit
 ) {
     if (habits.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(stringResource(R.string.habits_empty), color = Color.Gray, fontSize = 14.sp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ListAlt,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.outlineVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.habits_empty),
+                    color = MaterialTheme.colorScheme.outline,
+                    fontSize = 14.sp
+                )
+            }
         }
     } else {
+        val groupedHabits = remember(habits) {
+            val morning = mutableListOf<Habit>()
+            val afternoon = mutableListOf<Habit>()
+            val evening = mutableListOf<Habit>()
+            val other = mutableListOf<Habit>()
+
+            habits.forEach { habit ->
+                val time = habit.reminderTime
+                if (time == null) {
+                    other.add(habit)
+                } else {
+                    val hour = time.split(":").firstOrNull()?.toIntOrNull() ?: -1
+                    when (hour) {
+                        in 0..11 -> morning.add(habit)
+                        in 12..17 -> afternoon.add(habit)
+                        in 18..23 -> evening.add(habit)
+                        else -> other.add(habit)
+                    }
+                }
+            }
+            listOf(
+                "Buổi sáng" to morning,
+                "Buổi chiều" to afternoon,
+                "Buổi tối" to evening,
+                "Khác" to other
+            ).filter { it.second.isNotEmpty() }
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(items = habits, key = { it.id }) { habit ->
-                HabitSwipeableItem(habit = habit, onDeleteRequest = onDeleteRequest, onToggle = onToggle, onEdit = onEdit)
+            groupedHabits.forEach { (title, habitsInGroup) ->
+                item {
+                    Text(
+                        text = title.uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 8.dp, top = 8.dp)
+                    )
+                }
+                items(items = habitsInGroup, key = { it.id }) { habit ->
+                    HabitSwipeableItem(
+                        modifier = Modifier.animateItem(),
+                        habit = habit,
+                        onDelete = { onDelete(habit) },
+                        onToggle = onToggle,
+                        onEdit = onEdit
+                    )
+                }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HabitSwipeableItem(
+    modifier: Modifier = Modifier,
     habit: Habit,
-    onDeleteRequest: (Habit) -> Unit,
+    onDelete: () -> Unit,
     onToggle: (Habit, Boolean) -> Unit,
     onEdit: (Habit) -> Unit
 ) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = {
-            if (it == SwipeToDismissBoxValue.EndToStart) {
-                onDeleteRequest(habit)
-                false
-            } else false
-        }
-    )
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val anchorWidth = with(density) { 80.dp.toPx() }
+    val dismissThreshold = with(density) { 180.dp.toPx() }
+    
+    val offsetX = remember { Animatable(0f) }
 
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = false,
-        backgroundContent = {
-            val isSwiping = dismissState.targetValue != SwipeToDismissBoxValue.Settled
-            val backgroundColor = if (isSwiping && dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Color.Red.copy(alpha = 0.8f) else Color.Transparent
-            Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(backgroundColor), contentAlignment = Alignment.CenterEnd) {
-                if (isSwiping && dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
-                    Icon(Icons.Default.Delete, null, tint = Color.White, modifier = Modifier.padding(end = 16.dp))
-                }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFFFF4444))
+                .clickable { 
+                    scope.launch {
+                        offsetX.animateTo(-1500f, spring(stiffness = Spring.StiffnessMedium))
+                        onDelete()
+                    }
+                },
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            Box(
+                modifier = Modifier.width(80.dp).fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
             }
-        },
-        content = {
-            HabitItem(habit = habit, onToggle = { onToggle(habit, !habit.isCompleted) }, onEdit = { onEdit(habit) })
         }
-    )
+
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .fillMaxWidth()
+                .pointerInput(habit.id) {
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { change, dragAmount ->
+                            val newOffset = (offsetX.value + dragAmount).coerceAtMost(0f)
+                            scope.launch { offsetX.snapTo(newOffset) }
+                            change.consume()
+                        },
+                        onDragEnd = {
+                            scope.launch {
+                                if (offsetX.value < -dismissThreshold) {
+                                    offsetX.animateTo(-1500f, spring(stiffness = Spring.StiffnessMedium))
+                                    onDelete()
+                                } else if (offsetX.value < -anchorWidth / 2) {
+                                    offsetX.animateTo(-anchorWidth, spring(dampingRatio = Spring.DampingRatioNoBouncy))
+                                } else {
+                                    offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy))
+                                }
+                            }
+                        }
+                    )
+                }
+        ) {
+            HabitItem(
+                habit = habit, 
+                onToggle = { onToggle(habit, !habit.isCompleted) }, 
+                onEdit = { onEdit(habit) }
+            )
+        }
+    }
 }
 
 @Composable
 private fun AiFloatingButton(
-    modifier: Modifier = Modifier,
-    offset: Offset,
-    onOffsetChange: (Offset) -> Unit,
+    maxWidth: Float,
+    maxHeight: Float,
+    buttonSizePx: Float,
+    paddingPx: Float,
     onClick: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+
+    val density = LocalDensity.current
+    val navBarHeightPx = with(density) { 80.dp.toPx() } // Tăng lên để tránh đè lên Navbar
+    
+    val offsetX = remember(maxWidth) { Animatable(maxWidth - buttonSizePx - paddingPx) }
+    val offsetY = remember(maxHeight) { Animatable(maxHeight - buttonSizePx - paddingPx - navBarHeightPx) }
+
     Surface(
+        modifier = Modifier
+            .size(56.dp) // Đồng bộ với buttonSizePx (56.dp)
+            .offset { IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt()) }
+            .pointerInput(maxWidth, maxHeight) {
+                detectDragGestures(
+                    onDragEnd = {
+                        val centerX = offsetX.value + buttonSizePx / 2
+                        val targetX = if (centerX < maxWidth / 2) paddingPx else maxWidth - buttonSizePx - paddingPx
+                        scope.launch {
+                            offsetX.animateTo(targetX, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow))
+                        }
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        scope.launch {
+                            val newX = (offsetX.value + dragAmount.x).coerceIn(paddingPx, maxWidth - buttonSizePx - paddingPx)
+                            val newY = (offsetY.value + dragAmount.y).coerceIn(paddingPx, maxHeight - buttonSizePx - paddingPx - navBarHeightPx)
+                            offsetX.snapTo(newX)
+                            offsetY.snapTo(newY)
+                        }
+                    }
+                )
+            },
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp,
-        modifier = modifier
-            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
-            .pointerInput(Unit) { detectDragGestures { change, dragAmount -> change.consume(); onOffsetChange(offset + dragAmount) } }
-            .padding(end = 20.dp, bottom = 100.dp)
-            .size(56.dp)
-            .border(2.dp, Brush.linearGradient(listOf(Color(0xFF4285F4), Color(0xFF9B72CB))), CircleShape),
+        tonalElevation = 2.dp,
+        shadowElevation = 6.dp,
+        border = BorderStroke(0.5.dp, Brush.linearGradient(listOf(Color(0xFF007AFF).copy(alpha = 0.5f), Color(0xFF00C851).copy(alpha = 0.5f)))),
         onClick = onClick
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.AutoAwesome, "AI Assistant", modifier = Modifier.size(28.dp), tint = Color(0xFF9B72CB))
+            Icon(
+                imageVector = Icons.Default.AutoAwesome, 
+                contentDescription = "AI Assistant", 
+                modifier = Modifier.size(24.dp), 
+                tint = Color(0xFF007AFF)
+            )
         }
     }
 }
@@ -419,7 +799,10 @@ private fun AiInteractionSheet(
     isListening: Boolean,
     onToggleListening: () -> Unit
 ) {
-    val aiGradient = Brush.linearGradient(listOf(Color(0xFF4285F4), Color(0xFF9B72CB)))
+    val aiGradient = Brush.linearGradient(
+        colors = listOf(Color(0xFF007AFF), Color(0xFF007AFF), Color(0xFF00C851))
+    )
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = aiSheetState,
@@ -438,7 +821,13 @@ private fun AiInteractionSheet(
 
 @Composable
 private fun AiDraftingView(habits: List<Habit>, onConfirm: (List<Habit>) -> Unit, onCancel: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 24.dp, end = 24.dp, bottom = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Text("Xác nhận thói quen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Text("AI đã đề xuất ${habits.size} mục mới cho bạn", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
@@ -479,7 +868,7 @@ private fun AiInputView(
 ) {
     Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(start = 24.dp, end = 24.dp, bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.AutoAwesome, null, tint = Color(0xFF9B72CB), modifier = Modifier.size(24.dp))
+            Icon(Icons.Default.AutoAwesome, null, tint = Color(0xFF007AFF), modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
             Text("NewStart AI", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold, brush = gradient))
         }
@@ -492,33 +881,62 @@ private fun AiInputView(
             modifier = Modifier.fillMaxWidth().border(width = 1.dp, brush = if (command.isNotBlank() || isListening) gradient else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)), shape = RoundedCornerShape(16.dp)),
             shape = RoundedCornerShape(16.dp),
             leadingIcon = {
-                IconButton(onClick = onToggleListening) {
-                    Icon(imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicNone, contentDescription = "Voice", tint = if (isListening) Color.Red else Color(0xFF9B72CB))
+                IconButton(onClick = { onToggleListening() }) {
+                    Icon(imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicNone, contentDescription = "Voice", tint = if (isListening) Color.Red else Color(0xFF007AFF))
                 }
             },
             trailingIcon = {
                 IconButton(onClick = { if (command.isNotBlank()) onSend(command) }, enabled = command.isNotBlank() && state !is AiState.Loading) {
-                    Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = if (command.isNotBlank()) Color(0xFF9B72CB) else Color.Gray)
+                    Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = if (command.isNotBlank()) Color(0xFF007AFF) else Color.Gray)
                 }
             }
         )
-        if (state is AiState.Loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(2.dp).clip(CircleShape), color = Color(0xFF9B72CB))
+        if (state is AiState.Loading) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+                    .height(2.dp)
+                    .clip(CircleShape), 
+                color = Color(0xFF007AFF)
+            )
+        }
+        
+        if (state is AiState.Error) {
+            Text(
+                text = state.message,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        if (state is AiState.Success) {
+            Text(
+                text = state.message,
+                color = Color(0xFF00C851),
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
     }
 }
 
 @Composable
-private fun DeleteHabitDialog(habit: Habit, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+private fun JournalPromptDialog(habitName: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.habits_delete_title)) },
-        text = { Text(stringResource(R.string.habits_delete_msg, habit.name)) },
+        title = { Text("Tuyệt vời!") },
+        text = { Text("Bạn vừa hoàn thành '$habitName'. Bạn có muốn lưu lại khoảnh khắc này vào nhật ký không?") },
         confirmButton = {
-            TextButton(onClick = onConfirm, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-                Text(stringResource(R.string.habits_delete_confirm))
+            Button(onClick = onConfirm) {
+                Text("Viết nhật ký ngay")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.habits_cancel)) }
+            TextButton(onClick = onDismiss) {
+                Text("Để sau")
+            }
         }
     )
 }

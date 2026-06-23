@@ -109,14 +109,14 @@ fun WelcomeContent(
 
                 Text(
                     text = stringResource(id = R.string.welcome_simple),
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Color.White,
                     fontSize = 54.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 1.sp
                 )
                 Text(
                     text = stringResource(id = R.string.welcome_edu),
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Color.White,
                     fontSize = 54.sp,
                     fontWeight = FontWeight.ExtraBold,
                     modifier = Modifier.offset(y = (-15).dp),
