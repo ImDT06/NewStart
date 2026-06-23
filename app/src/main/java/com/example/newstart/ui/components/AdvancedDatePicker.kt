@@ -36,6 +36,7 @@ import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.*
 import kotlinx.coroutines.launch
+import androidx.compose.animation.core.animateDpAsState
 
 enum class PickerViewMode { Day, Month, Year }
 
@@ -55,7 +56,7 @@ fun AdvancedDatePickerDialog(
     val initialPage = 500
     val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = initialPage)
     val scope = rememberCoroutineScope()
-    
+
     val displayMonth by remember {
         derivedStateOf {
             val monthDiff = pagerState.currentPage - initialPage
@@ -67,17 +68,29 @@ fun AdvancedDatePickerDialog(
     val locale = context.resources.configuration.locales[0]
     val isVietnamese = locale.language == "vi"
 
+    val dialogRadius by animateDpAsState(
+        targetValue = 28.dp, label = "dialogRadius"
+    )
+
+
     Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+
+
         Surface(
+
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .wrapContentHeight()
-                .clip(RoundedCornerShape(24.dp)),
+                .clip(
+                    RoundedCornerShape(dialogRadius)
+                ),
+
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp
+
+            tonalElevation = 12.dp
+
         ) {
             Column(
                 modifier = Modifier.padding(16.dp)
@@ -87,11 +100,16 @@ fun AdvancedDatePickerDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
-                        onClick = { viewMode = if (viewMode == PickerViewMode.Month) PickerViewMode.Day else PickerViewMode.Month },
-                        shape = RoundedCornerShape(8.dp)
+                        onClick = {
+                            viewMode =
+                                if (viewMode == PickerViewMode.Month) PickerViewMode.Day else PickerViewMode.Month
+                        }, shape = RoundedCornerShape(8.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            val monthLabel = if (isVietnamese) "Tháng ${displayMonth.monthValue}" else displayMonth.month.getDisplayName(TextStyle.FULL, locale)
+                            val monthLabel =
+                                if (isVietnamese) "Tháng ${displayMonth.monthValue}" else displayMonth.month.getDisplayName(
+                                    TextStyle.FULL, locale
+                                )
                             Text(
                                 text = monthLabel,
                                 style = MaterialTheme.typography.titleMedium,
@@ -109,8 +127,10 @@ fun AdvancedDatePickerDialog(
                     Spacer(modifier = Modifier.width(8.dp))
 
                     TextButton(
-                        onClick = { viewMode = if (viewMode == PickerViewMode.Year) PickerViewMode.Day else PickerViewMode.Year },
-                        shape = RoundedCornerShape(8.dp)
+                        onClick = {
+                            viewMode =
+                                if (viewMode == PickerViewMode.Year) PickerViewMode.Day else PickerViewMode.Year
+                        }, shape = RoundedCornerShape(8.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
@@ -130,12 +150,12 @@ fun AdvancedDatePickerDialog(
                     Spacer(modifier = Modifier.weight(1f))
 
                     if (viewMode == PickerViewMode.Day) {
-                        IconButton(onClick = { 
+                        IconButton(onClick = {
                             scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
                         }) {
                             Icon(Icons.Default.ChevronLeft, null)
                         }
-                        IconButton(onClick = { 
+                        IconButton(onClick = {
                             scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                         }) {
                             Icon(Icons.Default.ChevronRight, null)
@@ -150,12 +170,12 @@ fun AdvancedDatePickerDialog(
                         .fillMaxWidth()
                         .padding(bottom = 2.dp)
                 ) {
-                    val weekLabels = if (isVietnamese) listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
-                    else listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
+                    val weekLabels =
+                        if (isVietnamese) listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
+                        else listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
                     weekLabels.forEach { label ->
                         Box(
-                            modifier = Modifier.weight(1f),
-                            contentAlignment = Alignment.Center
+                            modifier = Modifier.weight(1f), contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = label,
@@ -170,20 +190,23 @@ fun AdvancedDatePickerDialog(
 
                 Box(modifier = Modifier.height(240.dp)) {
                     AnimatedContent(
-                        targetState = viewMode,
-                        transitionSpec = {
-                            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-                        },
-                        label = "pickerViewMode"
+                        targetState = viewMode, transitionSpec = {
+                            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(
+                                animationSpec = tween(
+                                    300
+                                )
+                            )
+                        }, label = "pickerViewMode"
                     ) { targetMode ->
                         when (targetMode) {
                             PickerViewMode.Day -> {
                                 HorizontalPager(
                                     state = pagerState,
                                     modifier = Modifier.fillMaxSize(),
-                                    pageSpacing = 16.dp 
+                                    pageSpacing = 16.dp
                                 ) { page ->
-                                    val pageMonth = YearMonth.from(initialStartDate).plusMonths((page - initialPage).toLong())
+                                    val pageMonth = YearMonth.from(initialStartDate)
+                                        .plusMonths((page - initialPage).toLong())
                                     DayPickerGrid(
                                         displayMonth = pageMonth,
                                         startDate = selectedStartDate,
@@ -202,52 +225,63 @@ fun AdvancedDatePickerDialog(
                                                     selectedEndDate = date
                                                 }
                                             }
-                                        }
-                                    )
+                                        })
                                 }
                             }
+
                             PickerViewMode.Month -> {
                                 MonthPickerGrid(
-                                    selectedMonth = displayMonth.monthValue,
-                                    onMonthClick = { m ->
+                                    selectedMonth = displayMonth.monthValue, onMonthClick = { m ->
                                         scope.launch {
                                             val targetMonth = YearMonth.of(displayMonth.year, m)
-                                            val monthDiff = (targetMonth.year - initialStartDate.year) * 12 + (targetMonth.monthValue - initialStartDate.monthValue)
+                                            val monthDiff =
+                                                (targetMonth.year - initialStartDate.year) * 12 + (targetMonth.monthValue - initialStartDate.monthValue)
                                             pagerState.scrollToPage(initialPage + monthDiff)
                                             viewMode = PickerViewMode.Day
                                         }
-                                    }
-                                )
+                                    })
                             }
+
                             PickerViewMode.Year -> {
                                 YearPickerGrid(
-                                    selectedYear = displayMonth.year,
-                                    onYearClick = { y ->
+                                    selectedYear = displayMonth.year, onYearClick = { y ->
                                         scope.launch {
-                                            val targetMonth = YearMonth.of(y, displayMonth.monthValue)
-                                            val monthDiff = (targetMonth.year - initialStartDate.year) * 12 + (targetMonth.monthValue - initialStartDate.monthValue)
+                                            val targetMonth =
+                                                YearMonth.of(y, displayMonth.monthValue)
+                                            val monthDiff =
+                                                (targetMonth.year - initialStartDate.year) * 12 + (targetMonth.monthValue - initialStartDate.monthValue)
                                             pagerState.scrollToPage(initialPage + monthDiff)
                                             viewMode = PickerViewMode.Day
                                         }
-                                    }
-                                )
+                                    })
                             }
                         }
                     }
                 }
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text(if (isVietnamese) "HUỶ" else "CANCEL", fontWeight = FontWeight.Bold)
+                    OutlinedButton(
+                        onClick = onDismiss, shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            if (isVietnamese) "HUỶ"
+                            else "CANCEL", fontWeight = FontWeight.Bold
+                        )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
-                    TextButton(
-                        onClick = { onDateRangeSelected(selectedStartDate, selectedEndDate) }
+                    Button(
+                        onClick = {
+                            onDateRangeSelected(
+                                selectedStartDate, selectedEndDate
+                            )
+                        }, shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text(if (isVietnamese) "XÁC NHẬN" else "CONFIRM", fontWeight = FontWeight.Bold)
+                        Text(
+                            if (isVietnamese) "XÁC NHẬN" else "CONFIRM",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -264,13 +298,13 @@ fun DayPickerGrid(
 ) {
     val today = remember { LocalDate.now() }
     val daysInMonth = remember(displayMonth) { displayMonth.lengthOfMonth() }
-    val offset = remember(displayMonth) { 
+    val offset = remember(displayMonth) {
         val firstDay = displayMonth.atDay(1).dayOfWeek.value
         // Adjust for Monday as first day of week (value 1)
-        firstDay - 1 
+        firstDay - 1
     }
     val rangeColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-    
+
     Column(modifier = Modifier.fillMaxSize()) {
         repeat(6) { row ->
             Row(
@@ -282,7 +316,7 @@ fun DayPickerGrid(
                 repeat(7) { col ->
                     val cellIndex = row * 7 + col
                     val dayNum = cellIndex - offset + 1
-                    
+
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -292,13 +326,16 @@ fun DayPickerGrid(
                                     val date = displayMonth.atDay(dayNum)
                                     val isStart = date == startDate
                                     val isEnd = date == endDate
-                                    val isInRange = endDate != null && date.isAfter(startDate) && date.isBefore(endDate)
+                                    val isInRange =
+                                        endDate != null && date.isAfter(startDate) && date.isBefore(
+                                            endDate
+                                        )
 
                                     if (isInRange || (isStart && endDate != null) || isEnd) {
                                         val verticalPadding = 6.dp.toPx()
                                         val rectHeight = size.height - (verticalPadding * 2)
                                         val cornerRadius = rectHeight / 2
-                                        
+
                                         when {
                                             isInRange -> {
                                                 drawRect(
@@ -307,25 +344,31 @@ fun DayPickerGrid(
                                                     size = Size(size.width, rectHeight)
                                                 )
                                             }
+
                                             isStart -> {
                                                 drawRoundRect(
                                                     color = rangeColor,
                                                     topLeft = Offset(0f, verticalPadding),
                                                     size = Size(size.width, rectHeight),
-                                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius)
+                                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(
+                                                        cornerRadius
+                                                    )
                                                 )
                                                 drawRect(
-                                                    color = rangeColor,
-                                                    topLeft = Offset(size.width / 2, verticalPadding),
-                                                    size = Size(size.width / 2, rectHeight)
+                                                    color = rangeColor, topLeft = Offset(
+                                                        size.width / 2, verticalPadding
+                                                    ), size = Size(size.width / 2, rectHeight)
                                                 )
                                             }
+
                                             isEnd -> {
                                                 drawRoundRect(
                                                     color = rangeColor,
                                                     topLeft = Offset(0f, verticalPadding),
                                                     size = Size(size.width, rectHeight),
-                                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius)
+                                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(
+                                                        cornerRadius
+                                                    )
                                                 )
                                                 drawRect(
                                                     color = rangeColor,
@@ -336,8 +379,7 @@ fun DayPickerGrid(
                                         }
                                     }
                                 }
-                            },
-                        contentAlignment = Alignment.Center
+                            }, contentAlignment = Alignment.Center
                     ) {
                         if (dayNum in 1..daysInMonth) {
                             val date = remember(displayMonth, dayNum) { displayMonth.atDay(dayNum) }
@@ -346,19 +388,20 @@ fun DayPickerGrid(
                             val isEnd = date == endDate
 
                             Surface(
-                                modifier = Modifier.size(36.dp),
+                                modifier = Modifier.size(38.dp),
                                 shape = CircleShape,
                                 color = if (isStart || isEnd) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                border = if (isToday && !isStart && !isEnd) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
-                                onClick = { onDateClick(date) }
-                            ) {
+                                border = if (isToday && !isStart && !isEnd) BorderStroke(
+                                    2.dp, MaterialTheme.colorScheme.primary
+                                ) else null,
+                                onClick = { onDateClick(date) }) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
                                         text = dayNum.toString(),
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = if (isStart || isEnd || isToday) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isStart || isEnd) MaterialTheme.colorScheme.onPrimary 
-                                                else MaterialTheme.colorScheme.onSurface
+                                        color = if (isStart || isEnd) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -372,8 +415,7 @@ fun DayPickerGrid(
 
 @Composable
 fun MonthPickerGrid(
-    selectedMonth: Int,
-    onMonthClick: (Int) -> Unit
+    selectedMonth: Int, onMonthClick: (Int) -> Unit
 ) {
     val months = (1..12).toList()
     LazyVerticalGrid(
@@ -387,9 +429,14 @@ fun MonthPickerGrid(
             Surface(
                 onClick = { onMonthClick(m) },
                 shape = RoundedCornerShape(12.dp),
-                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(
+                    alpha = 0.5f
+                )
             ) {
-                Box(modifier = Modifier.padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.padding(vertical = 20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
                         text = "Thg $m",
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
@@ -403,8 +450,7 @@ fun MonthPickerGrid(
 
 @Composable
 fun YearPickerGrid(
-    selectedYear: Int,
-    onYearClick: (Int) -> Unit
+    selectedYear: Int, onYearClick: (Int) -> Unit
 ) {
     val currentYear = LocalDate.now().year
     val years = remember { (2020..2050).toList() }
@@ -417,7 +463,7 @@ fun YearPickerGrid(
             gridState.scrollToItem(index)
         }
     }
-    
+
     LazyVerticalGrid(
         state = gridState,
         columns = GridCells.Fixed(3),
@@ -431,10 +477,17 @@ fun YearPickerGrid(
             Surface(
                 onClick = { onYearClick(y) },
                 shape = RoundedCornerShape(12.dp),
-                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                border = if (isTodayYear && !isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(
+                    alpha = 0.5f
+                ),
+                border = if (isTodayYear && !isSelected) BorderStroke(
+                    1.dp, MaterialTheme.colorScheme.primary
+                ) else null
             ) {
-                Box(modifier = Modifier.padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
                         text = y.toString(),
                         fontWeight = if (isSelected || isTodayYear) FontWeight.Bold else FontWeight.Medium,
@@ -448,9 +501,7 @@ fun YearPickerGrid(
 
 @Composable
 fun MonthPickerDialog(
-    selectedDate: LocalDate,
-    onDateSelected: (LocalDate) -> Unit,
-    onDismiss: () -> Unit
+    selectedDate: LocalDate, onDateSelected: (LocalDate) -> Unit, onDismiss: () -> Unit
 ) {
     AdvancedDatePickerDialog(
         initialStartDate = selectedDate,
@@ -459,6 +510,5 @@ fun MonthPickerDialog(
         onDismiss = onDismiss,
         onDateRangeSelected = { start, _ ->
             onDateSelected(start)
-        }
-    )
+        })
 }
