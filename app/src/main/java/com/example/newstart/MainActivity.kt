@@ -400,7 +400,8 @@ class MainActivity : AppCompatActivity() {
                                     sheetState = sheetState,
                                     dragHandle = { BottomSheetDefaults.DragHandle() },
                                     containerColor = MaterialTheme.colorScheme.surface,
-                                    shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+                                    shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+                                    contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
                                 ) {
                                     when (sheetContentType) {
                                         SheetContent.JournalEntry -> {
@@ -411,8 +412,10 @@ class MainActivity : AppCompatActivity() {
                                                     showBottomSheet = false
                                                     mainViewModel.setShowJournalSheet(false)
                                                 },
-                                                onPost = { emoji, text, uri, source ->
-                                                    mainViewModel.saveJournalEntry(emoji, text, uri, source) {
+                                                onPost = { emoji, text, uri, source, type, movie, book, subject ->
+                                                    mainViewModel.saveJournalEntry(
+                                                        emoji, text, uri, source, type, movie, book, subject
+                                                    ) {
                                                         showBottomSheet = false
                                                         mainViewModel.setShowJournalSheet(false)
                                                     }

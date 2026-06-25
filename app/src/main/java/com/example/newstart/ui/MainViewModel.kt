@@ -12,6 +12,10 @@ import com.example.newstart.domain.repository.JournalRepository
 import com.example.newstart.domain.repository.UserRepository
 import com.example.newstart.ui.theme.AppThemeColor
 import com.example.newstart.ui.theme.ThemeMode
+import com.example.newstart.domain.model.JournalType
+import com.example.newstart.domain.model.MovieDetails
+import com.example.newstart.domain.model.BookDetails
+import com.example.newstart.domain.model.SubjectDetails
 import com.example.newstart.domain.usecase.SaveJournalEntryUseCase
 import com.example.newstart.domain.usecase.SuggestEmojiUseCase
 import com.example.newstart.domain.usecase.SaveHabitUseCase
@@ -244,12 +248,24 @@ class MainViewModel @Inject constructor(
 
     private var uploadJob: Job? = null
 
-    fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?, imageSource: String? = null, onSuccess: () -> Unit) {
+    fun saveJournalEntry(
+        emoji: String,
+        text: String,
+        imageUri: Uri?,
+        imageSource: String? = null,
+        type: JournalType = JournalType.NORMAL,
+        movieDetails: MovieDetails? = null,
+        bookDetails: BookDetails? = null,
+        subjectDetails: SubjectDetails? = null,
+        onSuccess: () -> Unit
+    ) {
         uploadJob?.cancel()
         uploadJob = viewModelScope.launch {
             try {
                 _isUploading.value = true
-                val result = saveJournalEntryUseCase(emoji, text, imageUri, imageSource)
+                val result = saveJournalEntryUseCase(
+                    emoji, text, imageUri, imageSource, type, movieDetails, bookDetails, subjectDetails
+                )
                 if (result.isSuccess) {
                     onSuccess()
                 }

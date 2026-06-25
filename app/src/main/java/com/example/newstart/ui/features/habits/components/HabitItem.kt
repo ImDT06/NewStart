@@ -98,54 +98,26 @@ fun HabitItem(
 
 
         Row(
-
             modifier = Modifier
                 .padding(
-                    horizontal = 14.dp,
-                    vertical = 10.dp
+                    horizontal = 16.dp,
+                    vertical = 12.dp
                 )
                 .fillMaxWidth(),
-
             verticalAlignment = Alignment.CenterVertically
-
         ) {
-
-
-
             // ICON
-
             Surface(
-
-                modifier = Modifier.size(32.dp),
-
-                shape = RoundedCornerShape(8.dp),
-
-                color =
-                    MaterialTheme.colorScheme.onSurface
-                        .copy(alpha = 0.1f)
-
+                modifier = Modifier.size(40.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
             ) {
-
-
-                Box(
-                    contentAlignment = Alignment.Center
-                ) {
-
-                    Text(
-                        habit.icon,
-                        fontSize = 16.sp
-                    )
-
+                Box(contentAlignment = Alignment.Center) {
+                    Text(habit.icon, fontSize = 20.sp)
                 }
-
             }
 
-
-
-
-            Spacer(
-                modifier = Modifier.width(10.dp)
-            )
+            Spacer(modifier = Modifier.width(16.dp))
 
 
 
@@ -291,86 +263,28 @@ fun HabitItem(
 
 
             // CHECK BUTTON
-
-
             Box(
-
                 modifier = Modifier
-
-                    .size(24.dp)
-
+                    .size(28.dp)
                     .clip(CircleShape)
-
                     .border(
-
-                        width = 1.2.dp,
-
-                        color =
-
-                            if(habit.isCompleted)
-
-                                Color.Transparent
-
-                            else
-
-                                MaterialTheme.colorScheme
-                                    .onSurface
-                                    .copy(alpha = 0.4f),
-
-
+                        width = 1.5.dp,
+                        color = if (habit.isCompleted) Color.Transparent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                         shape = CircleShape
-
                     )
-
-
-                    .background(
-
-                        if(habit.isCompleted)
-
-                            Color.White.copy(alpha = 0.2f)
-
-                        else
-
-                            Color.Transparent
-
-                    )
-
-
-                    .clickable {
-
-                        onToggle()
-
-                    },
-
-
+                    .background(if (habit.isCompleted) Color.White.copy(alpha = 0.25f) else Color.Transparent)
+                    .clickable { onToggle() },
                 contentAlignment = Alignment.Center
-
             ) {
-
-
-
-                if(habit.isCompleted) {
-
-
+                if (habit.isCompleted) {
                     Icon(
-
                         imageVector = Icons.Default.Check,
-
                         contentDescription = null,
-
                         tint = Color.White,
-
-
-                        modifier =
-                            Modifier.size(15.dp)
-
+                        modifier = Modifier.size(18.dp)
                     )
-
-
                 }
-
             }
-
         }
 
     }

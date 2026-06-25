@@ -186,8 +186,6 @@ fun HabitsScreen(
                 },
                 onShowMonthPicker = { showMonthPicker = true }
             )
-            
-            HabitProgressDashboard(habits = habits)
 
             HorizontalDatePicker(
                 pagerState = pagerState,
@@ -198,7 +196,7 @@ fun HabitsScreen(
                 onDateClick = { mainViewModel.onHabitDateSelected(it) }
             )
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             HabitList(
                 habits = habits,
@@ -476,18 +474,38 @@ private fun HabitsHeader(
     onTodayClick: () -> Unit,
     onShowMonthPicker: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Surface(color = MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(10.dp)) {
-            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(text = stringResource(R.string.habits_filter_all), color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(10.dp))
+        // Bên trái: Nút Filter
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.align(Alignment.CenterStart)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.habits_filter_all),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Icon(
+                    Icons.Default.KeyboardArrowDown,
+                    null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(14.dp)
+                )
             }
         }
 
+        // Ở giữa: Ngày tháng
         val headerDateText = remember(selectedDate, locale) {
             if (selectedDate == today) null
             else selectedDate.format(DateTimeFormatter.ofPattern(if (isVietnamese) "dd MMMM" else "MMM dd", locale))
@@ -496,17 +514,26 @@ private fun HabitsHeader(
         Text(
             text = headerDateText ?: stringResource(R.string.habits_today),
             color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onTodayClick() }.padding(horizontal = 8.dp, vertical = 4.dp)
+            fontSize = 17.sp,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onTodayClick() }
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            textAlign = TextAlign.Center
         )
 
-        IconButton(onClick = onShowMonthPicker) {
-            Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
-        }
-
-        IconButton(onClick = { navController.navigate(Screen.Statistics.route) }) {
-            Icon(Icons.Default.AutoGraph, null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+        // Bên phải: Nút chọn tháng
+        IconButton(
+            onClick = onShowMonthPicker,
+            modifier = Modifier.align(Alignment.CenterEnd)
+        ) {
+            Icon(
+                Icons.Default.CalendarMonth,
+                null,
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.onBackground
+            )
         }
     }
 }
