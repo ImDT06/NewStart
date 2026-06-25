@@ -76,6 +76,39 @@ class MainViewModel @Inject constructor(
     private val _isSuggestingEmojis = MutableStateFlow(false)
     val isSuggestingEmojis: StateFlow<Boolean> = _isSuggestingEmojis.asStateFlow()
 
+    val uniqueMovieTitles: StateFlow<List<String>> = journalRepository.getJournalEntries()
+        .map { entries ->
+            entries.filter { it.type == JournalType.MOVIE && it.movieDetails != null }
+                .map { it.movieDetails!!.title.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .sorted()
+        }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val uniqueBookTitles: StateFlow<List<String>> = journalRepository.getJournalEntries()
+        .map { entries ->
+            entries.filter { it.type == JournalType.BOOK && it.bookDetails != null }
+                .map { it.bookDetails!!.title.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .sorted()
+        }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val uniqueSubjectNames: StateFlow<List<String>> = journalRepository.getJournalEntries()
+        .map { entries ->
+            entries.filter { it.type == JournalType.SUBJECT && it.subjectDetails != null }
+                .map { it.subjectDetails!!.name.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .sorted()
+        }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private var suggestionJob: Job? = null
 
     fun getEmojiSuggestions(text: String) {

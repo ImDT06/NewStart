@@ -407,6 +407,9 @@ class MainActivity : AppCompatActivity() {
                                         SheetContent.JournalEntry -> {
                                             val suggestedEmojis by mainViewModel.aiSuggestedEmojis.collectAsStateWithLifecycle()
                                             val isSuggesting by mainViewModel.isSuggestingEmojis.collectAsStateWithLifecycle()
+                                            val suggestedMovies by mainViewModel.uniqueMovieTitles.collectAsStateWithLifecycle()
+                                            val suggestedBooks by mainViewModel.uniqueBookTitles.collectAsStateWithLifecycle()
+                                            val suggestedSubjects by mainViewModel.uniqueSubjectNames.collectAsStateWithLifecycle()
                                             JournalEntryPanel(
                                                 onDismiss = { 
                                                     showBottomSheet = false
@@ -423,6 +426,9 @@ class MainActivity : AppCompatActivity() {
                                                 isUploading = isUploading,
                                                 suggestedEmojis = suggestedEmojis,
                                                 isSuggesting = isSuggesting,
+                                                suggestedMovieTitles = suggestedMovies,
+                                                suggestedBookTitles = suggestedBooks,
+                                                suggestedSubjectNames = suggestedSubjects,
                                                 onTextChanged = { mainViewModel.getEmojiSuggestions(it) },
                                                 onCancelUpload = { mainViewModel.cancelUpload() },
                                                 onDirtyStateChanged = { isJournalDirty = it }

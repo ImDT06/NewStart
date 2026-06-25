@@ -57,6 +57,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
+import com.example.newstart.ui.navigation.Screen
 import androidx.compose.ui.platform.LocalView
 import android.view.WindowManager
 import android.graphics.Color as AndroidColor
@@ -83,6 +85,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 
 @Composable
 fun JournalScreen(
+    navController: NavController,
     modifier: Modifier = Modifier,
     viewModel: JournalViewModel = hiltViewModel()
 ) {
@@ -100,7 +103,8 @@ fun JournalScreen(
         onTabSelected = { viewModel.onTabSelected(it) },
         onDateRangeSelected = { start, end -> viewModel.onDateRangeSelected(start, end) },
         onQuickFilterSelected = { viewModel.setQuickFilter(it) },
-        onDeleteEntry = { viewModel.deleteEntry(it) }
+        onDeleteEntry = { viewModel.deleteEntry(it) },
+        onArchiveClick = { navController.navigate(Screen.JournalArchive.route) }
     )
 }
 
@@ -115,7 +119,8 @@ fun JournalContent(
     onTabSelected: (Int) -> Unit,
     onDateRangeSelected: (LocalDate, LocalDate?) -> Unit,
     onQuickFilterSelected: (String) -> Unit,
-    onDeleteEntry: (String) -> Unit
+    onDeleteEntry: (String) -> Unit,
+    onArchiveClick: () -> Unit
 ) {
     val isDark = LocalDarkTheme.current
     var selectedImageUrl by remember { mutableStateOf<String?>(null) }
@@ -222,15 +227,28 @@ fun JournalContent(
                     )
                 }
 
-                // 2. Icon Lịch (Fade out khi search)
+                // 2. Icon Lịch & Thư viện (Fade out khi search)
                 androidx.compose.animation.AnimatedVisibility(
                     visible = !isSearchActive,
                     enter = fadeIn(tween(200)),
                     exit = fadeOut(tween(200)),
                     modifier = Modifier.align(Alignment.CenterEnd)
                 ) {
-                    IconButton(onClick = { showDatePicker = true }) {
-                        Icon(Icons.Default.CalendarMonth, null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onArchiveClick) {
+                            Icon(
+                                imageVector = Icons.Default.CollectionsBookmark,
+                                contentDescription = "Archive",
+                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                            )
+                        }
+                        IconButton(onClick = { showDatePicker = true }) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = "Calendar",
+                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                            )
+                        }
                     }
                 }
 
@@ -1016,7 +1034,8 @@ fun JournalScreenPreview() {
             onTabSelected = {},
             onDateRangeSelected = { _, _ -> },
             onQuickFilterSelected = {},
-            onDeleteEntry = {}
+            onDeleteEntry = {},
+            onArchiveClick = {}
         )
     }
 }

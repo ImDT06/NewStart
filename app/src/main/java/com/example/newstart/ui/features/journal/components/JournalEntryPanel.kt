@@ -83,6 +83,9 @@ fun JournalEntryPanel(
     isUploading: Boolean = false,
     suggestedEmojis: List<String> = emptyList(),
     isSuggesting: Boolean = false,
+    suggestedMovieTitles: List<String> = emptyList(),
+    suggestedBookTitles: List<String> = emptyList(),
+    suggestedSubjectNames: List<String> = emptyList(),
     onTextChanged: (String) -> Unit = {},
     onCancelUpload: () -> Unit = {},
     onDirtyStateChanged: (Boolean) -> Unit = {}
@@ -311,6 +314,31 @@ fun JournalEntryPanel(
                                         )
                                         Text("”", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                     }
+                                    if (movieTitle.isEmpty() && suggestedMovieTitles.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            contentPadding = PaddingValues(horizontal = 4.dp),
+                                            modifier = Modifier.height(26.dp)
+                                        ) {
+                                            items(suggestedMovieTitles) { title ->
+                                                Surface(
+                                                    onClick = { movieTitle = title },
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = Color.White.copy(alpha = 0.15f),
+                                                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.2f))
+                                                ) {
+                                                    Text(
+                                                        text = title,
+                                                        color = Color.White,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 JournalType.BOOK -> {
                                     InteractiveRatingBar(
@@ -350,6 +378,31 @@ fun JournalEntryPanel(
                                         )
                                         Text("”", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                     }
+                                    if (bookTitle.isEmpty() && suggestedBookTitles.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            contentPadding = PaddingValues(horizontal = 4.dp),
+                                            modifier = Modifier.height(26.dp)
+                                        ) {
+                                            items(suggestedBookTitles) { title ->
+                                                Surface(
+                                                    onClick = { bookTitle = title },
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = Color.White.copy(alpha = 0.15f),
+                                                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.2f))
+                                                ) {
+                                                    Text(
+                                                        text = title,
+                                                        color = Color.White,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 JournalType.SUBJECT -> {
                                     InteractiveRatingBar(
@@ -388,6 +441,31 @@ fun JournalEntryPanel(
                                             }
                                         )
                                         Text("”", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    if (subjectName.isEmpty() && suggestedSubjectNames.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            contentPadding = PaddingValues(horizontal = 4.dp),
+                                            modifier = Modifier.height(26.dp)
+                                        ) {
+                                            items(suggestedSubjectNames) { name ->
+                                                Surface(
+                                                    onClick = { subjectName = name },
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = Color.White.copy(alpha = 0.15f),
+                                                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.2f))
+                                                ) {
+                                                    Text(
+                                                        text = name,
+                                                        color = Color.White,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                                 else -> {}
