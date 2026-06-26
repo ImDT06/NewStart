@@ -249,16 +249,6 @@ private fun HomeHeaderSection(userName: String) {
             else -> R.string.home_hello_evening
         }
         Text(text = stringResource(id = greetingRes, userName), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = "Hôm nay bạn thấy thế nào?", fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 10.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            listOf("😊", "😐", "😔", "😫", "🔥").forEach { mood ->
-                Surface(modifier = Modifier.size(48.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), onClick = { }) {
-                    Box(contentAlignment = Alignment.Center) { Text(mood, fontSize = 20.sp) }
-                }
-            }
-        }
     }
 }
 

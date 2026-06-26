@@ -12,6 +12,10 @@ import com.example.newstart.domain.repository.JournalRepository
 import com.example.newstart.domain.repository.UserRepository
 import com.example.newstart.ui.theme.AppThemeColor
 import com.example.newstart.ui.theme.ThemeMode
+import com.example.newstart.domain.model.JournalType
+import com.example.newstart.domain.model.MovieDetails
+import com.example.newstart.domain.model.BookDetails
+import com.example.newstart.domain.model.SubjectDetails
 import com.example.newstart.domain.usecase.SaveJournalEntryUseCase
 import com.example.newstart.domain.usecase.SuggestEmojiUseCase
 import com.example.newstart.domain.usecase.SaveHabitUseCase
@@ -71,6 +75,53 @@ class MainViewModel @Inject constructor(
 
     private val _isSuggestingEmojis = MutableStateFlow(false)
     val isSuggestingEmojis: StateFlow<Boolean> = _isSuggestingEmojis.asStateFlow()
+
+    val uniqueMovieTitles: StateFlow<List<String>> = journalRepository.getJournalEntries()
+        .map { entries ->
+            entries.filter { it.type == JournalType.MOVIE && it.movieDetails != null }
+                .map { it.movieDetails!!.title.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .sorted()
+        }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val uniqueBookTitles: StateFlow<List<String>> = journalRepository.getJournalEntries()
+        .map { entries ->
+            entries.filter { it.type == JournalType.BOOK && it.bookDetails != null }
+                .map { it.bookDetails!!.title.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .sorted()
+        }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val uniqueSubjectNames: StateFlow<List<String>> = journalRepository.getJournalEntries()
+        .map { entries ->
+            entries.filter { it.type == JournalType.SUBJECT && it.subjectDetails != null }
+                .map { it.subjectDetails!!.name.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .sorted()
+        }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val uniqueTags: StateFlow<List<String>> = journalRepository.getJournalEntries()
+        .map { entries ->
+            val tags = mutableSetOf<String>()
+            val regex = Regex("#[a-zA-Z0-9_\\-áàảãạâấầẩẫậăắằẳẵặéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ]+")
+            entries.forEach { entry ->
+                regex.findAll(entry.text).forEach { match ->
+                    tags.add(match.value.lowercase().trim())
+                }
+            }
+            tags.toList().sorted()
+        }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private var suggestionJob: Job? = null
 
@@ -244,12 +295,24 @@ class MainViewModel @Inject constructor(
 
     private var uploadJob: Job? = null
 
-    fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?, imageSource: String? = null, onSuccess: () -> Unit) {
+    fun saveJournalEntry(
+        emoji: String,
+        text: String,
+        imageUri: Uri?,
+        imageSource: String? = null,
+        type: JournalType = JournalType.NORMAL,
+        movieDetails: MovieDetails? = null,
+        bookDetails: BookDetails? = null,
+        subjectDetails: SubjectDetails? = null,
+        onSuccess: () -> Unit
+    ) {
         uploadJob?.cancel()
         uploadJob = viewModelScope.launch {
             try {
                 _isUploading.value = true
-                val result = saveJournalEntryUseCase(emoji, text, imageUri, imageSource)
+                val result = saveJournalEntryUseCase(
+                    emoji, text, imageUri, imageSource, type, movieDetails, bookDetails, subjectDetails
+                )
                 if (result.isSuccess) {
                     onSuccess()
                 }

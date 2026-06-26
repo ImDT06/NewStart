@@ -18,6 +18,7 @@ import com.example.newstart.ui.screens.detail.DetailScreen
 import com.example.newstart.ui.features.home.HomeScreen
 import com.example.newstart.ui.features.settings.SettingsScreen
 import com.example.newstart.ui.features.journal.JournalScreen
+import com.example.newstart.ui.features.journal.JournalArchiveScreen
 import com.example.newstart.ui.features.habits.HabitsScreen
 import com.example.newstart.ui.features.habits.StatisticsScreen
 import com.example.newstart.ui.features.social.SocialScreen
@@ -109,7 +110,11 @@ fun NavGraph(
         }
 
         composable(route = Screen.Journal.route) {
-            JournalScreen()
+            JournalScreen(navController = navController)
+        }
+
+        composable(route = Screen.JournalArchive.route) {
+            JournalArchiveScreen(navController = navController)
         }
 
         composable(route = Screen.Scan.route) {

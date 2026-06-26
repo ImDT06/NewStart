@@ -400,19 +400,26 @@ class MainActivity : AppCompatActivity() {
                                     sheetState = sheetState,
                                     dragHandle = { BottomSheetDefaults.DragHandle() },
                                     containerColor = MaterialTheme.colorScheme.surface,
-                                    shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+                                    shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+                                    contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
                                 ) {
                                     when (sheetContentType) {
                                         SheetContent.JournalEntry -> {
                                             val suggestedEmojis by mainViewModel.aiSuggestedEmojis.collectAsStateWithLifecycle()
                                             val isSuggesting by mainViewModel.isSuggestingEmojis.collectAsStateWithLifecycle()
+                                            val suggestedMovies by mainViewModel.uniqueMovieTitles.collectAsStateWithLifecycle()
+                                            val suggestedBooks by mainViewModel.uniqueBookTitles.collectAsStateWithLifecycle()
+                                            val suggestedSubjects by mainViewModel.uniqueSubjectNames.collectAsStateWithLifecycle()
+                                            val suggestedTags by mainViewModel.uniqueTags.collectAsStateWithLifecycle()
                                             JournalEntryPanel(
                                                 onDismiss = { 
                                                     showBottomSheet = false
                                                     mainViewModel.setShowJournalSheet(false)
                                                 },
-                                                onPost = { emoji, text, uri, source ->
-                                                    mainViewModel.saveJournalEntry(emoji, text, uri, source) {
+                                                onPost = { emoji, text, uri, source, type, movie, book, subject ->
+                                                    mainViewModel.saveJournalEntry(
+                                                        emoji, text, uri, source, type, movie, book, subject
+                                                    ) {
                                                         showBottomSheet = false
                                                         mainViewModel.setShowJournalSheet(false)
                                                     }
@@ -420,6 +427,10 @@ class MainActivity : AppCompatActivity() {
                                                 isUploading = isUploading,
                                                 suggestedEmojis = suggestedEmojis,
                                                 isSuggesting = isSuggesting,
+                                                suggestedMovieTitles = suggestedMovies,
+                                                suggestedBookTitles = suggestedBooks,
+                                                suggestedSubjectNames = suggestedSubjects,
+                                                suggestedTags = suggestedTags,
                                                 onTextChanged = { mainViewModel.getEmojiSuggestions(it) },
                                                 onCancelUpload = { mainViewModel.cancelUpload() },
                                                 onDirtyStateChanged = { isJournalDirty = it }
