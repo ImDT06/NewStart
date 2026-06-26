@@ -200,10 +200,10 @@ fun JournalContent(
             ) {
                 val constraintsScope = this
                 val availableWidth = constraintsScope.maxWidth
-                val searchIconSize = 44.dp
+                val searchIconSize = 48.dp
 
-                // Vị trí bắt đầu (bên phải, trước icon lịch) và kết thúc (bên trái)
-                val startOffset = availableWidth - (searchIconSize * 2)
+                // Vị trí bắt đầu (bên phải, trước các icon thao tác) và kết thúc (bên trái)
+                val startOffset = availableWidth - (searchIconSize * 3)
                 val endOffset = (-8).dp // Chỉnh một chút để khớp với padding của TextField
 
                 val searchOffset by animateDpAsState(

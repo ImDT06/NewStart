@@ -109,6 +109,20 @@ class MainViewModel @Inject constructor(
         .flowOn(kotlinx.coroutines.Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val uniqueTags: StateFlow<List<String>> = journalRepository.getJournalEntries()
+        .map { entries ->
+            val tags = mutableSetOf<String>()
+            val regex = Regex("#[a-zA-Z0-9_\\-áàảãạâấầẩẫậăắằẳẵặéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ]+")
+            entries.forEach { entry ->
+                regex.findAll(entry.text).forEach { match ->
+                    tags.add(match.value.lowercase().trim())
+                }
+            }
+            tags.toList().sorted()
+        }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private var suggestionJob: Job? = null
 
     fun getEmojiSuggestions(text: String) {

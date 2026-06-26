@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,6 +87,7 @@ fun JournalEntryPanel(
     suggestedMovieTitles: List<String> = emptyList(),
     suggestedBookTitles: List<String> = emptyList(),
     suggestedSubjectNames: List<String> = emptyList(),
+    suggestedTags: List<String> = emptyList(),
     onTextChanged: (String) -> Unit = {},
     onCancelUpload: () -> Unit = {},
     onDirtyStateChanged: (Boolean) -> Unit = {}
@@ -95,6 +97,16 @@ fun JournalEntryPanel(
     var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
     var isCapturedImage by remember { mutableStateOf(false) }
     var isTextOnlyMode by remember { mutableStateOf(false) }
+
+    val lastWord = remember(text) { text.split(Regex("\\s+")).lastOrNull() ?: "" }
+    val isTypingTag = remember(lastWord) { lastWord.startsWith("#") }
+    val tagSuggestions = remember(isTypingTag, lastWord, suggestedTags) {
+        if (isTypingTag) {
+            suggestedTags.filter { it.startsWith(lastWord, ignoreCase = true) && it != lastWord }
+        } else {
+            emptyList()
+        }
+    }
 
     var selectedType by remember { mutableStateOf(JournalType.NORMAL) }
     var movieTitle by remember { mutableStateOf("") }
@@ -124,7 +136,9 @@ fun JournalEntryPanel(
     var currentZoomRatio by remember { mutableFloatStateOf(1f) }
     val scope = rememberCoroutineScope()
 
-    val isKeyboardVisible = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
+    val keyboardHeight = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    val isKeyboardVisible = keyboardHeight > 0.dp
+    val bottomPadding = if (keyboardHeight < 102.dp) 110.dp - keyboardHeight else 8.dp
 
     LaunchedEffect(text, capturedImageUri, isTextOnlyMode, movieTitle) {
         onDirtyStateChanged(text.isNotBlank() || capturedImageUri != null || isTextOnlyMode || movieTitle.isNotBlank())
@@ -319,8 +333,17 @@ fun JournalEntryPanel(
                                         LazyRow(
                                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                                             contentPadding = PaddingValues(horizontal = 4.dp),
-                                            modifier = Modifier.height(26.dp)
+                                            modifier = Modifier.height(26.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
+                                            item {
+                                                Text(
+                                                    text = "Gợi ý:",
+                                                    color = Color.White.copy(alpha = 0.5f),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
                                             items(suggestedMovieTitles) { title ->
                                                 Surface(
                                                     onClick = { movieTitle = title },
@@ -383,8 +406,17 @@ fun JournalEntryPanel(
                                         LazyRow(
                                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                                             contentPadding = PaddingValues(horizontal = 4.dp),
-                                            modifier = Modifier.height(26.dp)
+                                            modifier = Modifier.height(26.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
+                                            item {
+                                                Text(
+                                                    text = "Gợi ý:",
+                                                    color = Color.White.copy(alpha = 0.5f),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
                                             items(suggestedBookTitles) { title ->
                                                 Surface(
                                                     onClick = { bookTitle = title },
@@ -447,8 +479,17 @@ fun JournalEntryPanel(
                                         LazyRow(
                                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                                             contentPadding = PaddingValues(horizontal = 4.dp),
-                                            modifier = Modifier.height(26.dp)
+                                            modifier = Modifier.height(26.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
+                                            item {
+                                                Text(
+                                                    text = "Gợi ý:",
+                                                    color = Color.White.copy(alpha = 0.5f),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
                                             items(suggestedSubjectNames) { name ->
                                                 Surface(
                                                     onClick = { subjectName = name },
@@ -477,7 +518,17 @@ fun JournalEntryPanel(
                 // Nút chụp lại (reset ảnh) góc dưới bên phải preview
                 if (capturedImageUri != null || isTextOnlyMode) {
                     IconButton(
-                        onClick = { capturedImageUri = null; isTextOnlyMode = false },
+                        onClick = { 
+                            capturedImageUri = null
+                            isTextOnlyMode = false
+                            selectedType = JournalType.NORMAL
+                            movieTitle = ""
+                            movieRating = 0f
+                            bookTitle = ""
+                            bookRating = 0f
+                            subjectName = ""
+                            understandingLevel = 3
+                        },
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(16.dp)
@@ -519,27 +570,99 @@ fun JournalEntryPanel(
         // LAYER 3: Vùng Nhập liệu & Nút Gửi (TỰ ĐẨY LÊN TRÊN BÀN PHÍM - CHỈ HIỆN KHI ĐÃ CÓ ẢNH HOẶC Ở CHẾ ĐỘ CHỈ NHẬP VĂN BẢN)
         if (capturedImageUri != null || isTextOnlyMode) {
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter).imePadding().padding(bottom = if (isKeyboardVisible) 8.dp else 110.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).imePadding().padding(bottom = bottomPadding),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Emoji Selector
-                Row(modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f), CircleShape).padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    journalEmojis.forEach { emoji ->
-                        val isSelected = selectedEmoji == emoji
-                        Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent).clickable { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); selectedEmoji = emoji }, contentAlignment = Alignment.Center) {
-                            Image(painter = painterResource(moodIcons[emoji] ?: R.drawable.ic_mood_neutral), contentDescription = null, modifier = Modifier.size(if (isSelected) 28.dp else 22.dp))
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 4.dp,
+                    shadowElevation = 3.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        journalEmojis.forEach { emoji ->
+                            val isSelected = selectedEmoji == emoji
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        selectedEmoji = emoji
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(moodIcons[emoji] ?: R.drawable.ic_mood_neutral),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(if (isSelected) 28.dp else 22.dp)
+                                )
+                            }
                         }
                     }
                 }
                 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                if (tagSuggestions.isNotEmpty()) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        item {
+                            Text(
+                                text = "Gợi ý nhãn:",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        items(tagSuggestions) { tag ->
+                            Surface(
+                                onClick = {
+                                    val words = text.split(" ").toMutableList()
+                                    if (words.isNotEmpty()) {
+                                        words[words.lastIndex] = tag
+                                        text = words.joinToString(" ") + " "
+                                    }
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                tonalElevation = 2.dp,
+                                shadowElevation = 2.dp,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                            ) {
+                                Text(
+                                    text = tag,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Ô nhập văn bản + Nút Gửi (Chỉ hiện nút gửi khi có bàn phím hoặc đã có nội dung)
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 4.dp,
+                    shadowElevation = 3.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                 ) {
                     Row(modifier = Modifier.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
@@ -547,14 +670,34 @@ fun JournalEntryPanel(
                             placeholder = { Text(stringResource(R.string.journal_panel_placeholder), fontSize = 14.sp) },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(20.dp),
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent)
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            )
                         )
                         
                         if (isKeyboardVisible || text.isNotBlank() || capturedImageUri != null) {
                             IconButton(
                                 onClick = { 
+                                    val isVietnamese = java.util.Locale.getDefault().language == "vi"
+                                    if (selectedType == JournalType.MOVIE && movieTitle.trim().isEmpty()) {
+                                        android.widget.Toast.makeText(context, if (isVietnamese) "Vui lòng nhập tên phim" else "Please enter movie title", android.widget.Toast.LENGTH_SHORT).show()
+                                        return@IconButton
+                                    }
+                                    if (selectedType == JournalType.BOOK && bookTitle.trim().isEmpty()) {
+                                        android.widget.Toast.makeText(context, if (isVietnamese) "Vui lòng nhập tên sách" else "Please enter book title", android.widget.Toast.LENGTH_SHORT).show()
+                                        return@IconButton
+                                    }
+                                    if (selectedType == JournalType.SUBJECT && subjectName.trim().isEmpty()) {
+                                        android.widget.Toast.makeText(context, if (isVietnamese) "Vui lòng nhập tên môn học" else "Please enter subject name", android.widget.Toast.LENGTH_SHORT).show()
+                                        return@IconButton
+                                    }
+
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onPost(selectedEmoji, text, capturedImageUri, if (capturedImageUri != null) (if (isCapturedImage) "CAMERA" else "GALLERY") else null, selectedType, if (selectedType == JournalType.MOVIE) MovieDetails(title = movieTitle, rating = movieRating) else null, if (selectedType == JournalType.BOOK) BookDetails(title = bookTitle, rating = bookRating) else null, if (selectedType == JournalType.SUBJECT) SubjectDetails(name = subjectName, understandingLevel = understandingLevel) else null)
+                                    onPost(selectedEmoji, text, capturedImageUri, if (capturedImageUri != null) (if (isCapturedImage) "CAMERA" else "GALLERY") else null, selectedType, if (selectedType == JournalType.MOVIE) MovieDetails(title = movieTitle.trim(), rating = movieRating) else null, if (selectedType == JournalType.BOOK) BookDetails(title = bookTitle.trim(), rating = bookRating) else null, if (selectedType == JournalType.SUBJECT) SubjectDetails(name = subjectName.trim(), understandingLevel = understandingLevel) else null)
                                 },
                                 modifier = Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary)
                             ) {
@@ -568,10 +711,55 @@ fun JournalEntryPanel(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Category Chips
-                LazyRow(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val types = listOf(JournalType.NORMAL to ("Nhật ký" to Icons.Default.EditNote), JournalType.MOVIE to ("Phim" to Icons.Default.Movie), JournalType.BOOK to ("Sách" to Icons.AutoMirrored.Filled.MenuBook), JournalType.SUBJECT to ("Môn học" to Icons.Default.School))
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val types = listOf(
+                        JournalType.NORMAL to ("Nhật ký" to Icons.Default.EditNote),
+                        JournalType.MOVIE to ("Phim" to Icons.Default.Movie),
+                        JournalType.BOOK to ("Sách" to Icons.AutoMirrored.Filled.MenuBook),
+                        JournalType.SUBJECT to ("Môn học" to Icons.Default.School)
+                    )
                     items(types) { (type, pair) ->
-                        FilterChip(selected = selectedType == type, onClick = { selectedType = type }, label = { Text(pair.first, fontSize = 10.sp) }, leadingIcon = { Icon(pair.second, null, modifier = Modifier.size(14.dp)) }, shape = RoundedCornerShape(8.dp))
+                        val isSelected = selectedType == type
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedType = type },
+                            label = {
+                                Text(
+                                    text = pair.first,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = pair.second,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp),
+                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                iconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                selectedBorderColor = MaterialTheme.colorScheme.primary,
+                                borderWidth = 1.dp,
+                                selectedBorderWidth = 1.5.dp
+                            )
+                        )
                     }
                 }
             }

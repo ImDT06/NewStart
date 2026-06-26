@@ -52,10 +52,13 @@ fun JournalArchiveScreen(
     val movies by viewModel.movieGroups.collectAsStateWithLifecycle()
     val books by viewModel.bookGroups.collectAsStateWithLifecycle()
     val subjects by viewModel.subjectGroups.collectAsStateWithLifecycle()
+    val tags by viewModel.tagGroups.collectAsStateWithLifecycle()
+    val moodAnalytics by viewModel.moodAnalytics.collectAsStateWithLifecycle()
 
     var expandedMovieGroup by remember { mutableStateOf<MovieGroup?>(null) }
     var expandedBookGroup by remember { mutableStateOf<BookGroup?>(null) }
     var expandedSubjectGroup by remember { mutableStateOf<SubjectGroup?>(null) }
+    var expandedTagGroup by remember { mutableStateOf<TagGroup?>(null) }
 
     val context = LocalContext.current
     val isVietnamese = remember(context) {
@@ -92,10 +95,11 @@ fun JournalArchiveScreen(
             }
 
             // Tabs
-            TabRow(
+            ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.primary,
+                edgePadding = 16.dp,
                 divider = {},
                 indicator = { tabPositions ->
                     if (selectedTab < tabPositions.size) {
@@ -105,16 +109,20 @@ fun JournalArchiveScreen(
                         )
                     }
                 },
-                modifier = Modifier.padding(horizontal = 16.dp).height(48.dp)
+                modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { viewModel.selectTab(0) },
                     text = {
+                        val isSelected = selectedTab == 0
                         Text(
                             text = if (isVietnamese) "Phim (${movies.size})" else "Movies (${movies.size})",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     }
                 )
@@ -122,10 +130,14 @@ fun JournalArchiveScreen(
                     selected = selectedTab == 1,
                     onClick = { viewModel.selectTab(1) },
                     text = {
+                        val isSelected = selectedTab == 1
                         Text(
                             text = if (isVietnamese) "Sách (${books.size})" else "Books (${books.size})",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     }
                 )
@@ -133,10 +145,44 @@ fun JournalArchiveScreen(
                     selected = selectedTab == 2,
                     onClick = { viewModel.selectTab(2) },
                     text = {
+                        val isSelected = selectedTab == 2
                         Text(
                             text = if (isVietnamese) "Môn học (${subjects.size})" else "Subjects (${subjects.size})",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { viewModel.selectTab(3) },
+                    text = {
+                        val isSelected = selectedTab == 3
+                        Text(
+                            text = if (isVietnamese) "Nhãn (${tags.size})" else "Tags (${tags.size})",
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTab == 4,
+                    onClick = { viewModel.selectTab(4) },
+                    text = {
+                        val isSelected = selectedTab == 4
+                        Text(
+                            text = if (isVietnamese) "Phân tích" else "Insights",
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     }
                 )
@@ -154,6 +200,8 @@ fun JournalArchiveScreen(
                     0 -> MovieArchiveGrid(movies, onMovieClick = { expandedMovieGroup = it })
                     1 -> BookArchiveGrid(books, onBookClick = { expandedBookGroup = it })
                     2 -> SubjectArchiveGrid(subjects, onSubjectClick = { expandedSubjectGroup = it })
+                    3 -> TagArchiveGrid(tags, onTagClick = { expandedTagGroup = it })
+                    4 -> MoodAnalyticsView(moodAnalytics, isVietnamese, isDark)
                 }
             }
         }
@@ -190,6 +238,17 @@ fun JournalArchiveScreen(
                 isDark = isDark,
                 isSubject = true,
                 onDismiss = { expandedSubjectGroup = null }
+            )
+        }
+
+        expandedTagGroup?.let { group ->
+            ExpandedGroupSheet(
+                title = group.tag,
+                subtitle = if (isVietnamese) "Nhãn" else "Tag",
+                rating = 0f,
+                entries = group.entries,
+                isDark = isDark,
+                onDismiss = { expandedTagGroup = null }
             )
         }
     }
@@ -601,6 +660,266 @@ private fun EmptyStateView(message: String) {
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+@Composable
+private fun TagArchiveGrid(
+    tags: List<TagGroup>,
+    onTagClick: (TagGroup) -> Unit
+) {
+    if (tags.isEmpty()) {
+        EmptyStateView(message = "Chưa có nhãn tag nào được sử dụng (ví dụ: #game, #chill)")
+        return
+    }
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(tags, key = { it.tag }) { tagGroup ->
+            ArchiveCard(
+                title = tagGroup.tag,
+                rating = 0f,
+                imageCount = tagGroup.entries.count { it.imageUrl != null },
+                totalCount = tagGroup.entries.size,
+                latestEntry = tagGroup.entries.firstOrNull(),
+                onClick = { onTagClick(tagGroup) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun MoodAnalyticsView(
+    analytics: MoodAnalytics?,
+    isVietnamese: Boolean,
+    isDark: Boolean
+) {
+    if (analytics == null) {
+        EmptyStateView(message = if (isVietnamese) "Chưa có ghi chép nào để phân tích" else "No entries to analyze")
+        return
+    }
+
+    val totalLogs = analytics.moodCounts.values.sum()
+    if (totalLogs == 0) {
+        EmptyStateView(message = if (isVietnamese) "Chưa có ghi chép nào để phân tích" else "No entries to analyze")
+        return
+    }
+
+    val moodIcons = remember {
+        mapOf(
+            "😫" to R.drawable.ic_mood_very_bad,
+            "😔" to R.drawable.ic_mood_bad,
+            "😐" to R.drawable.ic_mood_neutral,
+            "😊" to R.drawable.ic_mood_good,
+            "🥰" to R.drawable.ic_mood_very_good
+        )
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        // Section 1: Mood Distribution Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+                    else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+                ),
+                border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f))
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        text = if (isVietnamese) "Phân bổ tâm trạng" else "Mood Distribution",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (isVietnamese) "Dựa trên $totalLogs ghi chép cảm xúc" else "Based on $totalLogs mood logs",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    val moodList = listOf(
+                        Triple("🥰", if (isVietnamese) "Rất vui" else "Excellent", Color(0xFF00C851)),
+                        Triple("😊", if (isVietnamese) "Vui vẻ" else "Good", Color(0xFFFFCC00)),
+                        Triple("😐", if (isVietnamese) "Bình thường" else "Neutral", Color(0xFF33B5E5)),
+                        Triple("😔", if (isVietnamese) "Tâm trạng tệ" else "Bad", Color(0xFFFF8800)),
+                        Triple("😫", if (isVietnamese) "Rất tệ" else "Awful", Color(0xFFCC0000))
+                    )
+
+                    moodList.forEach { (emoji, label, color) ->
+                        val count = analytics.moodCounts[emoji] ?: 0
+                        val percentage = analytics.moodPercentages[emoji] ?: 0f
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                        ) {
+                            val icon = moodIcons[emoji]
+                            if (icon != null) {
+                                Image(
+                                    painter = painterResource(id = icon),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            } else {
+                                Text(text = emoji, fontSize = 20.sp)
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = String.format("%.0f%% (%d)", percentage * 100, count),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                // Custom Progress Bar
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .fillMaxWidth(fraction = percentage.coerceAtLeast(0.01f))
+                                            .clip(CircleShape)
+                                            .background(color)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section 2: Tag correlation Insights
+        if (analytics.tagMoodCorrelations.isNotEmpty()) {
+            item {
+                Text(
+                    text = if (isVietnamese) "Mối tương quan cảm xúc theo Nhãn" else "Tag-Mood Correlation",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                )
+            }
+
+            items(analytics.tagMoodCorrelations) { correlation ->
+                val rating = correlation.averageMood
+                val feedback = when {
+                    rating >= 4.2f -> if (isVietnamese) "Rất tích cực! Nhãn này đem lại niềm vui lớn." else "Highly positive! This tag brings great joy."
+                    rating >= 3.5f -> if (isVietnamese) "Tâm trạng tích cực khi gắn thẻ này." else "Positive mood when logging this tag."
+                    rating >= 2.5f -> if (isVietnamese) "Cảm xúc trung tính, ổn định." else "Stable, neutral mood."
+                    else -> if (isVietnamese) "Nhãn này thường gắn liền với sự trầm lắng/mệt mỏi." else "This tag is associated with reflective/low energy mood."
+                }
+
+                Surface(
+                    color = if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f)
+                    else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.03f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Tag Icon
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "#",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 16.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = correlation.tag,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 15.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isVietnamese) "${correlation.entryCount} ghi chép" else "${correlation.entryCount} logs",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            // Rating indicators (stars)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val roundedStars = (rating + 0.5f).toInt()
+                                (1..5).forEach { i ->
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = if (i <= roundedStars) Color(0xFFFFCC00) else Color.Gray.copy(alpha = 0.2f),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = String.format(java.util.Locale.US, "%.1f/5.0", rating),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = feedback,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -410,6 +410,7 @@ class MainActivity : AppCompatActivity() {
                                             val suggestedMovies by mainViewModel.uniqueMovieTitles.collectAsStateWithLifecycle()
                                             val suggestedBooks by mainViewModel.uniqueBookTitles.collectAsStateWithLifecycle()
                                             val suggestedSubjects by mainViewModel.uniqueSubjectNames.collectAsStateWithLifecycle()
+                                            val suggestedTags by mainViewModel.uniqueTags.collectAsStateWithLifecycle()
                                             JournalEntryPanel(
                                                 onDismiss = { 
                                                     showBottomSheet = false
@@ -429,6 +430,7 @@ class MainActivity : AppCompatActivity() {
                                                 suggestedMovieTitles = suggestedMovies,
                                                 suggestedBookTitles = suggestedBooks,
                                                 suggestedSubjectNames = suggestedSubjects,
+                                                suggestedTags = suggestedTags,
                                                 onTextChanged = { mainViewModel.getEmojiSuggestions(it) },
                                                 onCancelUpload = { mainViewModel.cancelUpload() },
                                                 onDirtyStateChanged = { isJournalDirty = it }
