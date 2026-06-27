@@ -10,7 +10,7 @@ data class Friendship(
     val userIds: List<String> = emptyList(), // Danh sách 2 ID người dùng
     @ServerTimestamp
     val createdAt: Date? = null,
-    val status: FriendshipStatus = FriendshipStatus.ACCEPTED
+    val status: String = "ACCEPTED"
 )
 
 @Immutable
@@ -18,7 +18,7 @@ data class FriendRequest(
     val id: String = "",
     val fromUserId: String = "",
     val toUserId: String = "",
-    val status: FriendshipStatus = FriendshipStatus.PENDING,
+    val status: String = "PENDING",
     @ServerTimestamp
     val timestamp: Date? = null
 )

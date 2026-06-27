@@ -61,8 +61,9 @@ fun JournalArchiveScreen(
     var expandedTagGroup by remember { mutableStateOf<TagGroup?>(null) }
 
     val context = LocalContext.current
-    val isVietnamese = remember(context) {
-        context.resources.configuration.locales[0].language == "vi"
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isVietnamese = remember(configuration) {
+        configuration.locales[0].language == "vi"
     }
 
     Box(
@@ -633,8 +634,9 @@ private fun ArchiveEntryItem(
     isSubject: Boolean
 ) {
     val context = LocalContext.current
-    val locale = remember(context) { context.resources.configuration.locales[0] }
-    val dateFormatter = remember { SimpleDateFormat("dd MMMM, yyyy HH:mm", locale) }
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val locale = remember(configuration) { configuration.locales[0] }
+    val dateFormatter = remember(locale) { SimpleDateFormat("dd MMMM, yyyy HH:mm", locale) }
     val formattedDate = remember(entry.timestamp) {
         entry.timestamp?.let { dateFormatter.format(it) } ?: ""
     }

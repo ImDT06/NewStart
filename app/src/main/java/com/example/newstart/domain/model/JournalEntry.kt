@@ -14,11 +14,12 @@ data class JournalEntry(
     val imageSource: String? = null, // "CAMERA" hoặc "GALLERY"
     val linkedHabitId: String? = null, // ID của thói quen liên kết
     val linkedTodoId: String? = null,  // ID của tác vụ liên kết
-    val privacy: JournalPrivacy = JournalPrivacy.PRIVATE, // Quyền riêng tư
+    val privacy: JournalPrivacy = JournalPrivacy.FRIENDS, // Quyền riêng tư
     val type: JournalType = JournalType.NORMAL,
     val movieDetails: MovieDetails? = null,
     val bookDetails: BookDetails? = null,
     val subjectDetails: SubjectDetails? = null,
+    val reactions: Map<String, String> = emptyMap(), // Thả cảm xúc: userId -> emoji
     @ServerTimestamp
     val timestamp: Date? = null
 )

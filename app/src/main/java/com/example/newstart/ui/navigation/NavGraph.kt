@@ -150,9 +150,12 @@ fun NavGraph(
         }
 
         composable(route = Screen.Social.route) {
-            SocialScreen(onNavigateBack = {
-                navController.popBackStack()
-            })
+            SocialScreen(
+                mainViewModel = mainViewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
         }
 
         composable(route = Screen.Pomodoro.route) {
