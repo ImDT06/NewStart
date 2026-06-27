@@ -1,5 +1,12 @@
 package com.example.newstart.ui.features.home
 
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.Calendar
+import android.app.DatePickerDialog
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.animation.*
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -12,6 +19,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -70,11 +78,11 @@ fun HomeScreen(
                 showTodoDialog = false
                 editingTodo = null
             },
-            onConfirm = { task, priority ->
+            onConfirm = { task, priority, dueDate ->
                 if (editingTodo != null) {
-                    viewModel.updateTodo(editingTodo!!.copy(task = task, priority = priority))
+                    viewModel.updateTodo(editingTodo!!.copy(task = task, priority = priority, dueDate = dueDate))
                 } else {
-                    viewModel.addTodo(task, priority)
+                    viewModel.addTodo(task, priority, dueDate)
                 }
                 showTodoDialog = false
                 editingTodo = null
@@ -121,6 +129,41 @@ fun HomeContent(
     onDeleteTodo: (Todo) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val activeTodos = remember(todos) {
+        todos
+            .filter { !it.isCompleted }
+            .sortedBy {
+                when (it.priority) {
+                    Priority.HIGH -> 0
+                    Priority.MEDIUM -> 1
+                    Priority.LOW -> 2
+                }
+            }
+    }
+    
+    val completedTodos = remember(todos) { todos.filter { it.isCompleted } }
+    
+    val completedGroups = remember(completedTodos) {
+        completedTodos
+            .groupBy { todo ->
+                val date = todo.createdAt ?: Date()
+                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                sdf.format(date)
+            }
+            .toList()
+            .sortedByDescending { it.first }
+    }
+    
+    var isCompletedExpanded by remember { mutableStateOf(false) }
+    var isActiveTodosExpanded by remember { mutableStateOf(false) }
+
+    val handleToggleTodo: (String, Boolean) -> Unit = { id, isCompleted ->
+        if (isCompleted) {
+            isCompletedExpanded = true
+        }
+        onToggleTodo(id, isCompleted)
+    }
+
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 100.dp)) {
@@ -129,7 +172,8 @@ fun HomeContent(
                     item { TimerCard(timerSeconds, onStopTimer) }
                 }
                 item { DailyOverviewCard(habits, todos) }
-                item { SectionHeader(title = "Thói quen hôm nay", action = "Tất cả", onActionClick = {})
+                item { 
+                    SectionHeader(title = "Thói quen hôm nay", action = "Tất cả", onActionClick = {})
                     LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         items(items = habits, key = { it.id }) { habit -> 
                             InstagramHabitItem(habit, onToggle = { onToggleHabit(habit, it) }) 
@@ -137,13 +181,165 @@ fun HomeContent(
                     }
                 }
                 item { SectionHeader(title = "Việc cần làm", action = "Thêm", onActionClick = onAddTodo) }
-                items(items = todos, key = { it.id }) { todo -> 
-                    TodoSwipeableItem(
-                        todo = todo,
-                        onToggle = { onToggleTodo(todo.id, it) },
-                        onClick = { onEditTodo(todo) },
-                        onDelete = { onDeleteTodo(todo) }
-                    )
+                
+                if (activeTodos.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp, horizontal = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Tuyệt vời! Bạn không còn việc nào cần làm.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                } else {
+                    itemsIndexed(items = activeTodos, key = { _, todo -> todo.id }) { index, todo -> 
+                        if (index < 5) {
+                            TodoSwipeableItem(
+                                todo = todo,
+                                onToggle = { handleToggleTodo(todo.id, it) },
+                                onClick = { onEditTodo(todo) },
+                                onDelete = { onDeleteTodo(todo) },
+                                modifier = Modifier.animateItem()
+                            )
+                        } else {
+                            AnimatedVisibility(
+                                visible = isActiveTodosExpanded,
+                                enter = expandVertically(spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
+                                exit = shrinkVertically(spring(stiffness = Spring.StiffnessLow)) + fadeOut()
+                            ) {
+                                TodoSwipeableItem(
+                                    todo = todo,
+                                    onToggle = { handleToggleTodo(todo.id, it) },
+                                    onClick = { onEditTodo(todo) },
+                                    onDelete = { onDeleteTodo(todo) },
+                                    modifier = Modifier.animateItem()
+                                )
+                            }
+                        }
+                    }
+
+                    if (activeTodos.size > 5) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                TextButton(
+                                    onClick = { isActiveTodosExpanded = !isActiveTodosExpanded },
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isActiveTodosExpanded) "Thu gọn danh sách" else "Xem thêm ${activeTodos.size - 5} việc cần làm khác",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Icon(
+                                            imageVector = if (isActiveTodosExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (completedTodos.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isCompletedExpanded = !isCompletedExpanded }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Đã hoàn thành (${completedTodos.size})",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = if (isCompletedExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    completedGroups.forEach { (dateStr, list) ->
+                        item(key = "header_$dateStr") {
+                            AnimatedVisibility(
+                                visible = isCompletedExpanded,
+                                enter = expandVertically(spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
+                                exit = shrinkVertically(spring(stiffness = Spring.StiffnessLow)) + fadeOut()
+                            ) {
+                                val headerText = remember(dateStr) {
+                                    try {
+                                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                                        val date = sdf.parse(dateStr) ?: Date()
+                                        
+                                        val todayStr = sdf.format(Date())
+                                        val yesterdayStr = sdf.format(Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000))
+                                        
+                                        when (dateStr) {
+                                            todayStr -> "Hôm nay"
+                                            yesterdayStr -> "Hôm qua"
+                                            else -> {
+                                                val outSdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                                                outSdf.format(date)
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        dateStr
+                                    }
+                                }
+                                Text(
+                                    text = headerText,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+
+                        items(items = list, key = { it.id }) { todo ->
+                            AnimatedVisibility(
+                                visible = isCompletedExpanded,
+                                enter = expandVertically(spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
+                                exit = shrinkVertically(spring(stiffness = Spring.StiffnessLow)) + fadeOut()
+                            ) {
+                                TodoSwipeableItem(
+                                    todo = todo,
+                                    onToggle = { handleToggleTodo(todo.id, it) },
+                                    onClick = { onEditTodo(todo) },
+                                    onDelete = { onDeleteTodo(todo) },
+                                    modifier = Modifier.animateItem()
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -155,7 +351,8 @@ private fun TodoSwipeableItem(
     todo: Todo,
     onToggle: (Boolean) -> Unit,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -166,7 +363,7 @@ private fun TodoSwipeableItem(
     val offsetX = remember { Animatable(0f) }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 1.dp)
     ) {
@@ -346,17 +543,37 @@ private fun HomeTodoItem(
         Priority.LOW -> Color(0xFF00C851)
     }
 
+    val isOverdue = remember(todo.dueDate, todo.isCompleted) {
+        todo.dueDate?.let {
+            val calToday = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val calDue = Calendar.getInstance().apply {
+                time = it
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            !todo.isCompleted && calDue.before(calToday)
+        } ?: false
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 2.dp)
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .height(IntrinsicSize.Min)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
             .border(
                 0.5.dp, 
                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), 
                 RoundedCornerShape(12.dp)
             )
-            .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -364,13 +581,13 @@ private fun HomeTodoItem(
         Box(
             modifier = Modifier
                 .width(4.dp)
-                .height(44.dp)
+                .fillMaxHeight()
                 .background(priorityColor)
         )
         
         Spacer(modifier = Modifier.width(12.dp))
 
-        Column(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
+        Column(modifier = Modifier.weight(1f).padding(vertical = 6.dp)) {
             Text(
                 text = todo.task, 
                 fontSize = 14.sp,
@@ -378,6 +595,26 @@ private fun HomeTodoItem(
                 color = if (todo.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium
             )
+
+            if (todo.dueDate != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+                    Icon(
+                        imageVector = Icons.Default.CalendarToday,
+                        contentDescription = null,
+                        tint = if (isOverdue) Color(0xFFFF4444) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (isOverdue) "Quá hạn: ${sdf.format(todo.dueDate)}" else sdf.format(todo.dueDate),
+                        fontSize = 11.sp,
+                        fontWeight = if (isOverdue) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isOverdue) Color(0xFFFF4444) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+            }
         }
 
         Checkbox(
@@ -408,11 +645,13 @@ private fun SectionHeader(title: String, action: String, onActionClick: () -> Un
 fun TodoEditDialog(
     todo: Todo?,
     onDismiss: () -> Unit,
-    onConfirm: (String, Priority) -> Unit
+    onConfirm: (String, Priority, Date?) -> Unit
 ) {
     var task by remember { mutableStateOf(todo?.task ?: "") }
     var priority by remember { mutableStateOf(todo?.priority ?: Priority.MEDIUM) }
+    var dueDate by remember { mutableStateOf<Date?>(todo?.dueDate) }
     val focusRequester = remember { FocusRequester() }
+    val context = LocalContext.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -440,23 +679,41 @@ fun TodoEditDialog(
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    OutlinedTextField(
-                        value = task,
-                        onValueChange = { task = it },
-                        placeholder = { Text("Bạn định làm gì thế?", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f),
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
-                        ),
-                        maxLines = 3,
-                        textStyle = MaterialTheme.typography.bodyLarge
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = task,
+                            onValueChange = { if (it.length <= 50) task = it },
+                            placeholder = { Text("Bạn định làm gì thế?", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f),
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            maxLines = 3,
+                            textStyle = MaterialTheme.typography.bodyLarge
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Text(
+                                text = "${task.length}/50",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (task.length >= 45) Color(0xFFFF4444) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                fontWeight = if (task.length >= 45) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
 
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
@@ -507,6 +764,84 @@ fun TodoEditDialog(
                         }
                     }
 
+                    // Hạn hoàn thành (Due Date)
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            "Hạn hoàn thành",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+                            val dateText = dueDate?.let { sdf.format(it) } ?: "Không có hạn chót"
+                            
+                            val showDatePicker = {
+                                val calendar = Calendar.getInstance()
+                                dueDate?.let { calendar.time = it }
+                                DatePickerDialog(
+                                    context,
+                                    { _, year, month, dayOfMonth ->
+                                        val newCal = Calendar.getInstance()
+                                        newCal.set(year, month, dayOfMonth)
+                                        dueDate = newCal.time
+                                    },
+                                    calendar.get(Calendar.YEAR),
+                                    calendar.get(Calendar.MONTH),
+                                    calendar.get(Calendar.DAY_OF_MONTH)
+                                ).show()
+                            }
+
+                            Surface(
+                                onClick = showDatePicker,
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (dueDate != null) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                border = BorderStroke(1.dp, if (dueDate != null) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = null,
+                                        tint = if (dueDate != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = dateText,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (dueDate != null) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (dueDate != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            if (dueDate != null) {
+                                IconButton(
+                                    onClick = { dueDate = null },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(Color.Red.copy(alpha = 0.08f), CircleShape)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Gỡ hạn chót",
+                                        tint = Color.Red,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -520,7 +855,7 @@ fun TodoEditDialog(
                         }
                         
                         Button(
-                            onClick = { if (task.isNotBlank()) onConfirm(task, priority) },
+                            onClick = { if (task.isNotBlank()) onConfirm(task, priority, dueDate) },
                             enabled = task.isNotBlank(),
                             modifier = Modifier.weight(1f).height(50.dp),
                             shape = RoundedCornerShape(14.dp),

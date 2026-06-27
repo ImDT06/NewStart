@@ -356,30 +356,91 @@ private fun ArchiveCard(
     onClick: () -> Unit
 ) {
     val isDark = LocalDarkTheme.current
-    val cardColor = if (isDark) {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+    val hasImage = latestEntry?.imageUrl != null
+    val cardShape = RoundedCornerShape(24.dp)
+
+    val borderStroke = if (hasImage) {
+        BorderStroke(
+            1.dp,
+            if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
+        )
     } else {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+        BorderStroke(
+            1.dp,
+            if (isDark) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            else MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        )
+    }
+
+    val shadowElevation = if (hasImage) {
+        0.dp
+    } else {
+        if (isDark) 0.dp else 3.dp
     }
 
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        color = cardColor,
-        border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f)),
+        shape = cardShape,
+        color = if (hasImage) {
+            if (isDark) Color(0xFF1E1E1E) else Color(0xFFF2F2F2)
+        } else {
+            Color.Transparent
+        },
+        border = borderStroke,
+        shadowElevation = shadowElevation,
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(0.9f)
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (!hasImage) {
+                        if (isDark) {
+                            Modifier.background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.05f)
+                                    )
+                                )
+                            )
+                        } else {
+                            Modifier.background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                                        MaterialTheme.colorScheme.surface
+                                    )
+                                )
+                            )
+                        }
+                    } else {
+                        Modifier
+                    }
+                )
+        ) {
             // Background preview image if available
             if (latestEntry?.imageUrl != null) {
                 AsyncImage(
                     model = latestEntry.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                    alpha = 0.25f
+                    contentScale = ContentScale.Crop
+                )
+                // Gradient scrim overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.15f),
+                                    Color.Black.copy(alpha = 0.85f)
+                                )
+                            )
+                        )
                 )
             }
 
@@ -390,36 +451,72 @@ private fun ArchiveCard(
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 // Header: Total logs
-                Row(
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.35f), CircleShape)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = if (imageCount > 0) Icons.Default.PhotoLibrary else Icons.Default.Description,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "$totalCount ghi chép",
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                if (hasImage) {
+                    // Glassmorphic translucent dark badge for image cards
+                    Row(
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (imageCount > 0) Icons.Default.PhotoLibrary else Icons.Default.Description,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "$totalCount ghi chép",
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
+                    // Modern styled color tag for non-image cards
+                    val badgeBgColor = if (isDark) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    } else {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    }
+                    val badgeTextColor = if (isDark) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .background(badgeBgColor, CircleShape)
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (imageCount > 0) Icons.Default.PhotoLibrary else Icons.Default.Description,
+                            contentDescription = null,
+                            tint = badgeTextColor,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "$totalCount ghi chép",
+                            color = badgeTextColor,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 // Bottom: Title & Rating
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Black,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = if (hasImage) Color.White else MaterialTheme.colorScheme.onSurface
                     )
 
                     if (rating > 0) {
@@ -432,10 +529,10 @@ private fun ArchiveCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = String.format("%.1f", rating),
+                                text = String.format(Locale.US, "%.1f", rating),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (hasImage) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -554,82 +651,124 @@ private fun ArchiveEntryItem(
 
     Surface(
         color = if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f)
-        else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+        else MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.03f)),
+        border = BorderStroke(
+            1.dp,
+            if (isDark) Color.White.copy(alpha = 0.06f)
+            else MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        ),
+        shadowElevation = if (isDark) 0.dp else 2.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            // Header: Date & Mood
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+        ) {
+            // Left Accent Strip
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(14.dp)
             ) {
-                Text(
-                    text = formattedDate,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                )
-
-                // Mood Icon
-                val icon = moodIcons[entry.emoji]
-                if (icon != null) {
-                    Image(
-                        painter = painterResource(id = icon),
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                } else if (entry.emoji.isNotEmpty()) {
-                    Text(text = entry.emoji, fontSize = 14.sp)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Body text
-            if (entry.text.isNotEmpty()) {
-                Text(
-                    text = entry.text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 20.sp
-                )
-            }
-
-            // Image Preview (scenes/slides/quotes snapshot)
-            if (entry.imageUrl != null) {
-                Spacer(modifier = Modifier.height(10.dp))
-                AsyncImage(
-                    model = entry.imageUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1.2f)
-                        .clip(RoundedCornerShape(14.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
-
-            // Specific rating info if different from group
-            val entryRating = when (entry.type) {
-                JournalType.MOVIE -> entry.movieDetails?.rating
-                JournalType.BOOK -> entry.bookDetails?.rating
-                JournalType.SUBJECT -> entry.subjectDetails?.understandingLevel?.toFloat()
-                else -> null
-            }
-
-            if (entryRating != null && entryRating > 0) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    (1..5).forEach { i ->
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = null,
-                            tint = if (i <= entryRating) (if (isSubject) Color(0xFF00C851) else Color(0xFFFFCC00)) else Color.Gray.copy(alpha = 0.25f),
-                            modifier = Modifier.size(12.dp)
+                // Header: Date & Mood
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Date Chip Badge
+                    Row(
+                        modifier = Modifier
+                            .background(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = formattedDate,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
+                    }
+
+                    // Mood Icon
+                    val icon = moodIcons[entry.emoji]
+                    if (icon != null) {
+                        Image(
+                            painter = painterResource(id = icon),
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    } else if (entry.emoji.isNotEmpty()) {
+                        Text(text = entry.emoji, fontSize = 14.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Body text
+                if (entry.text.isNotEmpty()) {
+                    Text(
+                        text = entry.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 20.sp
+                    )
+                }
+
+                // Image Preview (scenes/slides/quotes snapshot)
+                if (entry.imageUrl != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    AsyncImage(
+                        model = entry.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1.5f)
+                            .clip(RoundedCornerShape(14.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                // Specific rating info if different from group
+                val entryRating = when (entry.type) {
+                    JournalType.MOVIE -> entry.movieDetails?.rating
+                    JournalType.BOOK -> entry.bookDetails?.rating
+                    JournalType.SUBJECT -> entry.subjectDetails?.understandingLevel?.toFloat()
+                    else -> null
+                }
+
+                if (entryRating != null && entryRating > 0) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(
+                                if (isSubject) Color(0xFF00C851).copy(alpha = 0.08f)
+                                else Color(0xFFFFCC00).copy(alpha = 0.1f),
+                                RoundedCornerShape(6.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                    ) {
+                        (1..5).forEach { i ->
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = if (i <= entryRating) (if (isSubject) Color(0xFF00C851) else Color(0xFFFFCC00)) else Color.Gray.copy(alpha = 0.25f),
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
                     }
                 }
             }

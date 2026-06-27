@@ -12,6 +12,7 @@ import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.lazy.LazyColumn
@@ -35,9 +36,11 @@ class HabitWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val habits = fetchHabitsForToday()
+        val sharedPrefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val isStreakEnabled = sharedPrefs.getBoolean("is_streak_widget_enabled", true)
         
         provideContent {
-            HabitWidgetContent(habits)
+            HabitWidgetContent(habits, isStreakEnabled)
         }
     }
 
@@ -60,7 +63,7 @@ class HabitWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun HabitWidgetContent(habits: List<com.example.newstart.domain.model.Habit>) {
+    private fun HabitWidgetContent(habits: List<com.example.newstart.domain.model.Habit>, isStreakEnabled: Boolean) {
         val today = LocalDate.now()
         val dateFormatter = DateTimeFormatter.ofPattern("EEEE, dd/MM", java.util.Locale("vi"))
         val dateString = today.format(dateFormatter)
@@ -150,6 +153,10 @@ class HabitWidget : GlanceAppWidget() {
                                     )
                                 }
                             }
+                            if (isStreakEnabled && habit.streak > 0) {
+                                StreakBadge(streak = habit.streak)
+                                Spacer(modifier = GlanceModifier.width(8.dp))
+                            }
                             Text(
                                 text = if (habit.isCompleted) "✅" else "⭕",
                                 style = TextStyle(fontSize = 16.sp)
@@ -158,6 +165,31 @@ class HabitWidget : GlanceAppWidget() {
                     }
                 }
             }
+        }
+    }
+
+    @Composable
+    private fun StreakBadge(streak: Int) {
+        Row(
+            modifier = GlanceModifier
+                .background(Color(0xFF2A2A2A))
+                .cornerRadius(12.dp)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "🔥",
+                style = TextStyle(fontSize = 11.sp)
+            )
+            Spacer(modifier = GlanceModifier.width(4.dp))
+            Text(
+                text = streak.toString(),
+                style = TextStyle(
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ColorProvider(Color.White)
+                )
+            )
         }
     }
 }

@@ -137,9 +137,16 @@ fun NavGraph(
         }
 
         composable(route = Screen.Profile.route) {
-            SettingsScreen(onNavigateToSocial = {
-                navController.navigate(Screen.Social.route)
-            })
+            SettingsScreen(
+                onNavigateToSocial = {
+                    navController.navigate(Screen.Social.route)
+                },
+                onNavigateToHome = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = false }
+                    }
+                }
+            )
         }
 
         composable(route = Screen.Social.route) {
