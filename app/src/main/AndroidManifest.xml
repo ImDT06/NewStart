@@ -48,6 +48,10 @@
                 android:resource="@xml/habit_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".widget.WidgetPinnedReceiver"
+            android:exported="false" />
+
         <!-- Service to enable backward compatibility for Per-App Language -->
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
