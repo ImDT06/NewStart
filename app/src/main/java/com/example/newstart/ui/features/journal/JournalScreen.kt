@@ -167,16 +167,12 @@ fun JournalContent(
         derivedStateOf {
             if (searchQuery.isEmpty()) entries
             else entries.filter {
-                it.text.contains(
-                    searchQuery,
-                    ignoreCase = true
-                ) || it.emoji.contains(searchQuery)
+                it.text.contains(searchQuery, ignoreCase = true) || it.emoji.contains(searchQuery)
             }
         }
     }
 
     val backgroundColor = MaterialTheme.colorScheme.background
-    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
 
     Box(
         modifier = modifier
@@ -185,15 +181,14 @@ fun JournalContent(
                 brush = remember(isDark, backgroundColor) {
                     Brush.verticalGradient(
                         colors = if (isDark) listOf(Color.Black, Color.Black)
-                        else listOf(backgroundColor, backgroundColor) // Trắng đồng bộ ở chế độ sáng
+                        else listOf(backgroundColor, backgroundColor)
                     )
                 }
             )
     ) {
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()) {
-            // Header với hiệu ứng Search Icon chạy từ phải sang trái
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+
+            // Header
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -204,9 +199,8 @@ fun JournalContent(
                 val availableWidth = constraintsScope.maxWidth
                 val searchIconSize = 44.dp
 
-                // Vị trí bắt đầu (bên phải, trước icon lịch) và kết thúc (bên trái)
                 val startOffset = availableWidth - (searchIconSize * 2)
-                val endOffset = (-8).dp // Chỉnh một chút để khớp với padding của TextField
+                val endOffset = (-8).dp
 
                 val searchOffset by animateDpAsState(
                     targetValue = if (isSearchActive) endOffset else startOffset,
@@ -214,7 +208,6 @@ fun JournalContent(
                     label = "search_offset"
                 )
 
-                // 1. Tiêu đề (Fade out khi search)
                 androidx.compose.animation.AnimatedVisibility(
                     visible = !isSearchActive,
                     enter = fadeIn(tween(200)),
@@ -229,7 +222,6 @@ fun JournalContent(
                     )
                 }
 
-                // 2. Icon Lịch (Fade out khi search)
                 androidx.compose.animation.AnimatedVisibility(
                     visible = !isSearchActive,
                     enter = fadeIn(tween(200)),
@@ -245,7 +237,6 @@ fun JournalContent(
                     }
                 }
 
-                // 3. Khu vực Search
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
@@ -308,7 +299,7 @@ fun JournalContent(
                 }
             }
 
-            // Tabs: Cá nhân | Cộng đồng
+            // Tabs — fix highlight bug
             TabRow(
                 selectedTabIndex = currentTab,
                 containerColor = Color.Transparent,
@@ -329,6 +320,8 @@ fun JournalContent(
                 Tab(
                     selected = currentTab == 0,
                     onClick = { onTabSelected(0) },
+                    selectedContentColor = MaterialTheme.colorScheme.primary,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     text = {
                         Text(
                             if (isVietnamese) "Cá nhân" else "Personal",
@@ -340,6 +333,8 @@ fun JournalContent(
                 Tab(
                     selected = currentTab == 1,
                     onClick = { onTabSelected(1) },
+                    selectedContentColor = MaterialTheme.colorScheme.primary,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     text = {
                         Text(
                             if (isVietnamese) "Cộng đồng" else "Community",
@@ -350,7 +345,7 @@ fun JournalContent(
                 )
             }
 
-            // Ngày tháng & Filter (Chỉ hiện khi ở tab Cá nhân)
+            // Filter row
             AnimatedVisibility(visible = currentTab == 0) {
                 Row(
                     modifier = Modifier
@@ -365,20 +360,14 @@ fun JournalContent(
                             if (start == today) if (isVietnamese) "Hôm nay" else "Today"
                             else start.format(
                                 DateTimeFormatter.ofPattern(
-                                    if (isVietnamese) "dd MMMM" else "MMMM dd",
-                                    locale
+                                    if (isVietnamese) "dd MMMM" else "MMMM dd", locale
                                 )
                             )
                         } else {
                             val pattern = if (isVietnamese) "dd/MM" else "MM/dd"
-                            "${
-                                start.format(
-                                    DateTimeFormatter.ofPattern(
-                                        pattern,
-                                        locale
-                                    )
-                                )
-                            } - ${end.format(DateTimeFormatter.ofPattern(pattern, locale))}"
+                            "${start.format(DateTimeFormatter.ofPattern(pattern, locale))} - ${
+                                end.format(DateTimeFormatter.ofPattern(pattern, locale))
+                            }"
                         }
                     }
 
@@ -435,9 +424,9 @@ fun JournalContent(
                 onDateRangeSelected = { start, end ->
                     onDateRangeSelected(start, end)
                     showDatePicker = false
-                    val weekDiff =
-                        (start.toEpochDay() - today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                            .toEpochDay()) / 7
+                    val weekDiff = (start.toEpochDay() - today.with(
+                        TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)
+                    ).toEpochDay()) / 7
                     scope.launch { pagerState.scrollToPage(500 + weekDiff.toInt()) }
                 }
             )
@@ -471,15 +460,11 @@ fun JournalContent(
                         ) {
                             permissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
                         } else {
-                            scope.launch {
-                                ImageDownloader.downloadImage(context, url)
-                            }
+                            scope.launch { ImageDownloader.downloadImage(context, url) }
                         }
                     } ?: run {
                         android.widget.Toast.makeText(
-                            context,
-                            "Bài viết không có ảnh",
-                            android.widget.Toast.LENGTH_SHORT
+                            context, "Bài viết không có ảnh", android.widget.Toast.LENGTH_SHORT
                         ).show()
                     }
                 },
@@ -515,10 +500,8 @@ private fun QuickFiltersSection(
             val isSelected = remember(selectedDateRange, key) {
                 val today = LocalDate.now()
                 when (key) {
-                    "Month" -> selectedDateRange.first == today.withDayOfMonth(1) && selectedDateRange.second == today.withDayOfMonth(
-                        today.lengthOfMonth()
-                    )
-
+                    "Month" -> selectedDateRange.first == today.withDayOfMonth(1) &&
+                            selectedDateRange.second == today.withDayOfMonth(today.lengthOfMonth())
                     "All" -> selectedDateRange.first == LocalDate.of(2000, 1, 1)
                     else -> false
                 }
@@ -538,9 +521,8 @@ private fun QuickFiltersSection(
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                    containerColor = if (isDark) Color.White.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surfaceVariant.copy(
-                        alpha = 0.3f
-                    ),
+                    containerColor = if (isDark) Color.White.copy(alpha = 0.05f)
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                     labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                 ),
                 border = null
@@ -564,14 +546,11 @@ private fun JournalList(
     val focusManager = LocalFocusManager.current
     val listBackgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.background
 
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         if (filteredEntries.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                val emptyMsg =
-                    if (searchQuery.isEmpty()) stringResource(R.string.journal_empty_message)
-                    else if (isVietnamese) "Không tìm thấy nhật ký phù hợp" else "No matching journal found"
+                val emptyMsg = if (searchQuery.isEmpty()) stringResource(R.string.journal_empty_message)
+                else if (isVietnamese) "Không tìm thấy nhật ký phù hợp" else "No matching journal found"
                 Text(
                     emptyMsg,
                     textAlign = TextAlign.Center,
@@ -594,12 +573,8 @@ private fun JournalList(
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) },
-                contentPadding = PaddingValues(
-                    top = 2.dp,
-                    bottom = 100.dp,
-                    start = 16.dp,
-                    end = 16.dp
-                )
+                // Fix: tăng padding ngang để card không sát mép
+                contentPadding = PaddingValues(top = 2.dp, bottom = 100.dp, start = 16.dp, end = 16.dp)
             ) {
                 groupedEntries.forEach { (date, entriesInDate) ->
                     stickyHeader {
@@ -610,18 +585,14 @@ private fun JournalList(
                             Text(
                                 text = date.format(
                                     DateTimeFormatter.ofPattern(
-                                        if (isVietnamese) "dd MMMM, yyyy" else "MMMM dd, yyyy",
-                                        locale
+                                        if (isVietnamese) "dd MMMM, yyyy" else "MMMM dd, yyyy", locale
                                     )
                                 ),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
                                 modifier = Modifier.padding(
-                                    top = 4.dp,
-                                    bottom = 10.dp,
-                                    start = 12.dp,
-                                    end = 12.dp
+                                    top = 4.dp, bottom = 10.dp, start = 12.dp, end = 12.dp
                                 )
                             )
                         }
@@ -631,16 +602,14 @@ private fun JournalList(
                         TimelineEntryItem(
                             entry = entry,
                             timeFormatted = remember(entry.timestamp) {
-                                entry.timestamp?.let {
-                                    timeFormatter.format(
-                                        it
-                                    )
-                                } ?: "--:--"
+                                entry.timestamp?.let { timeFormatter.format(it) } ?: "--:--"
                             },
                             isLast = entriesInDate.last().id == entry.id,
                             onImageClick = onImageClick,
                             onOptionsClick = { onOptionsClick(entry) }
                         )
+                        // Spacer nhỏ giữa các entry (bottom padding đã có trong TimelineEntryItem)
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
             }
@@ -667,37 +636,21 @@ private fun JournalOptionsSheet(
                 .padding(bottom = 40.dp, top = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            TextButton(
-                onClick = { onShare(); onDismiss() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            TextButton(onClick = { onShare(); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
                 Text("Chia sẻ", style = MaterialTheme.typography.bodyLarge)
             }
-
-            TextButton(
-                onClick = { onDownload(); onDismiss() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            TextButton(onClick = { onDownload(); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
                 Text("Tải về", style = MaterialTheme.typography.bodyLarge)
             }
-
-            TextButton(
-                onClick = onDelete,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
                 Text(
                     "Xóa",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.error
                 )
             }
-
             Spacer(modifier = Modifier.height(12.dp))
-
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
                 Text(
                     "Hủy",
                     style = MaterialTheme.typography.bodyLarge,
@@ -724,7 +677,9 @@ private fun DeleteConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.journal_cancel_button)) }
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.journal_cancel_button))
+            }
         }
     )
 }
@@ -735,32 +690,23 @@ private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val view = LocalView.current
 
-    // Thiết lập Edge-to-Edge cực đoan cho Dialog Window
     SideEffect {
         val window = (view.parent as? DialogWindowProvider)?.window
         window?.let {
-            // Cho phép vẽ tràn ra ngoài mọi giới hạn hệ thống
             it.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
-
-            // Ép vẽ vào cả vùng tai thỏ (API 28+)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
                 it.attributes.layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
-
-            // Xóa bỏ hiệu ứng làm mờ nền của Dialog (dim)
             it.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-
             WindowCompat.setDecorFitsSystemWindows(it, false)
             it.statusBarColor = AndroidColor.TRANSPARENT
             it.navigationBarColor = AndroidColor.TRANSPARENT
             it.setBackgroundDrawableResource(android.R.color.transparent)
-
             it.setLayout(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT
             )
-
             WindowCompat.getInsetsController(it, view).isAppearanceLightStatusBars = false
         }
     }
@@ -769,7 +715,6 @@ private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
     var offset by remember { mutableStateOf(Offset.Zero) }
     var isUiVisible by remember { mutableStateOf(true) }
 
-    // Tự động ẩn/hiện thanh trạng thái giống Messenger
     LaunchedEffect(isUiVisible) {
         val window = (view.parent as? DialogWindowProvider)?.window
         window?.let {
@@ -784,21 +729,14 @@ private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
         }
     }
 
-    // Tính toán độ mờ của background và độ bo góc dựa trên trạng thái Zoom/UI
     val isZoomed = scale > 1f
     val backgroundAlpha by animateFloatAsState(
         targetValue = if (isUiVisible && !isZoomed) 0.4f else 0f,
         label = "bg_alpha"
     )
-    // Bo góc về 0 khi ẩn UI hoặc khi đang Zoom
     val imageCornerRadius by animateDpAsState(
         targetValue = if (isZoomed || !isUiVisible) 0.dp else 24.dp,
         label = "corner_radius"
-    )
-    // Padding về 0 khi ẩn UI hoặc khi đang Zoom để ảnh tràn màn hình
-    val horizontalPadding by animateDpAsState(
-        targetValue = if (isZoomed || !isUiVisible) 0.dp else 16.dp,
-        label = "padding"
     )
 
     Dialog(
@@ -808,28 +746,18 @@ private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
             decorFitsSystemWindows = false
         )
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-        ) {
-            // Blurred Background - Bây giờ sẽ tràn toàn bộ kể cả status bar
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             AsyncImage(
                 model = url,
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer {
-                        // Tăng scale mạnh hơn để đảm bảo không bị hở viền khi blur cực nặng
-                        scaleX = 1.3f
-                        scaleY = 1.3f
-                    }
+                    .graphicsLayer { scaleX = 1.3f; scaleY = 1.3f }
                     .blur(40.dp),
                 contentScale = ContentScale.Crop,
                 alpha = backgroundAlpha
             )
 
-            // Main Image with Zoom and Pan
             var containerSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
 
             Box(
@@ -840,16 +768,14 @@ private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
                         detectTransformGestures { centroid, pan, zoom, _ ->
                             val oldScale = scale
                             scale = (scale * zoom).coerceIn(1f, 5f)
-
                             if (scale > 1f) {
                                 isUiVisible = false
-                                // Công thức chuẩn: Zoom vào tâm điểm ngón tay
-                                // Cần trừ đi một nửa kích thước container để đưa centroid về hệ tọa độ tâm
-                                val center =
-                                    Offset(containerSize.width / 2f, containerSize.height / 2f)
+                                val center = Offset(
+                                    containerSize.width / 2f, containerSize.height / 2f
+                                )
                                 val relativeCentroid = centroid - center
-                                offset =
-                                    (offset + pan) * (scale / oldScale) + (relativeCentroid * (1 - scale / oldScale))
+                                offset = (offset + pan) * (scale / oldScale) +
+                                        (relativeCentroid * (1 - scale / oldScale))
                             } else {
                                 offset = Offset.Zero
                                 isUiVisible = true
@@ -860,23 +786,19 @@ private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
                         detectTapGestures(
                             onDoubleTap = { tapOffset ->
                                 if (scale > 1f) {
-                                    scale = 1f
-                                    offset = Offset.Zero
-                                    isUiVisible = true
+                                    scale = 1f; offset = Offset.Zero; isUiVisible = true
                                 } else {
                                     scale = 3f
-                                    val center =
-                                        Offset(containerSize.width / 2f, containerSize.height / 2f)
-                                    val relativeTap = tapOffset - center
-                                    offset = relativeTap * (1 - 3f)
+                                    val center = Offset(
+                                        containerSize.width / 2f, containerSize.height / 2f
+                                    )
+                                    offset = (tapOffset - center) * (1 - 3f)
                                     isUiVisible = false
                                 }
                             },
                             onTap = {
                                 if (scale > 1f) {
-                                    scale = 1f
-                                    offset = Offset.Zero
-                                    isUiVisible = true
+                                    scale = 1f; offset = Offset.Zero; isUiVisible = true
                                 } else {
                                     isUiVisible = !isUiVisible
                                 }
@@ -893,12 +815,8 @@ private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
                         .wrapContentHeight()
                         .padding(horizontal = if (isZoomed) 0.dp else 16.dp)
                         .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = offset.x
-                            translationY = offset.y
-
-                            // Luôn áp dụng bo góc, radius sẽ tự về 0 khi zoom nhờ animateDpAsState
+                            scaleX = scale; scaleY = scale
+                            translationX = offset.x; translationY = offset.y
                             shape = RoundedCornerShape(imageCornerRadius)
                             clip = true
                         },
@@ -906,7 +824,6 @@ private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
                 )
             }
 
-            // Messenger Style Top Bar
             AnimatedVisibility(
                 visible = isUiVisible && !isZoomed,
                 enter = fadeIn() + slideInVertically(),
@@ -922,47 +839,33 @@ private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
                 ) {
                     IconButton(onClick = onDismiss) {
                         Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            Icons.Default.Close, "Close",
+                            tint = Color.White, modifier = Modifier.size(24.dp)
                         )
                     }
-
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    ImageDownloader.downloadImage(context, url)
-                                }
-                            }
-                        ) {
+                        IconButton(onClick = {
+                            scope.launch { ImageDownloader.downloadImage(context, url) }
+                        }) {
                             Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = "Download",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
+                                Icons.Default.Download, "Download",
+                                tint = Color.White, modifier = Modifier.size(22.dp)
                             )
                         }
-
-                        IconButton(
-                            onClick = {
-                                val sendIntent = Intent().apply {
-                                    action = Intent.ACTION_SEND
-                                    putExtra(
-                                        Intent.EXTRA_TEXT,
-                                        "Xem khoảnh khắc từ NewStart Journal: $url"
-                                    )
-                                    type = "text/plain"
-                                }
-                                context.startActivity(Intent.createChooser(sendIntent, null))
+                        IconButton(onClick = {
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(
+                                    Intent.EXTRA_TEXT,
+                                    "Xem khoảnh khắc từ NewStart Journal: $url"
+                                )
+                                type = "text/plain"
                             }
-                        ) {
+                            context.startActivity(Intent.createChooser(sendIntent, null))
+                        }) {
                             Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Share",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
+                                Icons.Default.Share, "Share",
+                                tint = Color.White, modifier = Modifier.size(22.dp)
                             )
                         }
                     }
@@ -981,9 +884,7 @@ private fun SocialFeedList(
     onImageClick: (String) -> Unit
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
+        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
         color = if (isDark) Color.Black else MaterialTheme.colorScheme.background
     ) {
         if (socialFeed.isEmpty()) {
@@ -993,8 +894,7 @@ private fun SocialFeedList(
                 verticalArrangement = Arrangement.Center
             ) {
                 Icon(
-                    Icons.Default.Group,
-                    null,
+                    Icons.Default.Group, null,
                     modifier = Modifier.size(64.dp),
                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                 )
@@ -1005,7 +905,8 @@ private fun SocialFeedList(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    if (isVietnamese) "Kết nối với bạn bè để cùng nhau kỷ luật" else "Connect with friends to stay disciplined together",
+                    if (isVietnamese) "Kết nối với bạn bè để cùng nhau kỷ luật"
+                    else "Connect with friends to stay disciplined together",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
@@ -1013,23 +914,14 @@ private fun SocialFeedList(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    top = 16.dp,
-                    bottom = 100.dp,
-                    start = 12.dp,
-                    end = 12.dp
-                ),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp, start = 12.dp, end = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(items = socialFeed, key = { it.id }) { entry ->
                     SocialFeedItem(
                         entry = entry,
                         timeFormatted = remember(entry.timestamp) {
-                            entry.timestamp?.let {
-                                timeFormatter.format(
-                                    it
-                                )
-                            } ?: "--:--"
+                            entry.timestamp?.let { timeFormatter.format(it) } ?: "--:--"
                         },
                         onImageClick = onImageClick
                     )
@@ -1065,8 +957,7 @@ fun SocialFeedItem(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            Icons.Default.Person,
-                            null,
+                            Icons.Default.Person, null,
                             modifier = Modifier.size(20.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
@@ -1140,18 +1031,8 @@ fun JournalScreenPreview() {
     NewStartTheme {
         JournalContent(
             entries = listOf(
-                JournalEntry(
-                    id = "1",
-                    emoji = "😊",
-                    text = "Một ngày tuyệt vời!",
-                    timestamp = Date()
-                ),
-                JournalEntry(
-                    id = "2",
-                    emoji = "🥰",
-                    text = "Học Compose thú vị quá",
-                    timestamp = Date()
-                )
+                JournalEntry(id = "1", emoji = "😊", text = "Một ngày tuyệt vời!", timestamp = Date()),
+                JournalEntry(id = "2", emoji = "🥰", text = "Học Compose thú vị quá", timestamp = Date())
             ),
             socialFeed = emptyList(),
             selectedDateRange = LocalDate.now() to null,
