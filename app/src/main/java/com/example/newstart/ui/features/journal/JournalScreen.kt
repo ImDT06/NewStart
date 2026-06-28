@@ -103,6 +103,7 @@ fun JournalScreen(
         socialFeed = socialFeed,
         selectedDateRange = selectedDateRange,
         currentTab = currentTab,
+        currentUserId = viewModel.currentUserId ?: "",
         onTabSelected = { viewModel.onTabSelected(it) },
         onDateRangeSelected = { start, end -> viewModel.onDateRangeSelected(start, end) },
         onQuickFilterSelected = { viewModel.setQuickFilter(it) },
@@ -121,6 +122,7 @@ fun JournalContent(
     socialFeed: List<JournalEntry>,
     selectedDateRange: Pair<LocalDate, LocalDate?>,
     currentTab: Int,
+    currentUserId: String,
     onTabSelected: (Int) -> Unit,
     onDateRangeSelected: (LocalDate, LocalDate?) -> Unit,
     onQuickFilterSelected: (String) -> Unit,
@@ -405,6 +407,7 @@ fun JournalContent(
                     socialFeed = socialFeed,
                     isVietnamese = isVietnamese,
                     isDark = isDark,
+                    currentUserId = currentUserId,
                     dateTimeFormatter = dateTimeFormatter,
                     onImageClick = { selectedImageUrl = it },
                     getUserFlow = getUserFlow,
@@ -895,6 +898,7 @@ private fun SocialFeedList(
     socialFeed: List<JournalEntry>,
     isVietnamese: Boolean,
     isDark: Boolean,
+    currentUserId: String,
     dateTimeFormatter: SimpleDateFormat,
     onImageClick: (String) -> Unit,
     getUserFlow: (String) -> Flow<User>,
@@ -933,6 +937,7 @@ private fun SocialFeedList(
                     SocialFeedItem(
                         entry = entry,
                         timeFormatted = remember(entry.timestamp) { entry.timestamp?.let { dateTimeFormatter.format(it) } ?: "--:--" },
+                        currentUserId = currentUserId,
                         onImageClick = onImageClick,
                         getUserFlow = getUserFlow,
                         onReactToPost = onReactToPost
@@ -947,14 +952,12 @@ private fun SocialFeedList(
 fun SocialFeedItem(
     entry: JournalEntry,
     timeFormatted: String,
+    currentUserId: String,
     onImageClick: (String) -> Unit,
     getUserFlow: (String) -> Flow<User>,
     onReactToPost: (String, String) -> Unit
 ) {
     val isDark = LocalDarkTheme.current
-    val currentUserId = remember {
-        com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
-    }
     
     val userState by remember(entry.userId) {
         getUserFlow(entry.userId)
@@ -1199,6 +1202,7 @@ fun JournalScreenPreview() {
             socialFeed = emptyList(),
             selectedDateRange = LocalDate.now() to null,
             currentTab = 0,
+            currentUserId = "",
             onTabSelected = {},
             onDateRangeSelected = { _, _ -> },
             onQuickFilterSelected = {},

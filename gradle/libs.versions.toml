@@ -43,6 +43,8 @@ androidx-baselineprofile = "1.5.0-alpha06"
 androidx-uiautomator = "2.3.0"
 androidx-benchmark = "1.5.0-alpha06"
 emoji2-emojipicker = "1.6.0"
+retrofit = "2.11.0"
+
 
 
 [libraries]
@@ -106,6 +108,9 @@ androidx-security-crypto = { group = "androidx.security", name = "security-crypt
 tink-android = { group = "com.google.crypto.tink", name = "tink-android", version.ref = "tink-android" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 emoji2-emojipicker = { group = "androidx.emoji2", name = "emoji2-emojipicker", version.ref = "emoji2-emojipicker" }
+retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
+retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
+
 
 
 [plugins]

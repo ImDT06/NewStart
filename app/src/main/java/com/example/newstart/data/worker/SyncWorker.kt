@@ -7,24 +7,22 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.newstart.data.local.dao.HabitDao
 import com.example.newstart.data.local.toDomain
-import com.example.newstart.domain.model.Habit
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.newstart.data.remote.ApiService
+import com.example.newstart.domain.repository.AuthRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import kotlinx.coroutines.tasks.await
 
 @HiltWorker
 class SyncWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val habitDao: HabitDao,
-    private val firestore: FirebaseFirestore,
-    private val auth: FirebaseAuth
+    private val apiService: ApiService,
+    private val authRepository: AuthRepository
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val userId = auth.currentUser?.uid ?: return Result.failure()
+        val userId = authRepository.currentUserId ?: return Result.failure()
         
         return try {
             // 1. Lấy tất cả thói quen chưa đồng bộ
@@ -34,11 +32,12 @@ class SyncWorker @AssistedInject constructor(
             for (habitEntity in unsyncedHabits) {
                 val habit = habitEntity.toDomain()
                 
-                // 2. Đẩy lên Firestore
-                firestore.collection("habits")
-                    .document(habit.id)
-                    .set(habit)
-                    .await()
+                // 2. Đẩy lên backend API
+                if (habit.id.isEmpty()) {
+                    apiService.saveHabit(habit)
+                } else {
+                    apiService.updateHabit(habit.id, habit)
+                }
                 
                 // 3. Đánh dấu đã đồng bộ trong Room
                 habitDao.updateCompletion(
@@ -56,3 +55,4 @@ class SyncWorker @AssistedInject constructor(
         }
     }
 }
+

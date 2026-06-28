@@ -1,230 +1,150 @@
 package com.example.newstart.data.repository
 
+import com.example.newstart.data.remote.ApiService
 import com.example.newstart.domain.model.*
+import com.example.newstart.domain.repository.AuthRepository
 import com.example.newstart.domain.repository.SocialRepository
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class SocialRepositoryImpl @Inject constructor(
-    private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val authRepository: AuthRepository,
+    private val apiService: ApiService
 ) : SocialRepository {
 
-    override fun getFriends(): Flow<List<Friendship>> = callbackFlow {
-        val userId = auth.currentUser?.uid ?: return@callbackFlow
-        val listener = firestore.collection("friendships")
-            .whereArrayContains("userIds", userId)
-            .addSnapshotListener { snapshot, _ ->
-                val friendships = snapshot?.documents?.mapNotNull { doc ->
-                    try {
-                        doc.toObject(Friendship::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        android.util.Log.e("SocialRepository", "Error parsing friendship: ${e.message}")
-                        null
-                    }
-                }
-                trySend(friendships ?: emptyList())
-            }
-        awaitClose { listener.remove() }
+    override fun getFriends(): Flow<List<Friendship>> = flow {
+        val userId = authRepository.currentUserId
+        if (userId == null) {
+            emit(emptyList())
+            return@flow
+        }
+        try {
+            emit(apiService.getFriends(userId))
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error fetching friends: ${e.message}")
+            emit(emptyList())
+        }
     }
 
     override suspend fun sendFriendRequest(toUserId: String) {
-        val fromUserId = auth.currentUser?.uid ?: return
+        val fromUserId = authRepository.currentUserId ?: return
         try {
-            val requestData = mapOf(
-                "fromUserId" to fromUserId,
-                "toUserId" to toUserId,
-                "status" to FriendshipStatus.PENDING.name,
-                "timestamp" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-            )
-            firestore.collection("friendRequests").add(requestData).await()
+            apiService.sendFriendRequest(mapOf("fromUserId" to fromUserId, "toUserId" to toUserId))
         } catch (e: Exception) {
             android.util.Log.e("SocialRepository", "Error sending friend request: ${e.message}", e)
         }
     }
 
-    override fun getIncomingRequests(): Flow<List<FriendRequest>> = callbackFlow {
-        val userId = auth.currentUser?.uid ?: return@callbackFlow
-        val listener = firestore.collection("friendRequests")
-            .whereEqualTo("toUserId", userId)
-            .whereEqualTo("status", FriendshipStatus.PENDING.name)
-            .addSnapshotListener { snapshot, _ ->
-                val requests = snapshot?.documents?.mapNotNull { doc ->
-                    try {
-                        doc.toObject(FriendRequest::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        android.util.Log.e("SocialRepository", "Error parsing incoming request: ${e.message}")
-                        null
-                    }
-                }
-                trySend(requests ?: emptyList())
-            }
-        awaitClose { listener.remove() }
+    override fun getIncomingRequests(): Flow<List<FriendRequest>> = flow {
+        val userId = authRepository.currentUserId
+        if (userId == null) {
+            emit(emptyList())
+            return@flow
+        }
+        try {
+            emit(apiService.getIncomingRequests(userId))
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error fetching incoming requests: ${e.message}")
+            emit(emptyList())
+        }
     }
 
-    override fun getSentRequests(): Flow<List<FriendRequest>> = callbackFlow {
-        val userId = auth.currentUser?.uid ?: return@callbackFlow
-        val listener = firestore.collection("friendRequests")
-            .whereEqualTo("fromUserId", userId)
-            .whereEqualTo("status", FriendshipStatus.PENDING.name)
-            .addSnapshotListener { snapshot, _ ->
-                val requests = snapshot?.documents?.mapNotNull { doc ->
-                    try {
-                        doc.toObject(FriendRequest::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        android.util.Log.e("SocialRepository", "Error parsing sent request: ${e.message}")
-                        null
-                    }
-                }
-                trySend(requests ?: emptyList())
-            }
-        awaitClose { listener.remove() }
+    override fun getSentRequests(): Flow<List<FriendRequest>> = flow {
+        val userId = authRepository.currentUserId
+        if (userId == null) {
+            emit(emptyList())
+            return@flow
+        }
+        try {
+            emit(apiService.getSentRequests(userId))
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error fetching sent requests: ${e.message}")
+            emit(emptyList())
+        }
     }
 
     override suspend fun acceptFriendRequest(requestId: String) {
         try {
-            val doc = firestore.collection("friendRequests").document(requestId).get().await()
-            val request = doc.toObject(FriendRequest::class.java) ?: return
-            
-            // 1. Update request status
-            firestore.collection("friendRequests").document(requestId)
-                .update("status", FriendshipStatus.ACCEPTED.name).await()
-                
-            // 2. Create friendship
-            val friendshipData = mapOf(
-                "userIds" to listOf(request.fromUserId, request.toUserId),
-                "status" to FriendshipStatus.ACCEPTED.name,
-                "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-            )
-            firestore.collection("friendships").add(friendshipData).await()
+            apiService.acceptFriendRequest(requestId)
         } catch (e: Exception) {
             android.util.Log.e("SocialRepository", "Error accepting friend request: ${e.message}", e)
         }
     }
 
-    override fun getSquads(): Flow<List<Squad>> = callbackFlow {
-        val userId = auth.currentUser?.uid ?: return@callbackFlow
-        val listener = firestore.collection("squads")
-            .whereArrayContains("members", userId)
-            .addSnapshotListener { snapshot, _ ->
-                val squads = snapshot?.documents?.mapNotNull { it.toObject(Squad::class.java)?.copy(id = it.id) }
-                trySend(squads ?: emptyList())
-            }
-        awaitClose { listener.remove() }
+    override fun getSquads(): Flow<List<Squad>> = flow {
+        val userId = authRepository.currentUserId
+        if (userId == null) {
+            emit(emptyList())
+            return@flow
+        }
+        try {
+            emit(apiService.getSquads(userId))
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error fetching squads: ${e.message}")
+            emit(emptyList())
+        }
     }
 
     override suspend fun createSquad(squad: Squad) {
-        val userId = auth.currentUser?.uid ?: return
+        val userId = authRepository.currentUserId ?: return
         val squadWithAdmin = squad.copy(
             adminId = userId,
             members = (squad.members + userId).distinct()
         )
-        firestore.collection("squads").add(squadWithAdmin).await()
+        try {
+            apiService.createSquad(squadWithAdmin)
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error creating squad: ${e.message}")
+        }
     }
 
     override suspend fun joinSquad(squadId: String) {
-        val userId = auth.currentUser?.uid ?: return
-        firestore.collection("squads").document(squadId)
-            .update("members", com.google.firebase.firestore.FieldValue.arrayUnion(userId)).await()
+        val userId = authRepository.currentUserId ?: return
+        try {
+            apiService.joinSquad(squadId, mapOf("userId" to userId))
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error joining squad: ${e.message}")
+        }
     }
 
     override suspend fun leaveSquad(squadId: String) {
-        val userId = auth.currentUser?.uid ?: return
-        firestore.collection("squads").document(squadId)
-            .update("members", com.google.firebase.firestore.FieldValue.arrayRemove(userId)).await()
+        val userId = authRepository.currentUserId ?: return
+        try {
+            apiService.leaveSquad(squadId, mapOf("userId" to userId))
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error leaving squad: ${e.message}")
+        }
     }
 
     override suspend fun updateSquad(squadId: String, name: String, description: String) {
-        firestore.collection("squads").document(squadId)
-            .update(
-                mapOf(
-                    "name" to name,
-                    "description" to description
-                )
-            ).await()
+        try {
+            apiService.updateSquad(squadId, mapOf("name" to name, "description" to description))
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error updating squad: ${e.message}")
+        }
     }
 
-    override fun getSocialFeed(): Flow<List<JournalEntry>> = callbackFlow {
-        val currentUserId = auth.currentUser?.uid
+    override fun getSocialFeed(): Flow<List<JournalEntry>> = flow {
+        val currentUserId = authRepository.currentUserId
         if (currentUserId == null) {
-            trySend(emptyList())
-            close()
-            return@callbackFlow
+            emit(emptyList())
+            return@flow
         }
-
-        var journalsRegistration: com.google.firebase.firestore.ListenerRegistration? = null
-
-        val friendshipsRegistration = firestore.collection("friendships")
-            .whereArrayContains("userIds", currentUserId)
-            .addSnapshotListener { friendshipsSnapshot, error ->
-                if (error != null) {
-                    android.util.Log.e("SocialRepository", "Error fetching friendships: ${error.message}", error)
-                    return@addSnapshotListener
-                }
-
-                val friendIds = friendshipsSnapshot?.documents?.flatMap { doc ->
-                    val userIds = doc.get("userIds") as? List<String> ?: emptyList()
-                    userIds.filter { it != currentUserId }
-                }?.distinct() ?: emptyList()
-
-                val queryUsers = (friendIds + currentUserId).take(30)
-
-                // Hủy listener cũ của journals
-                journalsRegistration?.remove()
-
-                if (queryUsers.isEmpty()) {
-                    trySend(emptyList())
-                    return@addSnapshotListener
-                }
-
-                journalsRegistration = firestore.collection("journals")
-                    .whereIn("userId", queryUsers)
-                    .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                    .addSnapshotListener { journalsSnapshot, journalError ->
-                        if (journalError != null) {
-                            android.util.Log.e("SocialRepository", "Error fetching journals: ${journalError.message}", journalError)
-                            return@addSnapshotListener
-                        }
-
-                        if (journalsSnapshot != null) {
-                            val entries = journalsSnapshot.documents.mapNotNull { doc ->
-                                try {
-                                    doc.toObject(JournalEntry::class.java)?.copy(id = doc.id)
-                                } catch (e: Exception) {
-                                    android.util.Log.e("SocialRepository", "Error parsing journal: ${e.message}")
-                                    null
-                                }
-                            }
-                            trySend(entries)
-                        }
-                    }
-            }
-
-        awaitClose {
-            friendshipsRegistration.remove()
-            journalsRegistration?.remove()
+        try {
+            emit(apiService.getSocialFeed(currentUserId))
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error fetching feed: ${e.message}")
+            emit(emptyList())
         }
     }
 
     override suspend fun reactToPost(postId: String, emoji: String) {
-        val userId = auth.currentUser?.uid ?: return
+        val userId = authRepository.currentUserId ?: return
         try {
-            val docRef = firestore.collection("journals").document(postId)
-            val doc = docRef.get().await()
-            val reactions = doc.get("reactions") as? Map<String, String> ?: emptyMap()
-            
-            if (reactions[userId] == emoji) {
-                docRef.update("reactions.$userId", com.google.firebase.firestore.FieldValue.delete()).await()
-            } else {
-                docRef.update("reactions.$userId", emoji).await()
-            }
+            apiService.reactToPost(postId, mapOf("userId" to userId, "emoji" to emoji))
         } catch (e: Exception) {
             android.util.Log.e("SocialRepository", "Error reacting to post: ${e.message}", e)
         }
@@ -232,32 +152,7 @@ class SocialRepositoryImpl @Inject constructor(
 
     override suspend fun removeFriend(friendshipId: String) {
         try {
-            val doc = firestore.collection("friendships").document(friendshipId).get().await()
-            val userIds = doc.get("userIds") as? List<String> ?: emptyList()
-            
-            firestore.collection("friendships").document(friendshipId).delete().await()
-            
-            if (userIds.size == 2) {
-                val u1 = userIds[0]
-                val u2 = userIds[1]
-                
-                val reqs1 = firestore.collection("friendRequests")
-                    .whereEqualTo("fromUserId", u1)
-                    .whereEqualTo("toUserId", u2)
-                    .get().await()
-                    
-                val reqs2 = firestore.collection("friendRequests")
-                    .whereEqualTo("fromUserId", u2)
-                    .whereEqualTo("toUserId", u1)
-                    .get().await()
-                    
-                for (d in reqs1.documents) {
-                    d.reference.delete()
-                }
-                for (d in reqs2.documents) {
-                    d.reference.delete()
-                }
-            }
+            apiService.removeFriend(friendshipId)
         } catch (e: Exception) {
             android.util.Log.e("SocialRepository", "Error removing friend: ${e.message}", e)
         }
@@ -265,51 +160,44 @@ class SocialRepositoryImpl @Inject constructor(
 
     override suspend fun declineFriendRequest(requestId: String) {
         try {
-            firestore.collection("friendRequests").document(requestId).delete().await()
+            apiService.declineFriendRequest(requestId)
         } catch (e: Exception) {
-            android.util.Log.e("SocialRepository", "Error declining friend request: ${e.message}", e)
+            android.util.Log.e("SocialRepository", "Error declining request: ${e.message}", e)
         }
     }
 
     override suspend fun addMemberToSquad(squadId: String, memberId: String) {
-        firestore.collection("squads").document(squadId)
-            .update("members", com.google.firebase.firestore.FieldValue.arrayUnion(memberId)).await()
+        try {
+            apiService.addMemberToSquad(squadId, mapOf("memberId" to memberId))
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error adding member: ${e.message}")
+        }
     }
 
     override suspend fun removeMemberFromSquad(squadId: String, memberId: String) {
-        firestore.collection("squads").document(squadId)
-            .update("members", com.google.firebase.firestore.FieldValue.arrayRemove(memberId)).await()
+        try {
+            apiService.removeMemberFromSquad(squadId, mapOf("memberId" to memberId))
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error removing member: ${e.message}")
+        }
     }
 
-    override fun getSquadMessages(squadId: String): Flow<List<com.example.newstart.domain.model.SquadMessage>> = callbackFlow {
-        val listener = firestore.collection("squads").document(squadId).collection("messages")
-            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                if (snapshot != null) {
-                    val messages = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(com.example.newstart.domain.model.SquadMessage::class.java)?.copy(id = doc.id)
-                    }
-                    trySend(messages)
-                }
-            }
-        awaitClose { listener.remove() }
+    override fun getSquadMessages(squadId: String): Flow<List<SquadMessage>> = flow {
+        try {
+            emit(apiService.getSquadMessages(squadId))
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error fetching squad messages: ${e.message}")
+            emit(emptyList())
+        }
     }
 
     override suspend fun sendSquadMessage(squadId: String, text: String) {
-        val currentUserId = auth.currentUser?.uid ?: return
-        val senderDoc = firestore.collection("users").document(currentUserId).get().await()
-        val senderName = senderDoc.getString("name") ?: "Người dùng"
-        
-        val message = com.example.newstart.domain.model.SquadMessage(
-            senderId = currentUserId,
-            senderName = senderName,
-            text = text,
-            timestamp = java.util.Date()
-        )
-        firestore.collection("squads").document(squadId).collection("messages").add(message).await()
+        val currentUserId = authRepository.currentUserId ?: return
+        try {
+            apiService.sendSquadMessage(squadId, mapOf("text" to text, "senderId" to currentUserId))
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error sending message: ${e.message}")
+        }
     }
 }
+

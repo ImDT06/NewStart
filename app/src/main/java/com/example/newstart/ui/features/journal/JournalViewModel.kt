@@ -10,6 +10,7 @@ import com.example.newstart.domain.usecase.SaveJournalEntryUseCase
 import com.example.newstart.domain.repository.UserRepository
 import com.example.newstart.domain.model.User
 import kotlinx.coroutines.flow.Flow
+import com.example.newstart.domain.repository.AuthRepository
 import com.example.newstart.domain.repository.SocialRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -31,8 +32,12 @@ class JournalViewModel @Inject constructor(
     private val journalRepository: JournalRepository,
     private val socialRepository: SocialRepository,
     private val saveJournalEntryUseCase: SaveJournalEntryUseCase,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
+
+    val currentUserId: String?
+        get() = authRepository.currentUserId
 
     fun getUserById(userId: String): Flow<User> = userRepository.getUserById(userId)
 

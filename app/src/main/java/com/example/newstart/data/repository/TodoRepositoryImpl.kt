@@ -1,29 +1,28 @@
 package com.example.newstart.data.repository
 
+import android.content.Context
+import androidx.glance.appwidget.updateAll
 import com.example.newstart.data.local.dao.TodoDao
 import com.example.newstart.data.local.toDomain
 import com.example.newstart.data.local.toEntity
+import com.example.newstart.data.remote.ApiService
 import com.example.newstart.domain.model.Todo
+import com.example.newstart.domain.repository.AuthRepository
 import com.example.newstart.domain.repository.TodoRepository
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import android.content.Context
-import dagger.hilt.android.qualifiers.ApplicationContext
 import com.example.newstart.widget.HabitWidget
-import androidx.glance.appwidget.updateAll
-import kotlinx.coroutines.tasks.await
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class TodoRepositoryImpl @Inject constructor(
-    private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore,
+    private val authRepository: AuthRepository,
+    private val apiService: ApiService,
     private val todoDao: TodoDao,
     @ApplicationContext private val context: Context
 ) : TodoRepository {
@@ -31,7 +30,7 @@ class TodoRepositoryImpl @Inject constructor(
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
 
     override fun getTodos(): Flow<List<Todo>> {
-        val userId = auth.currentUser?.uid ?: ""
+        val userId = authRepository.currentUserId ?: ""
         if (userId.isNotEmpty()) {
             repositoryScope.launch {
                 syncTodosFromNetwork(userId)
@@ -47,13 +46,8 @@ class TodoRepositoryImpl @Inject constructor(
     }
 
     override suspend fun insertTodo(todo: Todo) {
-        val userId = auth.currentUser?.uid ?: ""
-        val docRef = if (todo.id.isEmpty()) {
-            firestore.collection("todos").document()
-        } else {
-            firestore.collection("todos").document(todo.id)
-        }
-        val todoWithId = todo.copy(id = docRef.id, userId = userId)
+        val userId = authRepository.currentUserId ?: ""
+        val todoWithId = todo.copy(userId = userId)
         
         // Local first
         todoDao.insertTodo(todoWithId.toEntity(isSynced = false))
@@ -61,10 +55,10 @@ class TodoRepositoryImpl @Inject constructor(
         
         // Remote
         try {
-            docRef.set(todoWithId).await()
-            todoDao.insertTodo(todoWithId.toEntity(isSynced = true))
+            val savedTodo = apiService.saveTodo(todoWithId)
+            todoDao.insertTodo(savedTodo.toEntity(isSynced = true))
         } catch (e: Exception) {
-            // Error handling ignored for simplicity, reliance on sync logic later
+            // Ignored for sync fallback later
         }
     }
 
@@ -72,8 +66,8 @@ class TodoRepositoryImpl @Inject constructor(
         todoDao.updateTodo(todo.toEntity(isSynced = false))
         try { HabitWidget().updateAll(context) } catch (e: Exception) {}
         try {
-            firestore.collection("todos").document(todo.id).set(todo).await()
-            todoDao.updateTodo(todo.toEntity(isSynced = true))
+            val savedTodo = apiService.updateTodo(todo.id, todo)
+            todoDao.updateTodo(savedTodo.toEntity(isSynced = true))
         } catch (e: Exception) {}
     }
 
@@ -81,7 +75,7 @@ class TodoRepositoryImpl @Inject constructor(
         todoDao.deleteTodo(todo.toEntity())
         try { HabitWidget().updateAll(context) } catch (e: Exception) {}
         try {
-            firestore.collection("todos").document(todo.id).delete().await()
+            apiService.deleteTodo(todo.id)
         } catch (e: Exception) {}
     }
 
@@ -89,21 +83,13 @@ class TodoRepositoryImpl @Inject constructor(
         todoDao.toggleTodoCompletion(id, isCompleted)
         try { HabitWidget().updateAll(context) } catch (e: Exception) {}
         try {
-            firestore.collection("todos").document(id).update("isCompleted", isCompleted).await()
+            apiService.toggleTodoCompletion(id, mapOf("isCompleted" to isCompleted))
         } catch (e: Exception) {}
     }
 
     private suspend fun syncTodosFromNetwork(userId: String) {
         try {
-            val snapshot = firestore.collection("todos")
-                .whereEqualTo("userId", userId)
-                .get()
-                .await()
-            
-            val remoteTodos = snapshot.documents.mapNotNull { doc ->
-                doc.toObject(Todo::class.java)?.copy(id = doc.id)
-            }
-            
+            val remoteTodos = apiService.getTodos(userId)
             if (remoteTodos.isNotEmpty()) {
                 for (todo in remoteTodos) {
                     todoDao.insertTodo(todo.toEntity(isSynced = true))
@@ -115,3 +101,4 @@ class TodoRepositoryImpl @Inject constructor(
         }
     }
 }
+

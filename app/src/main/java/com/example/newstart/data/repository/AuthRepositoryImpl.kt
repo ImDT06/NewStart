@@ -1,60 +1,59 @@
 package com.example.newstart.data.repository
 
+import android.content.Context
+import com.example.newstart.data.remote.ApiService
 import com.example.newstart.domain.model.User
 import com.example.newstart.domain.repository.AuthRepository
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.GoogleAuthProvider
-import com.google.firebase.auth.UserProfileChangeRequest
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.channels.awaitClose
+import com.google.gson.Gson
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
-    private val firebaseAuth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val apiService: ApiService,
+    @ApplicationContext private val context: Context
 ) : AuthRepository {
 
-    override val currentUser: Flow<User?> = callbackFlow {
-        val authStateListener = FirebaseAuth.AuthStateListener { auth ->
-            val firebaseUser = auth.currentUser
-            val user = firebaseUser?.let {
-                User(
-                    id = it.uid,
-                    name = it.displayName ?: "",
-                    email = it.email ?: "",
-                    avatarUrl = it.photoUrl?.toString()
-                )
-            }
-            trySend(user)
-        }
-        firebaseAuth.addAuthStateListener(authStateListener)
-        awaitClose { firebaseAuth.removeAuthStateListener(authStateListener) }
-    }
+    private val sharedPrefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+    private val gson = Gson()
+    
+    private val _currentUser = MutableStateFlow<User?>(null)
+    override val currentUser: Flow<User?> = _currentUser.asStateFlow()
+
+    override val currentUserId: String?
+        get() = _currentUser.value?.id
 
     override val isEmailVerified: Boolean
-        get() = firebaseAuth.currentUser?.isEmailVerified ?: false
+        get() = true // Giả định là true đối với hệ thống custom API trừ khi có API check riêng
+
+    init {
+        // Khôi phục session từ SharedPreferences
+        val userJson = sharedPrefs.getString("logged_in_user", null)
+        if (userJson != null) {
+            try {
+                val user = gson.fromJson(userJson, User::class.java)
+                _currentUser.value = user
+            } catch (e: Exception) {
+                sharedPrefs.edit().remove("logged_in_user").apply()
+            }
+        }
+    }
+
+    private fun saveUserToPrefs(user: User) {
+        _currentUser.value = user
+        sharedPrefs.edit().putString("logged_in_user", gson.toJson(user)).apply()
+    }
 
     override suspend fun loginWithEmail(email: String, password: String): Result<User> {
         return try {
-            val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
-            val firebaseUser = result.user ?: throw Exception("User is null")
-            
-            // Reload user to get latest verification status
-            firebaseUser.reload().await()
-            
-            Result.success(
-                User(
-                    id = firebaseUser.uid,
-                    name = firebaseUser.displayName ?: "",
-                    email = firebaseUser.email ?: "",
-                    avatarUrl = firebaseUser.photoUrl?.toString()
-                )
-            )
+            val body = mapOf("email" to email, "password" to password)
+            val user = apiService.login(body)
+            saveUserToPrefs(user)
+            Result.success(user)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -62,25 +61,10 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun registerWithEmail(name: String, email: String, password: String): Result<User> {
         return try {
-            val result = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
-            val firebaseUser = result.user ?: throw Exception("User creation failed")
-            
-            // Update profile with name
-            val profileUpdates = UserProfileChangeRequest.Builder()
-                .setDisplayName(name)
-                .build()
-            firebaseUser.updateProfile(profileUpdates).await()
-
-            // LƯU VÀO FIRESTORE NGAY KHI ĐĂNG KÝ
-            val newUser = User(
-                id = firebaseUser.uid,
-                name = name,
-                email = email,
-                avatarUrl = null
-            )
-            firestore.collection("users").document(firebaseUser.uid).set(newUser).await()
-
-            Result.success(newUser)
+            val body = mapOf("name" to name, "email" to email, "password" to password)
+            val user = apiService.register(body)
+            saveUserToPrefs(user)
+            Result.success(user)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -88,7 +72,7 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun sendEmailVerification(): Result<Unit> {
         return try {
-            firebaseAuth.currentUser?.sendEmailVerification()?.await()
+            apiService.sendVerification()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -97,7 +81,8 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
         return try {
-            firebaseAuth.sendPasswordResetEmail(email).await()
+            val body = mapOf("email" to email)
+            apiService.resetPassword(body)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -106,23 +91,18 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun loginWithGoogle(idToken: String): Result<User> {
         return try {
-            val credential = GoogleAuthProvider.getCredential(idToken, null)
-            val result = firebaseAuth.signInWithCredential(credential).await()
-            val firebaseUser = result.user ?: throw Exception("Google sign in failed")
-            Result.success(
-                User(
-                    id = firebaseUser.uid,
-                    name = firebaseUser.displayName ?: "",
-                    email = firebaseUser.email ?: "",
-                    avatarUrl = firebaseUser.photoUrl?.toString()
-                )
-            )
+            val body = mapOf("idToken" to idToken)
+            val user = apiService.loginWithGoogle(body)
+            saveUserToPrefs(user)
+            Result.success(user)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
     override suspend fun logout() {
-        firebaseAuth.signOut()
+        _currentUser.value = null
+        sharedPrefs.edit().remove("logged_in_user").apply()
     }
 }
+

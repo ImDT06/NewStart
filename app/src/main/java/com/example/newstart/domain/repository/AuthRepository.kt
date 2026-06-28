@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {
     val currentUser: Flow<User?>
+    val currentUserId: String?
     val isEmailVerified: Boolean
     
     suspend fun loginWithEmail(email: String, password: String): Result<User>
