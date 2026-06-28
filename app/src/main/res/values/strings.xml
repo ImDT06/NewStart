@@ -151,7 +151,7 @@
 
     <!-- Social Screen -->
     <string name="social_tab_friends">Bạn bè</string>
-    <string name="social_tab_squads">Nhóm (Squads)</string>
+    <string name="social_tab_squads">Nhóm</string>
     <string name="social_search_placeholder">Tìm kiếm tên hoặc email</string>
     <string name="social_search_results">Kết quả tìm kiếm</string>
     <string name="social_friend_me">Tôi</string>
@@ -182,7 +182,7 @@
     
     <!-- Squad Detail -->
     <string name="squad_tab_messages">Tin nhắn</string>
-    <string name="squad_tab_members_habits">Thành viên &amp; Thói quen</string>
+    <string name="squad_tab_members_habits">Thành viên</string>
     <string name="squad_chat_empty">Chưa có tin nhắn nào. Hãy gửi tin nhắn đầu tiên!</string>
     <string name="squad_chat_placeholder">Nhập tin nhắn…</string>
     <string name="squad_members_title">Thành viên nhóm</string>
@@ -198,7 +198,7 @@
     <string name="squad_habit_reminder">Giờ nhắc nhở (HH:mm)</string>
     <string name="squad_loading">Đang tải…</string>
     <string name="squad_btn_create">Tạo</string>
-    <string name="squad_create_new_title">Tạo nhóm mới (Squad)</string>
+    <string name="squad_create_new_title">Tạo nhóm mới</string>
     <string name="squad_name">Tên nhóm</string>
     <string name="squad_desc">Mô tả nhóm</string>
     <string name="squad_add_friends_label">Thêm thành viên (bạn bè):</string>

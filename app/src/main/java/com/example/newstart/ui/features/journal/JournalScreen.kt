@@ -584,7 +584,7 @@ private fun DeleteConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
 }
 
 @Composable
-private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
+fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val view = LocalView.current

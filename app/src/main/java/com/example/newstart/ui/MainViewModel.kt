@@ -55,6 +55,13 @@ class MainViewModel @Inject constructor(
     private val _showJournalSheet = MutableStateFlow(false)
     val showJournalSheet: StateFlow<Boolean> = _showJournalSheet.asStateFlow()
 
+    private val _isBottomBarVisible = MutableStateFlow(true)
+    val isBottomBarVisible: StateFlow<Boolean> = _isBottomBarVisible.asStateFlow()
+
+    fun setBottomBarVisible(visible: Boolean) {
+        _isBottomBarVisible.value = visible
+    }
+
     fun onHabitDateSelected(date: LocalDate) {
         _selectedHabitDate.value = date
     }

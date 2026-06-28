@@ -135,11 +135,11 @@ class MainActivity : AppCompatActivity() {
                 val showFab = showShell && isMainRoute
 
                 // Tối ưu hóa Navbar nổi: Hide on Scroll
-                var isBottomBarVisible by remember { mutableStateOf(true) }
+                val isBottomBarVisible by mainViewModel.isBottomBarVisible.collectAsState()
                 
                 // Tự động hiện lại thanh điều hướng khi chuyển trang
                 LaunchedEffect(currentRoute) {
-                    isBottomBarVisible = true
+                    mainViewModel.setBottomBarVisible(true)
                 }
 
                 val nestedScrollConnection = remember(currentRoute) {
@@ -151,9 +151,9 @@ class MainActivity : AppCompatActivity() {
                         ): Offset {
                             // Chỉ xử lý ẩn/hiện nếu trang thực sự có thể cuộn (consumed.y != 0)
                             if (consumed.y < -5f) {
-                                isBottomBarVisible = false
+                                mainViewModel.setBottomBarVisible(false)
                             } else if (consumed.y > 5f) {
-                                isBottomBarVisible = true
+                                mainViewModel.setBottomBarVisible(true)
                             }
                             return super.onPostScroll(consumed, available, source)
                         }

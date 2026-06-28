@@ -563,30 +563,15 @@ fun HomeContent(
                         }
                     }
                 } else {
-                    itemsIndexed(items = activeTodos, key = { _, todo -> todo.id }) { index, todo -> 
-                        if (index < 5) {
-                            TodoSwipeableItem(
-                                todo = todo,
-                                onToggle = { handleToggleTodo(todo.id, it) },
-                                onClick = { onEditTodo(todo) },
-                                onDelete = { onDeleteTodo(todo) },
-                                modifier = Modifier.animateItem()
-                            )
-                        } else {
-                            AnimatedVisibility(
-                                visible = isActiveTodosExpanded,
-                                enter = expandVertically(spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
-                                exit = shrinkVertically(spring(stiffness = Spring.StiffnessLow)) + fadeOut()
-                            ) {
-                                TodoSwipeableItem(
-                                    todo = todo,
-                                    onToggle = { handleToggleTodo(todo.id, it) },
-                                    onClick = { onEditTodo(todo) },
-                                    onDelete = { onDeleteTodo(todo) },
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-                        }
+                    val visibleActiveTodos = if (isActiveTodosExpanded) activeTodos else activeTodos.take(5)
+                    items(items = visibleActiveTodos, key = { it.id }) { todo ->
+                        TodoSwipeableItem(
+                            todo = todo,
+                            onToggle = { handleToggleTodo(todo.id, it) },
+                            onClick = { onEditTodo(todo) },
+                            onDelete = { onDeleteTodo(todo) },
+                            modifier = Modifier.animateItem()
+                        )
                     }
 
                     if (activeTodos.size > 5) {
@@ -653,12 +638,8 @@ fun HomeContent(
                     }
 
                     completedGroups.forEach { (dateStr, list) ->
-                        item(key = "header_$dateStr") {
-                            AnimatedVisibility(
-                                visible = isCompletedExpanded,
-                                enter = expandVertically(spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
-                                exit = shrinkVertically(spring(stiffness = Spring.StiffnessLow)) + fadeOut()
-                            ) {
+                        if (isCompletedExpanded) {
+                            item(key = "header_$dateStr") {
                                 val headerText = try {
                                     val sdfInput = SimpleDateFormat("yyyy-MM-dd", Locale.US)
                                     val date = sdfInput.parse(dateStr) ?: Date()
@@ -677,17 +658,13 @@ fun HomeContent(
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)
+                                    modifier = Modifier
+                                        .padding(horizontal = 24.dp, vertical = 6.dp)
+                                        .animateItem()
                                 )
                             }
-                        }
 
-                        items(items = list, key = { it.id }) { todo ->
-                            AnimatedVisibility(
-                                visible = isCompletedExpanded,
-                                enter = expandVertically(spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
-                                exit = shrinkVertically(spring(stiffness = Spring.StiffnessLow)) + fadeOut()
-                            ) {
+                            items(items = list, key = { it.id }) { todo ->
                                 TodoSwipeableItem(
                                     todo = todo,
                                     onToggle = { handleToggleTodo(todo.id, it) },

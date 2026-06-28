@@ -22,6 +22,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -1027,6 +1028,7 @@ fun SquadDetailView(
     var selectedTab by remember { mutableStateOf(0) } // 0: Chat, 1: Members & Habits
     val messages by viewModel.getSquadMessages(squad.id).collectAsState(initial = emptyList())
     var messageText by remember { mutableStateOf("") }
+    var activeTimestampMessageId by remember { mutableStateOf<String?>(null) }
 
     var showAddMemberDialog by remember { mutableStateOf(false) }
     var showCreateHabitDialog by remember { mutableStateOf(false) }
@@ -1059,14 +1061,103 @@ fun SquadDetailView(
                     }
                 }
             )
+        },
+        bottomBar = {
+            if (selectedTab == 0) {
+                // Floating input capsule aligned at the bottom using Scaffold's bottomBar
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .imePadding()
+                        .padding(bottom = if (hasBottomBar) 64.dp else 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .shadow(8.dp, shape = RoundedCornerShape(24.dp))
+                            .background(
+                                color = if (isDark) Color(0xFF1E1E22) else Color.White,
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = messageText,
+                            onValueChange = { messageText = it },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            maxLines = 4,
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                            decorationBox = { innerTextField ->
+                                Box(contentAlignment = Alignment.CenterStart) {
+                                    if (messageText.isEmpty()) {
+                                        Text(
+                                            text = stringResource(R.string.squad_chat_placeholder),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
+                        )
+                        
+                        val sendButtonScale by animateFloatAsState(
+                            targetValue = if (messageText.isNotBlank()) 1f else 0.85f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            label = "SendButtonScale"
+                        )
+                        
+                        IconButton(
+                            onClick = {
+                                if (messageText.isNotBlank()) {
+                                    viewModel.sendSquadMessage(squad.id, messageText.trim())
+                                    messageText = ""
+                                }
+                            },
+                            enabled = messageText.isNotBlank(),
+                            modifier = Modifier
+                                .scale(sendButtonScale)
+                                .size(40.dp)
+                                .background(
+                                    color = if (messageText.isNotBlank()) MaterialTheme.colorScheme.primary 
+                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                    shape = CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Send, 
+                                contentDescription = "Send", 
+                                tint = if (messageText.isNotBlank()) MaterialTheme.colorScheme.onPrimary 
+                                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(bottom = if (hasBottomBar && !WindowInsets.isImeVisible) 80.dp else 0.dp)
-                .imePadding()
+                .padding(top = padding.calculateTopPadding())
+                .padding(bottom = if (selectedTab == 0) 0.dp else padding.calculateBottomPadding())
         ) {
             // Modern Segmented Control Style Tabs for Chat vs Members & Habits
             val detailTabs = listOf(
@@ -1116,7 +1207,6 @@ fun SquadDetailView(
                             animationSpec = tween(durationMillis = 200),
                             label = "SquadDetailTabTextColor"
                         )
-                        
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -1142,93 +1232,110 @@ fun SquadDetailView(
 
             if (selectedTab == 0) {
                 val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .pointerInput(Unit) {
-                                detectTapGestures(onTap = { focusManager.clearFocus() })
-                            }
-                    ) {
-                        if (messages.isEmpty()) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(stringResource(R.string.squad_chat_empty), color = Color.Gray, fontSize = 13.sp)
-                            }
-                        } else {
-                            LazyColumn(
-                                state = lazyListState,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(Unit) {
-                                        detectTapGestures(onTap = { focusManager.clearFocus() })
-                                    },
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                                contentPadding = PaddingValues(vertical = 12.dp)
-                            ) {
-                                items(messages) { message ->
-                                    val isMe = message.senderId == currentUserId
-                                    val timeString = remember(message.timestamp) { timeFormatter.format(message.timestamp) }
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
-                                    ) {
-                                        if (!isMe) {
-                                            Surface(
-                                                modifier = Modifier.size(32.dp),
-                                                shape = CircleShape,
-                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                            ) {
-                                                val userFlow = remember(message.senderId) { viewModel.getUserById(message.senderId) }
-                                                val userState by userFlow.collectAsState(initial = User())
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    if (!userState.avatarUrl.isNullOrEmpty()) {
-                                                        AsyncImage(
-                                                            model = userState.avatarUrl,
-                                                            contentDescription = null,
-                                                            modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                                            contentScale = ContentScale.Crop
-                                                        )
-                                                    } else {
-                                                        Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp))
-                                                    }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .pointerInput(Unit) {
+                            detectTapGestures(onTap = { focusManager.clearFocus() })
+                        }
+                ) {
+                    if (messages.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(stringResource(R.string.squad_chat_empty), color = Color.Gray, fontSize = 13.sp)
+                        }
+                    } else {
+                        LazyColumn(
+                            state = lazyListState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    detectTapGestures(onTap = { focusManager.clearFocus() })
+                                },
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 12.dp,
+                                bottom = padding.calculateBottomPadding() + 8.dp
+                            )
+                        ) {
+                            items(messages) { message ->
+                                val isMe = message.senderId == currentUserId
+                                val timeString = remember(message.timestamp) { timeFormatter.format(message.timestamp) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
+                                ) {
+                                    if (!isMe) {
+                                        Surface(
+                                            modifier = Modifier.size(32.dp),
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                        ) {
+                                            val userFlow = remember(message.senderId) { viewModel.getUserById(message.senderId) }
+                                            val userState by userFlow.collectAsState(initial = User())
+                                            Box(contentAlignment = Alignment.Center) {
+                                                if (!userState.avatarUrl.isNullOrEmpty()) {
+                                                    AsyncImage(
+                                                        model = userState.avatarUrl,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                } else {
+                                                    Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp))
                                                 }
                                             }
-                                            Spacer(modifier = Modifier.width(8.dp))
                                         }
- 
-                                        Column(
-                                            horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
+
+                                    Column(
+                                        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
+                                    ) {
+                                        if (!isMe) {
+                                            Text(
+                                                text = message.senderName, 
+                                                style = MaterialTheme.typography.labelSmall, 
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                        }
+                                        
+                                        val isTimestampVisible = activeTimestampMessageId == message.id
+                                        Surface(
+                                            color = if (isMe) MaterialTheme.colorScheme.primary else {
+                                                if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                            },
+                                            shape = RoundedCornerShape(
+                                                topStart = 16.dp,
+                                                topEnd = 16.dp,
+                                                bottomStart = if (isMe) 16.dp else 4.dp,
+                                                bottomEnd = if (isMe) 4.dp else 16.dp
+                                            ),
+                                            modifier = Modifier.clickable(
+                                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                                indication = null,
+                                                onClick = {
+                                                    activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                                }
+                                            )
                                         ) {
-                                            if (!isMe) {
-                                                Text(
-                                                    text = message.senderName, 
-                                                    style = MaterialTheme.typography.labelSmall, 
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                            }
-                                            
-                                            Surface(
-                                                color = if (isMe) MaterialTheme.colorScheme.primary else {
-                                                    if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                                                },
-                                                shape = RoundedCornerShape(
-                                                    topStart = 16.dp,
-                                                    topEnd = 16.dp,
-                                                    bottomStart = if (isMe) 16.dp else 4.dp,
-                                                    bottomEnd = if (isMe) 4.dp else 16.dp
-                                                )
-                                            ) {
-                                                Text(
-                                                    text = message.text,
-                                                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
-                                                )
-                                            }
-                                            
+                                            Text(
+                                                text = message.text,
+                                                color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
+                                            )
+                                        }
+                                        
+                                        androidx.compose.animation.AnimatedVisibility(
+                                            visible = isTimestampVisible,
+                                            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                                            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                                        ) {
                                             Text(
                                                 text = timeString,
                                                 style = MaterialTheme.typography.labelSmall,
@@ -1241,81 +1348,13 @@ fun SquadDetailView(
                             }
                         }
                     }
- 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .background(
-                                color = if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(28.dp)
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                                shape = RoundedCornerShape(28.dp)
-                            )
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = messageText,
-                            onValueChange = { messageText = it },
-                            placeholder = { Text(stringResource(R.string.squad_chat_placeholder), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                                disabledBorderColor = Color.Transparent,
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent
-                            ),
-                            maxLines = 4,
-                            textStyle = MaterialTheme.typography.bodyMedium
-                        )
-                        
-                        val sendButtonScale by animateFloatAsState(
-                            targetValue = if (messageText.isNotBlank()) 1f else 0.85f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            ),
-                            label = "SendButtonScale"
-                        )
-                        
-                        IconButton(
-                            onClick = {
-                                if (messageText.isNotBlank()) {
-                                    viewModel.sendSquadMessage(squad.id, messageText.trim())
-                                    messageText = ""
-                                }
-                            },
-                            enabled = messageText.isNotBlank(),
-                            modifier = Modifier
-                                .scale(sendButtonScale)
-                                .size(40.dp)
-                                .background(
-                                    color = if (messageText.isNotBlank()) MaterialTheme.colorScheme.primary 
-                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                    shape = CircleShape
-                                )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Send, 
-                                contentDescription = "Send", 
-                                tint = if (messageText.isNotBlank()) MaterialTheme.colorScheme.onPrimary 
-                                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item {
                         Row(

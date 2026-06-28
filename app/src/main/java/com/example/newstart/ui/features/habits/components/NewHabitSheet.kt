@@ -32,7 +32,7 @@ import java.time.format.DateTimeFormatter
 data class HabitPreset(
     val name: String,
     val icon: String,
-    val color: Color = Color(0xFF1D1D1F),
+    val color: Color = Color.Black,
     val time: String? = null,
     val minsBefore: Int = 0
 )
@@ -213,7 +213,7 @@ fun HabitConfigContent(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { if (name.isNotBlank() && selectedTime != null) onConfirm(name, icon, selectedTime, minsBefore, Color(0xFF1D1D1F), selectedDate, selectedSquadId) }, enabled = name.isNotBlank() && selectedTime != null, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) { Text(stringResource(R.string.habits_btn_create), fontWeight = FontWeight.Bold) }
+        Button(onClick = { if (name.isNotBlank() && selectedTime != null) onConfirm(name, icon, selectedTime, minsBefore, Color.Black, selectedDate, selectedSquadId) }, enabled = name.isNotBlank() && selectedTime != null, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) { Text(stringResource(R.string.habits_btn_create), fontWeight = FontWeight.Bold) }
     }
 }
 
