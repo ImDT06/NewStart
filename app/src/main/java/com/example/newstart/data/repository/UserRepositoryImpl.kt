@@ -150,15 +150,55 @@ class UserRepositoryImpl @Inject constructor(
     }
 
     override suspend fun searchUsers(query: String): List<User> {
+        val queryClean = query.trim()
+        if (queryClean.isEmpty()) return emptyList()
+
         return try {
-            val snapshot = firestore.collection("users")
-                .whereGreaterThanOrEqualTo("name", query)
-                .whereLessThanOrEqualTo("name", query + "\uf8ff")
+            val capitalizedQuery = queryClean.replaceFirstChar { 
+                if (it.isLowerCase()) it.titlecase(java.util.Locale.ROOT) else it.toString() 
+            }
+            val lowercaseQuery = queryClean.lowercase()
+
+            val nameQuery1 = firestore.collection("users")
+                .whereGreaterThanOrEqualTo("name", queryClean)
+                .whereLessThanOrEqualTo("name", queryClean + "\uf8ff")
                 .limit(20)
                 .get()
-                .await()
-            
-            snapshot.documents.mapNotNull { it.toObject(User::class.java)?.copy(id = it.id) }
+
+            val nameQuery2 = if (capitalizedQuery != queryClean) {
+                firestore.collection("users")
+                    .whereGreaterThanOrEqualTo("name", capitalizedQuery)
+                    .whereLessThanOrEqualTo("name", capitalizedQuery + "\uf8ff")
+                    .limit(20)
+                    .get()
+            } else null
+
+            val emailQuery1 = firestore.collection("users")
+                .whereGreaterThanOrEqualTo("email", queryClean)
+                .whereLessThanOrEqualTo("email", queryClean + "\uf8ff")
+                .limit(20)
+                .get()
+
+            val emailQuery2 = if (lowercaseQuery != queryClean) {
+                firestore.collection("users")
+                    .whereGreaterThanOrEqualTo("email", lowercaseQuery)
+                    .whereLessThanOrEqualTo("email", lowercaseQuery + "\uf8ff")
+                    .limit(20)
+                    .get()
+            } else null
+
+            val snapshot1 = nameQuery1.await()
+            val snapshot2 = nameQuery2?.await()
+            val snapshot3 = emailQuery1.await()
+            val snapshot4 = emailQuery2?.await()
+
+            val users = mutableListOf<User>()
+            users.addAll(snapshot1.documents.mapNotNull { it.toObject(User::class.java)?.copy(id = it.id) })
+            snapshot2?.let { s -> users.addAll(s.documents.mapNotNull { it.toObject(User::class.java)?.copy(id = it.id) }) }
+            users.addAll(snapshot3.documents.mapNotNull { it.toObject(User::class.java)?.copy(id = it.id) })
+            snapshot4?.let { s -> users.addAll(s.documents.mapNotNull { it.toObject(User::class.java)?.copy(id = it.id) }) }
+
+            users.distinctBy { it.id }
         } catch (e: Exception) {
             emptyList()
         }

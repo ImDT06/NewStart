@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,8 +41,8 @@ fun LanguagePickerDialog(
         Language("English", "en", R.drawable.ic_flag_en)
     )
     
-    val currentLocale = AppCompatDelegate.getApplicationLocales().toLanguageTags()
-    val currentLangCode = if (currentLocale.contains("en")) "en" else "vi"
+    val context = LocalContext.current
+    val currentLangCode = context.resources.configuration.locales[0].language
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(

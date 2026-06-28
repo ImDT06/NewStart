@@ -134,7 +134,7 @@ fun ProfileHeaderCard(
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
-                        text = "Thành viên Premium",
+                        text = stringResource(id = R.string.settings_premium_member),
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -158,9 +158,9 @@ fun QuickStatsRow(
             .padding(bottom = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        StatItem(label = "Nhật ký", value = journalCount.toString(), modifier = Modifier.weight(1f))
-        StatItem(label = "Thói quen", value = "$completionPercent%", modifier = Modifier.weight(1f))
-        StatItem(label = "Chuỗi", value = "$streakDays ngày", modifier = Modifier.weight(1f))
+        StatItem(label = stringResource(id = R.string.settings_stat_journal), value = journalCount.toString(), modifier = Modifier.weight(1f))
+        StatItem(label = stringResource(id = R.string.settings_stat_habit), value = "$completionPercent%", modifier = Modifier.weight(1f))
+        StatItem(label = stringResource(id = R.string.settings_stat_streak), value = stringResource(id = R.string.settings_stat_days, streakDays), modifier = Modifier.weight(1f))
     }
 }
 
@@ -191,6 +191,8 @@ fun SettingsScreen(
     mainViewModel: MainViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isVietnamese = remember(configuration) { configuration.locales[0].language == "vi" }
     var showLanguagePicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf(false) }
@@ -575,7 +577,7 @@ fun SettingsScreen(
                 // Profile Header Card
                 item {
                     ProfileHeaderCard(
-                        name = currentUser?.name ?: "Người dùng",
+                        name = currentUser?.name ?: stringResource(id = R.string.social_default_user_name),
                         email = currentUser?.email ?: "",
                         avatarUri = avatarUri,
                         onEditAvatar = { galleryLauncher.launch("image/*") }
@@ -592,20 +594,20 @@ fun SettingsScreen(
                 }
 
                 // 1. Thiết lập Tiện ích (Widget Settings)
-                item { SectionTitle(title = "Thiết lập Tiện ích") }
+                item { SectionTitle(title = stringResource(id = R.string.settings_widget_section)) }
                 item {
                     SettingsCard {
                         SettingsItem(
                             icon = Icons.Default.AddBox,
-                            title = "Thêm Tiện ích",
-                            subtitle = "Đưa ứng dụng ra màn hình chính",
+                            title = stringResource(id = R.string.settings_add_widget),
+                            subtitle = stringResource(id = R.string.settings_add_widget_desc),
                             onClick = { requestPinWidget() }
                         )
 
                         SettingsDivider()
                         SettingsToggleItem(
                             icon = Icons.Default.Whatshot,
-                            title = "Chuỗi trên tiện ích",
+                            title = stringResource(id = R.string.settings_widget_streak),
                             checked = isStreakWidgetEnabled,
                             onCheckedChange = {
                                 isStreakWidgetEnabled = it
@@ -623,33 +625,33 @@ fun SettingsScreen(
                 }
 
                 // 2. Tổng quát (General)
-                item { SectionTitle(title = "Tổng quát") }
+                item { SectionTitle(title = stringResource(id = R.string.settings_general_section)) }
                 item {
                     SettingsCard {
                         SettingsToggleItem(
                             icon = Icons.Default.Notifications,
-                            title = "Thông báo",
+                            title = stringResource(id = R.string.settings_notifications),
                             checked = isNotificationEnabled,
                             onCheckedChange = { isNotificationEnabled = it }
                         )
                         SettingsDivider()
                         SettingsItem(
                             icon = Icons.Default.Person,
-                            title = "Sửa tên",
-                            subtitle = currentUser?.name ?: "Người dùng",
+                            title = stringResource(id = R.string.settings_edit_name),
+                            subtitle = currentUser?.name ?: stringResource(id = R.string.social_default_user_name),
                             onClick = { showEditProfileDialog = true }
                         )
                         SettingsDivider()
                         SettingsItem(
                             icon = Icons.Default.Email,
-                            title = "Thay đổi địa chỉ email",
+                            title = stringResource(id = R.string.settings_change_email),
                             subtitle = userEmailText,
                             onClick = { showChangeEmailDialog = true }
                         )
                         SettingsDivider()
                         SettingsItem(
                             icon = Icons.Default.Cake,
-                            title = "Ngày sinh (Edit birthday)",
+                            title = stringResource(id = R.string.settings_edit_birthday),
                             subtitle = birthdayText,
                             onClick = { showBirthdayDialog = true }
                         )
@@ -657,20 +659,20 @@ fun SettingsScreen(
                 }
 
                 // 3. Cộng đồng & Tùy chọn (Community & Preferences)
-                item { SectionTitle(title = "Cộng đồng & Tùy chọn") }
+                item { SectionTitle(title = stringResource(id = R.string.settings_community_preferences)) }
                 item {
                     SettingsCard {
                         SettingsItem(
                             icon = Icons.Default.Group,
-                            title = "Bạn bè (Inner Circle)",
-                            subtitle = "Kết nối & Chia sẻ tiến độ",
+                            title = stringResource(id = R.string.settings_friends_title),
+                            subtitle = stringResource(id = R.string.settings_friends_desc),
                             onClick = onNavigateToSocial
                         )
                         SettingsDivider()
                         SettingsItem(
                             icon = Icons.Default.Language,
                             titleRes = R.string.settings_language,
-                            subtitle = "Tiếng Việt",
+                            subtitle = if (isVietnamese) "Tiếng Việt" else "English",
                             onClick = { showLanguagePicker = true }
                         )
                         SettingsDivider()
@@ -680,12 +682,14 @@ fun SettingsScreen(
                                 ThemeMode.DARK -> Icons.Default.DarkMode
                                 ThemeMode.SYSTEM -> Icons.Default.SettingsBrightness
                             },
-                            title = "Chế độ hiển thị",
-                            subtitle = when (themeMode) {
-                                ThemeMode.LIGHT -> "Sáng"
-                                ThemeMode.DARK -> "Tối"
-                                ThemeMode.SYSTEM -> "Hệ thống"
-                            },
+                            title = stringResource(id = R.string.settings_theme_display),
+                            subtitle = stringResource(
+                                id = when (themeMode) {
+                                    ThemeMode.LIGHT -> R.string.settings_theme_light
+                                    ThemeMode.DARK -> R.string.settings_theme_dark
+                                    ThemeMode.SYSTEM -> R.string.settings_theme_system
+                                }
+                            ),
                             onClick = { showThemePicker = true }
                         )
                         SettingsDivider()
@@ -703,7 +707,7 @@ fun SettingsScreen(
                         SettingsDivider()
                         SettingsToggleItem(
                             icon = Icons.Default.EditNote,
-                            title = "Gợi ý viết nhật ký",
+                            title = stringResource(id = R.string.settings_journal_prompt),
                             checked = isJournalPromptEnabled,
                             onCheckedChange = { mainViewModel.setJournalPromptEnabled(it) }
                         )
@@ -711,38 +715,38 @@ fun SettingsScreen(
                 }
 
                 // 4. Riêng tư & bảo mật
-                item { SectionTitle(title = "Riêng tư & bảo mật") }
+                item { SectionTitle(title = stringResource(id = R.string.settings_privacy_security)) }
                 item {
                     SettingsCard {
                         SettingsItem(
                             icon = Icons.Default.Block,
-                            title = "Tài khoản bị chặn",
+                            title = stringResource(id = R.string.settings_blocked_users),
                             onClick = { /* Block list */ }
                         )
                         SettingsDivider()
                         SettingsItem(
                             icon = Icons.Default.Lock,
-                            title = "Privacy and Data",
+                            title = stringResource(id = R.string.settings_privacy_data),
                             onClick = { /* Privacy details */ }
                         )
                     }
                 }
 
                 // 5. Vùng nguy hiểm (Danger Zone)
-                item { SectionTitle(title = "Vùng nguy hiểm") }
+                item { SectionTitle(title = stringResource(id = R.string.settings_danger_zone)) }
                 item {
                     SettingsCard {
                         SettingsItem(
                             icon = Icons.Default.DeleteForever,
-                            title = "Xóa tài khoản",
-                            subtitle = "Xóa vĩnh viễn toàn bộ dữ liệu",
+                            title = stringResource(id = R.string.settings_delete_account),
+                            subtitle = stringResource(id = R.string.settings_delete_account_desc),
                             isDestructive = true,
                             onClick = { showDeleteAccountDialog = true }
                         )
                         SettingsDivider()
                         SettingsItem(
                             icon = Icons.AutoMirrored.Filled.Logout,
-                            title = "Đăng xuất",
+                            title = stringResource(id = R.string.settings_logout),
                             subtitle = currentUser?.email ?: "",
                             onClick = { showLogoutDialog = true }
                         )

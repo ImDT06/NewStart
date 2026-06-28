@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -67,6 +68,8 @@ import androidx.compose.foundation.Image
 import coil.compose.AsyncImage
 import com.example.newstart.R
 import com.example.newstart.domain.model.JournalEntry
+import com.example.newstart.domain.model.User
+import kotlinx.coroutines.flow.Flow
 import com.example.newstart.ui.components.AdvancedDatePickerDialog
 import com.example.newstart.ui.features.journal.components.TimelineEntryItem
 import com.example.newstart.ui.theme.LocalDarkTheme
@@ -104,7 +107,9 @@ fun JournalScreen(
         onDateRangeSelected = { start, end -> viewModel.onDateRangeSelected(start, end) },
         onQuickFilterSelected = { viewModel.setQuickFilter(it) },
         onDeleteEntry = { viewModel.deleteEntry(it) },
-        onArchiveClick = { navController.navigate(Screen.JournalArchive.route) }
+        onArchiveClick = { navController.navigate(Screen.JournalArchive.route) },
+        getUserFlow = { viewModel.getUserById(it) },
+        onReactToPost = { postId, emoji -> viewModel.reactToPost(postId, emoji) }
     )
 }
 
@@ -120,7 +125,9 @@ fun JournalContent(
     onDateRangeSelected: (LocalDate, LocalDate?) -> Unit,
     onQuickFilterSelected: (String) -> Unit,
     onDeleteEntry: (String) -> Unit,
-    onArchiveClick: () -> Unit
+    onArchiveClick: () -> Unit,
+    getUserFlow: (String) -> Flow<User>,
+    onReactToPost: (String, String) -> Unit
 ) {
     val isDark = LocalDarkTheme.current
     var selectedImageUrl by remember { mutableStateOf<String?>(null) }
@@ -142,6 +149,7 @@ fun JournalContent(
     val locale = remember(context) { context.resources.configuration.locales[0] }
     val isVietnamese = locale.language == "vi"
     val timeFormatter = remember { SimpleDateFormat("HH:mm", locale) }
+    val dateTimeFormatter = remember { SimpleDateFormat("HH:mm - dd/MM/yyyy", locale) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -397,8 +405,10 @@ fun JournalContent(
                     socialFeed = socialFeed,
                     isVietnamese = isVietnamese,
                     isDark = isDark,
-                    timeFormatter = timeFormatter,
-                    onImageClick = { selectedImageUrl = it }
+                    dateTimeFormatter = dateTimeFormatter,
+                    onImageClick = { selectedImageUrl = it },
+                    getUserFlow = getUserFlow,
+                    onReactToPost = onReactToPost
                 )
             }
         }
@@ -885,8 +895,10 @@ private fun SocialFeedList(
     socialFeed: List<JournalEntry>,
     isVietnamese: Boolean,
     isDark: Boolean,
-    timeFormatter: SimpleDateFormat,
-    onImageClick: (String) -> Unit
+    dateTimeFormatter: SimpleDateFormat,
+    onImageClick: (String) -> Unit,
+    getUserFlow: (String) -> Flow<User>,
+    onReactToPost: (String, String) -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
@@ -920,8 +932,10 @@ private fun SocialFeedList(
                 items(items = socialFeed, key = { it.id }) { entry ->
                     SocialFeedItem(
                         entry = entry,
-                        timeFormatted = remember(entry.timestamp) { entry.timestamp?.let { timeFormatter.format(it) } ?: "--:--" },
-                        onImageClick = onImageClick
+                        timeFormatted = remember(entry.timestamp) { entry.timestamp?.let { dateTimeFormatter.format(it) } ?: "--:--" },
+                        onImageClick = onImageClick,
+                        getUserFlow = getUserFlow,
+                        onReactToPost = onReactToPost
                     )
                 }
             }
@@ -933,9 +947,21 @@ private fun SocialFeedList(
 fun SocialFeedItem(
     entry: JournalEntry,
     timeFormatted: String,
-    onImageClick: (String) -> Unit
+    onImageClick: (String) -> Unit,
+    getUserFlow: (String) -> Flow<User>,
+    onReactToPost: (String, String) -> Unit
 ) {
     val isDark = LocalDarkTheme.current
+    val currentUserId = remember {
+        com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    }
+    
+    val userState by remember(entry.userId) {
+        getUserFlow(entry.userId)
+    }.collectAsState(initial = User(name = "Đang tải..."))
+
+    val displayName = if (userState.name.isNotBlank()) userState.name else "Người dùng"
+    var showReactorsDialog by remember { mutableStateOf(false) }
     
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -954,13 +980,22 @@ fun SocialFeedItem(
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Person, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                        if (!userState.avatarUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = userState.avatarUrl,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(Icons.Default.Person, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "User ${entry.userId.take(5)}",
+                        text = displayName,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -1015,6 +1050,139 @@ fun SocialFeedItem(
                     contentScale = ContentScale.Crop
                 )
             }
+
+            if (entry.userId == currentUserId && entry.reactions.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier
+                        .clickable { showReactorsDialog = true }
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Xem người đã tương tác (${entry.reactions.size})",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (showReactorsDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showReactorsDialog = false },
+                        title = {
+                            Text(
+                                text = "Lượt tương tác (${entry.reactions.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        text = {
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)
+                            ) {
+                                items(entry.reactions.toList()) { (reactorId, emoji) ->
+                                    val reactorState by remember(reactorId) {
+                                        getUserFlow(reactorId)
+                                    }.collectAsState(initial = User(name = "Đang tải..."))
+                                    
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                            .padding(8.dp)
+                                    ) {
+                                        if (!reactorState.avatarUrl.isNullOrEmpty()) {
+                                            AsyncImage(
+                                                model = reactorState.avatarUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(32.dp).clip(CircleShape),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            Icon(Icons.Default.Person, null, modifier = Modifier.size(32.dp))
+                                        }
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = reactorState.name,
+                                            modifier = Modifier.weight(1f),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(text = emoji, fontSize = 20.sp)
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showReactorsDialog = false }) {
+                                Text("Đóng")
+                            }
+                        }
+                    )
+                }
+            }
+
+            // Thả cảm xúc
+            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.08f))
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val commonEmojis = listOf("❤️", "👍", "🔥", "😂", "👏")
+                commonEmojis.forEach { emoji ->
+                    val count = entry.reactions.values.count { it == emoji }
+                    val hasReacted = entry.reactions[currentUserId] == emoji
+                    
+                    val backgroundColor = if (hasReacted) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                          else Color.Transparent
+                    val contentColor = if (hasReacted) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant
+                    val border = if (hasReacted) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)) else null
+                    
+                    Surface(
+                        onClick = { onReactToPost(entry.id, emoji) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = backgroundColor,
+                        border = border,
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(emoji, fontSize = 14.sp)
+                            if (count > 0) {
+                                Text(
+                                    text = count.toString(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = contentColor,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1035,7 +1203,9 @@ fun JournalScreenPreview() {
             onDateRangeSelected = { _, _ -> },
             onQuickFilterSelected = {},
             onDeleteEntry = {},
-            onArchiveClick = {}
+            onArchiveClick = {},
+            getUserFlow = { kotlinx.coroutines.flow.flowOf(User()) },
+            onReactToPost = { _, _ -> }
         )
     }
 }

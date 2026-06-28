@@ -7,6 +7,9 @@ import com.example.newstart.domain.model.JournalEntry
 import com.example.newstart.domain.model.JournalType
 import com.example.newstart.domain.repository.JournalRepository
 import com.example.newstart.domain.usecase.SaveJournalEntryUseCase
+import com.example.newstart.domain.repository.UserRepository
+import com.example.newstart.domain.model.User
+import kotlinx.coroutines.flow.Flow
 import com.example.newstart.domain.repository.SocialRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -27,8 +30,17 @@ import javax.inject.Inject
 class JournalViewModel @Inject constructor(
     private val journalRepository: JournalRepository,
     private val socialRepository: SocialRepository,
-    private val saveJournalEntryUseCase: SaveJournalEntryUseCase
+    private val saveJournalEntryUseCase: SaveJournalEntryUseCase,
+    private val userRepository: UserRepository
 ) : ViewModel() {
+
+    fun getUserById(userId: String): Flow<User> = userRepository.getUserById(userId)
+
+    fun reactToPost(postId: String, emoji: String) {
+        viewModelScope.launch {
+            socialRepository.reactToPost(postId, emoji)
+        }
+    }
 
     private val _selectedDateRange = MutableStateFlow<Pair<LocalDate, LocalDate?>>(LocalDate.now() to null)
     val selectedDateRange: StateFlow<Pair<LocalDate, LocalDate?>> = _selectedDateRange.asStateFlow()

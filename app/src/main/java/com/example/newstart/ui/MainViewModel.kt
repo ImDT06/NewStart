@@ -280,8 +280,10 @@ class MainViewModel @Inject constructor(
     fun logout() {
         viewModelScope.launch {
             try {
-                // 1. Clear database
-                database.clearAllTables()
+                // 1. Clear database on IO dispatcher
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    database.clearAllTables()
+                }
                 
                 // 2. Clear Auth
                 authRepository.logout()
