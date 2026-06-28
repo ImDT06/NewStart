@@ -54,9 +54,12 @@ fun TimelineEntryItem(
         }
     }
 
-    Row(modifier = Modifier
-        .fillMaxWidth()
-        .height(IntrinsicSize.Min)) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .padding(end = 8.dp, bottom = 8.dp)
+    ) {
         // Timeline Column
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -106,7 +109,7 @@ fun TimelineEntryItem(
         Card(
             modifier = Modifier
                 .weight(1f)
-                .padding(start = 2.dp),
+                .padding(start = 8.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = if (isDark) MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp)
