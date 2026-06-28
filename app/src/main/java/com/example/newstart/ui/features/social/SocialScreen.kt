@@ -1061,12 +1061,17 @@ fun SquadDetailView(
             )
         }
     ) { padding ->
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val keyboardHeightDp = with(density) { WindowInsets.ime.getBottom(density).toDp() }
+        val baseBottomPadding = padding.calculateBottomPadding()
+        val bottomBarHeightDp = if (hasBottomBar) 64.dp else 0.dp
+        val unifiedBottomPadding = maxOf(keyboardHeightDp, baseBottomPadding + bottomBarHeightDp)
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(bottom = if (hasBottomBar && !WindowInsets.isImeVisible) 80.dp else 0.dp)
-                .imePadding()
+                .padding(top = padding.calculateTopPadding())
+                .padding(bottom = unifiedBottomPadding)
         ) {
             // Modern Segmented Control Style Tabs for Chat vs Members & Habits
             val detailTabs = listOf(
