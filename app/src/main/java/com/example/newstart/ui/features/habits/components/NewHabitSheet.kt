@@ -50,7 +50,6 @@ fun NewHabitSheet(
     
     if (editingHabit != null) {
         Column(modifier = Modifier.fillMaxWidth().imePadding().padding(bottom = 32.dp)) {
-            Box(modifier = Modifier.padding(top = 8.dp).width(40.dp).height(4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)).align(Alignment.CenterHorizontally))
             Row(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null) }
                 Text(text = stringResource(R.string.habits_custom_dialog_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -94,8 +93,7 @@ fun NewHabitSheet(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).imePadding().padding(top = 8.dp)) {
-        Box(modifier = Modifier.width(40.dp).height(4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)).align(Alignment.CenterHorizontally))
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).imePadding().padding(top = 0.dp)) {
         Row(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurface) }
             Text(text = stringResource(R.string.habits_new_title), color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp, fontWeight = FontWeight.Bold)
