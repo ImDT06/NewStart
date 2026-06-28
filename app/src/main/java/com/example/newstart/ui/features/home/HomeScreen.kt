@@ -67,6 +67,7 @@ fun HomeScreen(
     val todos by viewModel.todos.collectAsStateWithLifecycle()
     val timerSeconds by viewModel.timerSeconds.collectAsStateWithLifecycle()
     val isTimerRunning by viewModel.isTimerRunning.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var showTodoDialog by remember { mutableStateOf(false) }
     var editingTodo by remember { mutableStateOf<Todo?>(null) }
@@ -82,7 +83,11 @@ fun HomeScreen(
                 if (editingTodo != null) {
                     viewModel.updateTodo(editingTodo!!.copy(task = task, priority = priority, dueDate = dueDate))
                 } else {
-                    viewModel.addTodo(task, priority, dueDate)
+                    if (todos.count { !it.isCompleted } >= 50) {
+                        android.widget.Toast.makeText(context, "Bạn đã đạt giới hạn 50 nhiệm vụ chưa hoàn thành!", android.widget.Toast.LENGTH_LONG).show()
+                    } else {
+                        viewModel.addTodo(task, priority, dueDate)
+                    }
                 }
                 showTodoDialog = false
                 editingTodo = null
@@ -100,8 +105,12 @@ fun HomeScreen(
         onToggleHabit = { h, c -> viewModel.toggleHabit(h, c) },
         onToggleTodo = { id, c -> viewModel.toggleTodo(id, c) },
         onAddTodo = {
-            editingTodo = null
-            showTodoDialog = true
+            if (todos.count { !it.isCompleted } >= 50) {
+                android.widget.Toast.makeText(context, "Bạn chỉ được thêm tối đa 50 nhiệm vụ chưa hoàn thành. Hãy hoàn thành bớt việc trước!", android.widget.Toast.LENGTH_LONG).show()
+            } else {
+                editingTodo = null
+                showTodoDialog = true
+            }
         },
         onEditTodo = { todo ->
             editingTodo = todo

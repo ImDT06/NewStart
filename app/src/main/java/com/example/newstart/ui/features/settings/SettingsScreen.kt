@@ -202,6 +202,7 @@ fun SettingsScreen(
     var selectedReason by remember { mutableStateOf("") }
     var emailConfirmationText by remember { mutableStateOf("") }
     var countdownSeconds by remember { mutableStateOf(3) }
+    var deleteAccountPasswordText by remember { mutableStateOf("") }
 
     val sharedPrefs = remember(context) { context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE) }
     var isStreakWidgetEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("is_streak_widget_enabled", true)) }
@@ -257,12 +258,13 @@ fun SettingsScreen(
             deleteAccountStep = 1
             selectedReason = ""
             emailConfirmationText = ""
+            deleteAccountPasswordText = ""
             countdownSeconds = 3
         }
     }
 
     LaunchedEffect(deleteAccountStep) {
-        if (deleteAccountStep == 3) {
+        if (deleteAccountStep == 4) {
             countdownSeconds = 3
             while (countdownSeconds > 0) {
                 kotlinx.coroutines.delay(1000L)
@@ -325,10 +327,11 @@ fun SettingsScreen(
                     text = when (deleteAccountStep) {
                         1 -> "Tại sao bạn rời đi?"
                         2 -> "Xác nhận địa chỉ email"
+                        3 -> "Xác thực mật khẩu"
                         else -> "Cảnh báo bảo mật cuối cùng"
                     },
                     fontWeight = FontWeight.ExtraBold,
-                    color = if (deleteAccountStep == 3) Color.Red else MaterialTheme.colorScheme.onSurface
+                    color = if (deleteAccountStep == 4) Color.Red else MaterialTheme.colorScheme.onSurface
                 )
             },
             text = {
@@ -437,12 +440,28 @@ fun SettingsScreen(
                                 }
                             }
                         }
-                        else -> {
+                        3 -> {
                             Text(
-                                text = "LƯU Ý: Hành động này sẽ xóa vĩnh viễn toàn bộ nhật ký của bạn ($journalCount mục), cùng với tất cả dữ liệu thói quen và công việc. Bạn không thể hoàn tác.",
+                                "Vui lòng nhập mật khẩu tài khoản của bạn để tiếp tục.",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.Red,
-                                fontWeight = FontWeight.Bold
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            )
+                            TextField(
+                                value = deleteAccountPasswordText,
+                                onValueChange = { deleteAccountPasswordText = it },
+                                placeholder = { Text("Mật khẩu", color = Color.Gray) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color(0xFF252528),
+                                    unfocusedContainerColor = Color(0xFF252528),
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                ),
+                                singleLine = true,
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(
@@ -456,12 +475,35 @@ fun SettingsScreen(
                                     Text("Quay lại", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Button(
+                                    onClick = { deleteAccountStep = 4 },
+                                    enabled = deleteAccountPasswordText.isNotBlank(),
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Tiếp tục", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        else -> {
+                            Text(
+                                text = "LƯU Ý: Hành động này sẽ xóa vĩnh viễn toàn bộ nhật ký của bạn ($journalCount mục), cùng với tất cả dữ liệu thói quen và công việc. Bạn không thể hoàn tác.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Red,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Button(
                                     onClick = {
                                         mainViewModel.logout()
                                         showDeleteAccountDialog = false
                                     },
                                     enabled = countdownSeconds <= 0,
-                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    modifier = Modifier.fillMaxWidth().height(48.dp),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = Color.Red,
@@ -471,9 +513,15 @@ fun SettingsScreen(
                                     )
                                 ) {
                                     Text(
-                                        text = if (countdownSeconds > 0) "Chờ (${countdownSeconds}s)" else "Xóa vĩnh viễn",
+                                        text = if (countdownSeconds > 0) "Chờ (${countdownSeconds}s)" else "Xóa tài khoản vĩnh viễn",
                                         fontWeight = FontWeight.Bold
                                     )
+                                }
+                                TextButton(
+                                    onClick = { deleteAccountStep = 3 },
+                                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                                ) {
+                                    Text("Quay lại", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -1422,7 +1470,7 @@ fun SectionTitle(title: String) {
         text = title,
         fontSize = 14.sp,
         fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.outline,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
         modifier = Modifier.padding(start = 8.dp, bottom = 4.dp, top = 16.dp)
     )
 }
@@ -1484,7 +1532,7 @@ fun SettingsItem(
                 Text(
                     text = subtitle,
                     fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
                 )
             }
         }

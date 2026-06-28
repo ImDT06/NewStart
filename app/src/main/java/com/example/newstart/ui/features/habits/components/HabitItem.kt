@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -86,13 +87,11 @@ fun HabitItem(
 
         shadowElevation = 4.dp,
 
-        color = color.copy(
-            alpha =
-                if(habit.isCompleted)
-                    0.8f
-                else
-                    0.12f
-        )
+        color = if (habit.isCompleted) {
+            color.copy(alpha = 0.25f).compositeOver(MaterialTheme.colorScheme.surface)
+        } else {
+            color.copy(alpha = 0.15f).compositeOver(MaterialTheme.colorScheme.surface)
+        }
 
     ) {
 
@@ -141,7 +140,7 @@ fun HabitItem(
                         color =
                             if(habit.isCompleted)
 
-                                Color.White.copy(alpha = 0.85f)
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
 
                             else
 
@@ -203,7 +202,7 @@ fun HabitItem(
                             color =
                                 if(habit.isCompleted)
 
-                                    Color.White.copy(alpha = 0.7f)
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
 
                                 else
 
@@ -243,11 +242,11 @@ fun HabitItem(
 
                         if(habit.isCompleted)
 
-                            Color.White.copy(alpha = 0.7f)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
 
                         else
 
-                            Color.Gray.copy(alpha = 0.7f),
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
 
 
 
@@ -272,7 +271,7 @@ fun HabitItem(
                         color = if (habit.isCompleted) Color.Transparent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                         shape = CircleShape
                     )
-                    .background(if (habit.isCompleted) Color.White.copy(alpha = 0.25f) else Color.Transparent)
+                    .background(if (habit.isCompleted) color else Color.Transparent)
                     .clickable { onToggle() },
                 contentAlignment = Alignment.Center
             ) {
