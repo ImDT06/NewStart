@@ -208,7 +208,7 @@ class MainActivity : AppCompatActivity() {
                             .nestedScroll(nestedScrollConnection),
                         containerColor = MaterialTheme.colorScheme.background,
                         contentColor = MaterialTheme.colorScheme.onBackground
-                    ) { innerPadding ->
+                    ) { _ ->
                         Box(
                             modifier = Modifier.fillMaxSize()
                         ) {

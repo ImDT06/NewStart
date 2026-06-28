@@ -1,6 +1,7 @@
 package com.example.newstart.ui.features.social
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -17,12 +18,15 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -31,8 +35,18 @@ import coil.compose.AsyncImage
 import com.example.newstart.domain.model.Squad
 import com.example.newstart.domain.model.User
 import kotlinx.coroutines.flow.Flow
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.Date
 import com.example.newstart.ui.MainViewModel
 import com.example.newstart.R
+import com.example.newstart.ui.theme.LocalDarkTheme
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.tween
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,11 +63,11 @@ fun SocialScreen(
     val friends by viewModel.friends.collectAsStateWithLifecycle()
     val sentRequests by viewModel.sentRequests.collectAsStateWithLifecycle()
     val currentUserId = viewModel.currentUserId
-    
-    var selectedTab by remember { mutableStateOf(0) } // 0: Bạn bè, 1: Squads
+    var selectedTab by remember { mutableStateOf(0) }
     var activeSquadDetail by remember { mutableStateOf<Squad?>(null) }
     val activeSquad = squads.find { it.id == activeSquadDetail?.id } ?: activeSquadDetail
-
+    val isDark = LocalDarkTheme.current
+    
     if (activeSquad != null) {
         SquadDetailView(
             squad = activeSquad,
@@ -81,33 +95,81 @@ fun SocialScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                TabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    modifier = Modifier.height(44.dp)
+                // Modern Segmented Control Style Tabs for Friends vs Squads
+                val tabs = listOf(
+                    stringResource(R.string.social_tab_friends),
+                    stringResource(R.string.social_tab_squads)
+                )
+
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .fillMaxWidth()
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isDark) Color(0xFF1E1E1E) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 ) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text(stringResource(R.string.social_tab_friends), fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+                    val totalWidth = maxWidth
+                    val tabWidth = totalWidth / tabs.size
+                    
+                    val indicatorOffset by animateDpAsState(
+                        targetValue = tabWidth * selectedTab,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        label = "TabIndicatorOffset"
                     )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text(stringResource(R.string.social_tab_squads), fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+
+                    Box(
+                        modifier = Modifier
+                            .padding(3.dp)
+                            .offset(x = indicatorOffset)
+                            .width(tabWidth - 6.dp)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(MaterialTheme.colorScheme.primary)
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        tabs.forEachIndexed { index, title ->
+                            val isSelected = selectedTab == index
+                            val textColor by animateColorAsState(
+                                targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary 
+                                              else MaterialTheme.colorScheme.onSurfaceVariant,
+                                animationSpec = tween(durationMillis = 200),
+                                label = "TabTextColor"
+                            )
+                            
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = { selectedTab = index }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = textColor
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                     if (selectedTab == 0) {
-                        FriendsTab(
+                        FriendsTabWrapper(
                             searchQuery = searchQuery,
                             onSearchQueryChange = { 
                                 searchQuery = it
@@ -126,13 +188,13 @@ fun SocialScreen(
                             getUserFlow = { viewModel.getUserById(it) }
                         )
                     } else {
-                        SquadsTab(
+                        SquadsTabWrapper(
                             squads = squads,
                             friends = friends,
                             currentUserId = currentUserId ?: "",
-                            getUserFlow = { viewModel.getUserById(it) },
-                            onCreateSquad = { name, desc, members -> viewModel.createSquad(name, desc, members) },
-                            onUpdateSquad = { id, name, desc -> viewModel.updateSquad(id, name, desc) },
+                            getUserFlow = { id -> viewModel.getUserById(id) },
+                            onCreateSquad = { n, d, m -> viewModel.createSquad(n, d, m) },
+                            onUpdateSquad = { id, n, d -> viewModel.updateSquad(id, n, d) },
                             onSquadClick = { activeSquadDetail = it }
                         )
                     }
@@ -143,7 +205,7 @@ fun SocialScreen(
 }
 
 @Composable
-private fun FriendsTab(
+fun FriendsTabWrapper(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     isSearching: Boolean,
@@ -162,10 +224,41 @@ private fun FriendsTab(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearchQueryChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    color = if (LocalDarkTheme.current) Color(0xFF1E1E1E) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(16.dp)
+                ),
             placeholder = { Text(stringResource(R.string.social_search_placeholder), fontSize = 14.sp) },
-            leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(20.dp)) },
-            shape = RoundedCornerShape(12.dp),
+            leadingIcon = { 
+                Icon(
+                    imageVector = Icons.Default.Search, 
+                    contentDescription = null, 
+                    modifier = Modifier.size(20.dp),
+                    tint = if (searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                ) 
+            },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { onSearchQueryChange("") }) {
+                        Icon(
+                            imageVector = Icons.Default.Clear, 
+                            contentDescription = "Clear",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = Color.Transparent,
+                disabledBorderColor = Color.Transparent,
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent
+            ),
+            shape = RoundedCornerShape(16.dp),
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyMedium
         )
@@ -270,7 +363,7 @@ private fun FriendsTab(
 }
 
 @Composable
-private fun SquadsTab(
+fun SquadsTabWrapper(
     squads: List<Squad>,
     friends: List<com.example.newstart.domain.model.Friendship>,
     currentUserId: String,
@@ -321,6 +414,7 @@ private fun SquadsTab(
                         SquadItem(
                             squad = squad,
                             currentUserId = currentUserId,
+                            getUserFlow = getUserFlow,
                             onEditClick = { squadToEdit = squad }
                         )
                     }
@@ -384,7 +478,7 @@ private fun SquadsTab(
                                 val friendState by remember(friendId) {
                                     getUserFlow(friendId)
                                 }.collectAsState(initial = User(name = stringResource(R.string.squad_loading)))
-                                
+
                                 val isSelected = selectedMembers.contains(friendId)
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -399,7 +493,6 @@ private fun SquadsTab(
                                         }
                                         .padding(vertical = 6.dp, horizontal = 4.dp)
                                 ) {
-                                    // Custom Circular Check Box
                                     Surface(
                                         modifier = Modifier.size(20.dp),
                                         shape = CircleShape,
@@ -416,7 +509,6 @@ private fun SquadsTab(
                                         }
                                     }
                                     Spacer(modifier = Modifier.width(10.dp))
-                                    // Friend Avatar
                                     Surface(
                                         modifier = Modifier.size(32.dp),
                                         shape = CircleShape,
@@ -470,8 +562,8 @@ private fun SquadsTab(
             },
             dismissButton = {
                 TextButton(
-                    onClick = { 
-                        showCreateDialog = false 
+                    onClick = {
+                        showCreateDialog = false
                         squadName = ""
                         squadDesc = ""
                         selectedMembers = emptySet()
@@ -530,28 +622,61 @@ private fun SquadsTab(
 
 @Composable
 fun UserItem(user: User, action: @Composable () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-            .padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically
+    val isDark = LocalDarkTheme.current
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        AsyncImage(
-            model = user.avatarUrl,
-            contentDescription = null,
+        Row(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape),
-            contentScale = ContentScale.Crop
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(user.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text(user.email, fontSize = 11.sp, color = Color.Gray)
-        }
-        Box(modifier = Modifier.scale(0.85f)) {
-            action()
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(46.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (!user.avatarUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = user.avatarUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Person, 
+                            contentDescription = null, 
+                            modifier = Modifier.size(24.dp), 
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = user.name.ifBlank { stringResource(R.string.social_default_user_name) }, 
+                    fontWeight = FontWeight.ExtraBold, 
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Box(modifier = Modifier.padding(start = 8.dp)) {
+                action()
+            }
         }
     }
 }
@@ -563,52 +688,95 @@ fun RequestItem(
     onDecline: () -> Unit,
     getUserFlow: (String) -> Flow<User>
 ) {
+    val isDark = LocalDarkTheme.current
     val userState by remember(fromUserId) {
         getUserFlow(fromUserId)
     }.collectAsState(initial = User(name = stringResource(R.string.squad_loading)))
 
     val displayName = if (userState.name.isNotBlank()) userState.name else stringResource(R.string.social_default_user_name)
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-            .padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (!userState.avatarUrl.isNullOrEmpty()) {
-            AsyncImage(
-                model = userState.avatarUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Icon(Icons.Default.Person, null, modifier = Modifier.size(32.dp))
-        }
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = stringResource(R.string.social_friend_request_from, displayName),
-            modifier = Modifier.weight(1f),
-            fontWeight = FontWeight.Medium,
-            fontSize = 13.sp
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) Color(0xFF1B1B1E) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = onDecline,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
             ) {
-                Text(stringResource(R.string.social_btn_decline), fontSize = 11.sp)
+                Box(contentAlignment = Alignment.Center) {
+                    if (!userState.avatarUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = userState.avatarUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(Icons.Default.Person, null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
             }
-            Button(
-                onClick = onAccept,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp)
-            ) {
-                Text(stringResource(R.string.social_btn_accept), fontSize = 11.sp)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = displayName,
+                    fontWeight = FontWeight.ExtraBold,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = stringResource(R.string.social_friend_request_from, ""),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                IconButton(
+                    onClick = onDecline,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(
+                            color = if (isDark) Color(0xFF2C2C2F) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                            shape = CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close, 
+                        contentDescription = stringResource(R.string.social_btn_decline),
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                IconButton(
+                    onClick = onAccept,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check, 
+                        contentDescription = stringResource(R.string.social_btn_accept),
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }
@@ -656,27 +824,21 @@ fun FriendItem(
     UserItem(
         user = userState,
         action = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.social_friend_already),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-                IconButton(
-                    onClick = { showConfirmDialog = true },
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.social_btn_unfriend),
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
+            IconButton(
+                onClick = { showConfirmDialog = true },
+                modifier = Modifier
+                    .size(30.dp)
+                    .background(
+                        color = if (LocalDarkTheme.current) Color(0xFF2C2C2F) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = CircleShape
                     )
-                }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.social_btn_unfriend),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     )
@@ -686,50 +848,160 @@ fun FriendItem(
 fun SquadItem(
     squad: Squad,
     currentUserId: String,
+    getUserFlow: (String) -> Flow<User>,
     onEditClick: (() -> Unit)? = null
 ) {
+    val isDark = LocalDarkTheme.current
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(squad.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = squad.name, 
+                        style = MaterialTheme.typography.titleMedium, 
+                        fontWeight = FontWeight.ExtraBold
+                    )
                     if (squad.habitCategory.isNotBlank()) {
-                        Text(squad.habitCategory, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ) {
+                            Text(
+                                text = squad.habitCategory,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
                 if (squad.adminId == currentUserId && onEditClick != null) {
-                    IconButton(onClick = onEditClick, modifier = Modifier.size(28.dp)) {
+                    IconButton(
+                        onClick = onEditClick, 
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(
+                                color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = CircleShape
+                            )
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = stringResource(R.string.squad_edit_title),
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            Text(squad.description, style = MaterialTheme.typography.bodySmall, maxLines = 2)
             Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Group, null, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(stringResource(R.string.social_members_count, squad.members.size), fontSize = 11.sp)
+            Text(
+                text = squad.description, 
+                style = MaterialTheme.typography.bodyMedium, 
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                maxLines = 2
+            )
+            Spacer(Modifier.height(16.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Overlapping Avatar Stack of members
+                val firstMembers = squad.members.take(3)
+                val memberUsers = firstMembers.map { memberId ->
+                    remember(memberId) { getUserFlow(memberId) }.collectAsState(initial = User())
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy((-10).dp)
+                ) {
+                    memberUsers.forEach { userState ->
+                        val user = userState.value
+                        Surface(
+                            modifier = Modifier.size(28.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.5.dp, if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (!user.avatarUrl.isNullOrEmpty()) {
+                                    AsyncImage(
+                                        model = user.avatarUrl,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Person, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (squad.members.size > 3) {
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Text(
+                            text = "+${squad.members.size - 3}",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(
+                            color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Group, 
+                        contentDescription = null, 
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.social_members_count, squad.members.size), 
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SectionTitle(title: String) {
+fun SectionTitle(title: String) {
     Text(
         text = title,
         fontSize = 13.sp,
@@ -739,20 +1011,23 @@ private fun SectionTitle(title: String) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun SquadDetailView(
+fun SquadDetailView(
     squad: Squad,
     currentUserId: String,
     friends: List<com.example.newstart.domain.model.Friendship>,
     viewModel: SocialViewModel,
     mainViewModel: MainViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    hasBottomBar: Boolean = false
 ) {
+    val isDark = LocalDarkTheme.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     var selectedTab by remember { mutableStateOf(0) } // 0: Chat, 1: Members & Habits
     val messages by viewModel.getSquadMessages(squad.id).collectAsState(initial = emptyList())
     var messageText by remember { mutableStateOf("") }
-    
+
     var showAddMemberDialog by remember { mutableStateOf(false) }
     var showCreateHabitDialog by remember { mutableStateOf(false) }
     val lazyListState = rememberLazyListState()
@@ -760,6 +1035,12 @@ private fun SquadDetailView(
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             lazyListState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    LaunchedEffect(lazyListState.isScrollInProgress) {
+        if (lazyListState.isScrollInProgress) {
+            focusManager.clearFocus()
         }
     }
 
@@ -784,35 +1065,93 @@ private fun SquadDetailView(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .padding(bottom = if (hasBottomBar && !WindowInsets.isImeVisible) 80.dp else 0.dp)
                 .imePadding()
         ) {
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.primary,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                },
-                modifier = Modifier.height(44.dp)
+            // Modern Segmented Control Style Tabs for Chat vs Members & Habits
+            val detailTabs = listOf(
+                stringResource(R.string.squad_tab_messages),
+                stringResource(R.string.squad_tab_members_habits)
+            )
+
+            BoxWithConstraints(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isDark) Color(0xFF1E1E1E) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text(stringResource(R.string.squad_tab_messages), fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+                val totalWidth = maxWidth
+                val tabWidth = totalWidth / detailTabs.size
+                
+                val indicatorOffset by animateDpAsState(
+                    targetValue = tabWidth * selectedTab,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "SquadDetailTabIndicatorOffset"
                 )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text(stringResource(R.string.squad_tab_members_habits), fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+
+                Box(
+                    modifier = Modifier
+                        .padding(3.dp)
+                        .offset(x = indicatorOffset)
+                        .width(tabWidth - 6.dp)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(MaterialTheme.colorScheme.primary)
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    detailTabs.forEachIndexed { index, title ->
+                        val isSelected = selectedTab == index
+                        val textColor by animateColorAsState(
+                            targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary 
+                                          else MaterialTheme.colorScheme.onSurfaceVariant,
+                            animationSpec = tween(durationMillis = 200),
+                            label = "SquadDetailTabTextColor"
+                        )
+                        
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(9.dp))
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = { selectedTab = index }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = textColor
+                            )
+                        }
+                    }
+                }
             }
 
             if (selectedTab == 0) {
+                val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
                 Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .pointerInput(Unit) {
+                                detectTapGestures(onTap = { focusManager.clearFocus() })
+                            }
+                    ) {
                         if (messages.isEmpty()) {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text(stringResource(R.string.squad_chat_empty), color = Color.Gray, fontSize = 13.sp)
@@ -820,19 +1159,24 @@ private fun SquadDetailView(
                         } else {
                             LazyColumn(
                                 state = lazyListState,
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(onTap = { focusManager.clearFocus() })
+                                    },
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
                                 contentPadding = PaddingValues(vertical = 12.dp)
                             ) {
                                 items(messages) { message ->
                                     val isMe = message.senderId == currentUserId
+                                    val timeString = remember(message.timestamp) { timeFormatter.format(message.timestamp) }
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
                                     ) {
                                         if (!isMe) {
                                             Surface(
-                                                modifier = Modifier.size(28.dp),
+                                                modifier = Modifier.size(32.dp),
                                                 shape = CircleShape,
                                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
                                             ) {
@@ -853,52 +1197,92 @@ private fun SquadDetailView(
                                             }
                                             Spacer(modifier = Modifier.width(8.dp))
                                         }
-
+ 
                                         Column(
                                             horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
                                         ) {
                                             if (!isMe) {
-                                                Text(message.senderName, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                                Text(
+                                                    text = message.senderName, 
+                                                    style = MaterialTheme.typography.labelSmall, 
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                                )
                                                 Spacer(modifier = Modifier.height(2.dp))
                                             }
+                                            
                                             Surface(
-                                                color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                                color = if (isMe) MaterialTheme.colorScheme.primary else {
+                                                    if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                                },
                                                 shape = RoundedCornerShape(
-                                                    topStart = 12.dp,
-                                                    topEnd = 12.dp,
-                                                    bottomStart = if (isMe) 12.dp else 0.dp,
-                                                    bottomEnd = if (isMe) 0.dp else 12.dp
+                                                    topStart = 16.dp,
+                                                    topEnd = 16.dp,
+                                                    bottomStart = if (isMe) 16.dp else 4.dp,
+                                                    bottomEnd = if (isMe) 4.dp else 16.dp
                                                 )
                                             ) {
                                                 Text(
                                                     text = message.text,
-                                                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                                    style = MaterialTheme.typography.bodyMedium
+                                                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
                                                 )
                                             }
+                                            
+                                            Text(
+                                                text = timeString,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                modifier = Modifier.padding(top = 2.dp, start = if (isMe) 0.dp else 4.dp, end = if (isMe) 4.dp else 0.dp)
+                                            )
                                         }
                                     }
                                 }
                             }
                         }
                     }
-
+ 
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .background(
+                                color = if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(28.dp)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                shape = RoundedCornerShape(28.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         OutlinedTextField(
                             value = messageText,
                             onValueChange = { messageText = it },
-                            placeholder = { Text(stringResource(R.string.squad_chat_placeholder)) },
+                            placeholder = { Text(stringResource(R.string.squad_chat_placeholder), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(24.dp),
-                            maxLines = 3
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                disabledBorderColor = Color.Transparent,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent
+                            ),
+                            maxLines = 4,
+                            textStyle = MaterialTheme.typography.bodyMedium
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        val sendButtonScale by animateFloatAsState(
+                            targetValue = if (messageText.isNotBlank()) 1f else 0.85f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            label = "SendButtonScale"
+                        )
+                        
                         IconButton(
                             onClick = {
                                 if (messageText.isNotBlank()) {
@@ -907,9 +1291,22 @@ private fun SquadDetailView(
                                 }
                             },
                             enabled = messageText.isNotBlank(),
-                            modifier = Modifier.background(MaterialTheme.colorScheme.primary, CircleShape)
+                            modifier = Modifier
+                                .scale(sendButtonScale)
+                                .size(40.dp)
+                                .background(
+                                    color = if (messageText.isNotBlank()) MaterialTheme.colorScheme.primary 
+                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                    shape = CircleShape
+                                )
                         ) {
-                            Icon(Icons.Default.Send, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
+                            Icon(
+                                imageVector = Icons.Default.Send, 
+                                contentDescription = "Send", 
+                                tint = if (messageText.isNotBlank()) MaterialTheme.colorScheme.onPrimary 
+                                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }
@@ -1156,5 +1553,26 @@ fun CreateSharedHabitDialog(
                 Text(stringResource(R.string.settings_cancel))
             }
         }
+    )
+}
+
+@Composable
+fun SquadDetailViewWrapper(
+    squad: Squad,
+    currentUserId: String,
+    friends: List<com.example.newstart.domain.model.Friendship>,
+    viewModel: SocialViewModel,
+    mainViewModel: MainViewModel,
+    onBack: () -> Unit,
+    hasBottomBar: Boolean = false
+) {
+    SquadDetailView(
+        squad = squad,
+        currentUserId = currentUserId,
+        friends = friends,
+        viewModel = viewModel,
+        mainViewModel = mainViewModel,
+        onBack = onBack,
+        hasBottomBar = hasBottomBar
     )
 }

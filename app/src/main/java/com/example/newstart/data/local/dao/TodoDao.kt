@@ -9,6 +9,9 @@ interface TodoDao {
     @Query("SELECT * FROM todos ORDER BY createdAt DESC")
     fun getAllTodos(): Flow<List<TodoEntity>>
 
+    @Query("SELECT * FROM todos ORDER BY createdAt DESC")
+    suspend fun getAllTodosSync(): List<TodoEntity>
+
     @Query("SELECT * FROM todos WHERE id = :id")
     suspend fun getTodoById(id: String): TodoEntity?
 

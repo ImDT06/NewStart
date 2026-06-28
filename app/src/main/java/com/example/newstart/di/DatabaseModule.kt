@@ -23,7 +23,9 @@ object DatabaseModule {
             context,
             NewStartDatabase::class.java,
             NewStartDatabase.DATABASE_NAME
-        ).fallbackToDestructiveMigration().build()
+        ).fallbackToDestructiveMigration()
+         .enableMultiInstanceInvalidation()
+         .build()
     }
 
     @Provides

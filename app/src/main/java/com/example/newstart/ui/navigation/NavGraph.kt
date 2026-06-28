@@ -106,7 +106,10 @@ fun NavGraph(
 
         // Màn hình Home
         composable(route = Screen.Home.route) {
-            HomeScreen()
+            HomeScreen(
+                mainViewModel = mainViewModel,
+                navController = navController
+            )
         }
 
         composable(route = Screen.Journal.route) {
