@@ -308,6 +308,19 @@ fun JournalEntryPanel(
                                     }
                                 }
                             }
+
+                            ZoomOption(label = "2x", isSelected = currentZoomRatio in 1.5f..2.8f) {
+                                scope.launch {
+                                    val minZ = currentCameraInfo?.zoomState?.value?.minZoomRatio ?: 1f
+                                    val maxZ = currentCameraInfo?.zoomState?.value?.maxZoomRatio ?: 10f
+                                    val target = 2.0f.coerceIn(minZ, maxZ)
+                                    val anim = Animatable(currentZoomRatio)
+                                    anim.animateTo(target, tween(400, easing = FastOutSlowInEasing)) {
+                                        currentCameraControl?.setZoomRatio(value)
+                                    }
+                                }
+                            }
+
                             ZoomOption(label = "3x", isSelected = currentZoomRatio in 2.8f..3.2f) { 
                                 scope.launch {
                                     val minZ = currentCameraInfo?.zoomState?.value?.minZoomRatio ?: 1f
