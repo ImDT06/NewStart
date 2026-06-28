@@ -58,7 +58,7 @@ fun TimelineEntryItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(IntrinsicSize.Min)
-            .padding(end = 8.dp, bottom = 8.dp)
+            .padding(bottom = 8.dp)
     ) {
         // Timeline Column
         Column(

@@ -88,7 +88,8 @@ fun JournalScreen(
 ) {
     val entries by viewModel.entries.collectAsStateWithLifecycle()
     val selectedDateRange by viewModel.selectedDateRange.collectAsStateWithLifecycle()
-    
+    val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
+
     JournalContent(
         modifier = modifier,
         entries = entries,
@@ -119,12 +120,13 @@ fun JournalContent(
     var searchQuery by remember { mutableStateOf("") }
     var isSearchActive by remember { mutableStateOf(false) }
     var previousDateRange by remember { mutableStateOf<Pair<LocalDate, LocalDate?>?>(null) }
-    
+
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
     val isInspectionMode = LocalInspectionMode.current
     val today = LocalDate.now()
-    
+
+    val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val locale = remember(context) { context.resources.configuration.locales[0] }
@@ -159,10 +161,12 @@ fun JournalContent(
     val filteredEntries by remember(entries, searchQuery) {
         derivedStateOf {
             if (searchQuery.isEmpty()) entries
-            else entries.filter { it.text.contains(searchQuery, ignoreCase = true) || it.emoji.contains(searchQuery) }
+            else entries.filter {
+                it.text.contains(searchQuery, ignoreCase = true) || it.emoji.contains(searchQuery)
+            }
         }
     }
-    
+
     val backgroundColor = MaterialTheme.colorScheme.background
 
     Box(
@@ -178,6 +182,8 @@ fun JournalContent(
             )
     ) {
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+
+            // Header
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -188,7 +194,7 @@ fun JournalContent(
                 val availableWidth = constraintsScope.maxWidth
                 val searchIconSize = 48.dp
 
-                val startOffset = availableWidth - (searchIconSize * 3)
+                val startOffset = availableWidth - (searchIconSize * 2)
                 val endOffset = (-8).dp
 
                 val searchOffset by animateDpAsState(
@@ -217,21 +223,12 @@ fun JournalContent(
                     exit = fadeOut(tween(200)),
                     modifier = Modifier.align(Alignment.CenterEnd)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = onArchiveClick) {
-                            Icon(
-                                imageVector = Icons.Default.CollectionsBookmark,
-                                contentDescription = "Archive",
-                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                            )
-                        }
-                        IconButton(onClick = { showDatePicker = true }) {
-                            Icon(
-                                imageVector = Icons.Default.CalendarMonth,
-                                contentDescription = "Calendar",
-                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                            )
-                        }
+                    IconButton(onClick = { showDatePicker = true }) {
+                        Icon(
+                            Icons.Default.CalendarMonth,
+                            null,
+                            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                        )
                     }
                 }
 
@@ -263,7 +260,7 @@ fun JournalContent(
                                 )
                             },
                             trailingIcon = {
-                                IconButton(onClick = { 
+                                IconButton(onClick = {
                                     if (searchQuery.isNotEmpty()) searchQuery = ""
                                     else {
                                         isSearchActive = false
@@ -287,27 +284,86 @@ fun JournalContent(
                         )
                     } else {
                         IconButton(onClick = { isSearchActive = true }) {
-                            Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+                            Icon(
+                                Icons.Default.Search,
+                                null,
+                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                            )
                         }
                     }
                 }
             }
 
-            Row(
+            // Tabs — fix highlight bug
+            TabRow(
+                selectedTabIndex = currentTab,
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.primary,
+                divider = {},
+                indicator = { tabPositions ->
+                    if (currentTab < tabPositions.size) {
+                        TabRowDefaults.SecondaryIndicator(
+                            Modifier.tabIndicatorOffset(tabPositions[currentTab]),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 16.dp)
+                    .height(44.dp)
             ) {
-                val headerDateText = remember(selectedDateRange, locale) {
-                    val start = selectedDateRange.first
-                    val end = selectedDateRange.second
-                    if (end == null) {
-                        if (start == today) if (isVietnamese) "Hôm nay" else "Today"
-                        else start.format(DateTimeFormatter.ofPattern(if (isVietnamese) "dd MMMM" else "MMMM dd", locale))
-                    } else {
-                        val pattern = if (isVietnamese) "dd/MM" else "MM/dd"
-                        "${start.format(DateTimeFormatter.ofPattern(pattern, locale))} - ${end.format(DateTimeFormatter.ofPattern(pattern, locale))}"
+                Tab(
+                    selected = currentTab == 0,
+                    onClick = { onTabSelected(0) },
+                    selectedContentColor = MaterialTheme.colorScheme.primary,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = {
+                        Text(
+                            if (isVietnamese) "Cá nhân" else "Personal",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+                )
+                Tab(
+                    selected = currentTab == 1,
+                    onClick = { onTabSelected(1) },
+                    selectedContentColor = MaterialTheme.colorScheme.primary,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = {
+                        Text(
+                            if (isVietnamese) "Cộng đồng" else "Community",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+                )
+            }
+
+            // Filter row
+            AnimatedVisibility(visible = currentTab == 0) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val headerDateText = remember(selectedDateRange, locale) {
+                        val start = selectedDateRange.first
+                        val end = selectedDateRange.second
+                        if (end == null) {
+                            if (start == today) if (isVietnamese) "Hôm nay" else "Today"
+                            else start.format(
+                                DateTimeFormatter.ofPattern(
+                                    if (isVietnamese) "dd MMMM" else "MMMM dd", locale
+                                )
+                            )
+                        } else {
+                            val pattern = if (isVietnamese) "dd/MM" else "MM/dd"
+                            "${start.format(DateTimeFormatter.ofPattern(pattern, locale))} - ${
+                                end.format(DateTimeFormatter.ofPattern(pattern, locale))
+                            }"
+                        }
                     }
                 }
 
@@ -352,6 +408,10 @@ fun JournalContent(
                 onDateRangeSelected = { start, end ->
                     onDateRangeSelected(start, end)
                     showDatePicker = false
+                    val weekDiff = (start.toEpochDay() - today.with(
+                        TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)
+                    ).toEpochDay()) / 7
+                    scope.launch { pagerState.scrollToPage(500 + weekDiff.toInt()) }
                 }
             )
         }
@@ -377,15 +437,19 @@ fun JournalContent(
                 onDownload = {
                     entry.imageUrl?.let { url ->
                         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q &&
-                            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                            androidx.core.content.ContextCompat.checkSelfPermission(
+                                context,
+                                android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+                            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                        ) {
                             permissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
                         } else {
-                            scope.launch {
-                                ImageDownloader.downloadImage(context, url)
-                            }
+                            scope.launch { ImageDownloader.downloadImage(context, url) }
                         }
                     } ?: run {
-                        android.widget.Toast.makeText(context, "Bài viết không có ảnh", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(
+                            context, "Bài viết không có ảnh", android.widget.Toast.LENGTH_SHORT
+                        ).show()
                     }
                 },
                 onDelete = {
@@ -420,7 +484,8 @@ private fun QuickFiltersSection(
             val isSelected = remember(selectedDateRange, key) {
                 val today = LocalDate.now()
                 when (key) {
-                    "Month" -> selectedDateRange.first == today.withDayOfMonth(1) && selectedDateRange.second == today.withDayOfMonth(today.lengthOfMonth())
+                    "Month" -> selectedDateRange.first == today.withDayOfMonth(1) &&
+                            selectedDateRange.second == today.withDayOfMonth(today.lengthOfMonth())
                     "All" -> selectedDateRange.first == LocalDate.of(2000, 1, 1)
                     else -> false
                 }
@@ -429,12 +494,19 @@ private fun QuickFiltersSection(
             FilterChip(
                 selected = isSelected,
                 onClick = { onQuickFilterSelected(key) },
-                label = { Text(text = label, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium) },
+                label = {
+                    Text(
+                        text = label,
+                        fontSize = 11.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                    )
+                },
                 shape = RoundedCornerShape(12.dp),
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                    containerColor = if (isDark) Color.White.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    containerColor = if (isDark) Color.White.copy(alpha = 0.05f)
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                     labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                 ),
                 border = null
@@ -457,43 +529,55 @@ private fun JournalList(
 ) {
     val focusManager = LocalFocusManager.current
     val listBackgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.background
-    
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
+
+    Box(modifier = Modifier.fillMaxSize()) {
         if (filteredEntries.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 val emptyMsg = if (searchQuery.isEmpty()) stringResource(R.string.journal_empty_message)
-                              else if (isVietnamese) "Không tìm thấy nhật ký phù hợp" else "No matching journal found"
-                Text(emptyMsg, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else if (isVietnamese) "Không tìm thấy nhật ký phù hợp" else "No matching journal found"
+                Text(
+                    emptyMsg,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         } else {
             val groupedEntries by remember(filteredEntries) {
                 derivedStateOf {
                     filteredEntries.groupBy { entry ->
                         entry.timestamp?.let {
-                            java.time.Instant.ofEpochMilli(it.time).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                            java.time.Instant.ofEpochMilli(it.time)
+                                .atZone(java.time.ZoneId.systemDefault()).toLocalDate()
                         } ?: LocalDate.now()
                     }
                 }
             }
 
             LazyColumn(
-                modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) },
-                contentPadding = PaddingValues(top = 2.dp, bottom = 100.dp, start = 12.dp, end = 12.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) },
+                // Fix: tăng padding ngang để card không sát mép
+                contentPadding = PaddingValues(top = 2.dp, bottom = 100.dp, start = 16.dp, end = 16.dp)
             ) {
                 groupedEntries.forEach { (date, entriesInDate) ->
                     stickyHeader {
                         Surface(
-                            modifier = Modifier.fillMaxWidth(), 
+                            modifier = Modifier.fillMaxWidth(),
                             color = listBackgroundColor.copy(alpha = 0.98f)
                         ) {
                             Text(
-                                text = date.format(DateTimeFormatter.ofPattern(if (isVietnamese) "dd MMMM, yyyy" else "MMMM dd, yyyy", locale)),
+                                text = date.format(
+                                    DateTimeFormatter.ofPattern(
+                                        if (isVietnamese) "dd MMMM, yyyy" else "MMMM dd, yyyy", locale
+                                    )
+                                ),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp, start = 12.dp, end = 12.dp)
+                                modifier = Modifier.padding(
+                                    top = 4.dp, bottom = 10.dp, start = 12.dp, end = 12.dp
+                                )
                             )
                         }
                     }
@@ -501,12 +585,15 @@ private fun JournalList(
                     items(items = entriesInDate, key = { it.id }) { entry ->
                         TimelineEntryItem(
                             entry = entry,
-                            timeFormatted = remember(entry.timestamp) { entry.timestamp?.let { timeFormatter.format(it) } ?: "--:--" },
+                            timeFormatted = remember(entry.timestamp) {
+                                entry.timestamp?.let { timeFormatter.format(it) } ?: "--:--"
+                            },
                             isLast = entriesInDate.last().id == entry.id,
                             onImageClick = onImageClick,
                             onOptionsClick = { onOptionsClick(entry) }
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        // Spacer nhỏ giữa các entry (bottom padding đã có trong TimelineEntryItem)
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
             }
@@ -533,34 +620,27 @@ private fun JournalOptionsSheet(
                 .padding(bottom = 40.dp, top = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            TextButton(
-                onClick = { onShare(); onDismiss() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            TextButton(onClick = { onShare(); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
                 Text("Chia sẻ", style = MaterialTheme.typography.bodyLarge)
             }
-            
-            TextButton(
-                onClick = { onDownload(); onDismiss() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            TextButton(onClick = { onDownload(); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
                 Text("Tải về", style = MaterialTheme.typography.bodyLarge)
             }
-            
-            TextButton(
-                onClick = onDelete,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Xóa", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "Xóa",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
-            
             Spacer(modifier = Modifier.height(12.dp))
-            
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Hủy", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "Hủy",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -573,12 +653,17 @@ private fun DeleteConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
         title = { Text(stringResource(R.string.journal_delete_confirm_title)) },
         text = { Text(stringResource(R.string.journal_delete_confirm_message)) },
         confirmButton = {
-            TextButton(onClick = onConfirm, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) {
                 Text(stringResource(R.string.journal_delete_confirm_button))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.journal_cancel_button)) }
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.journal_cancel_button))
+            }
         }
     )
 }
@@ -594,7 +679,8 @@ fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
         window?.let {
             it.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                it.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                it.attributes.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
             it.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             WindowCompat.setDecorFitsSystemWindows(it, false)
@@ -621,7 +707,8 @@ fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
                 controller.show(WindowInsetsCompat.Type.systemBars())
             } else {
                 controller.hide(WindowInsetsCompat.Type.systemBars())
-                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         }
     }
@@ -643,27 +730,20 @@ fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
             decorFitsSystemWindows = false
         )
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             AsyncImage(
                 model = url,
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = 1.3f
-                        scaleY = 1.3f
-                    }
+                    .graphicsLayer { scaleX = 1.3f; scaleY = 1.3f }
                     .blur(40.dp),
                 contentScale = ContentScale.Crop,
                 alpha = backgroundAlpha
             )
 
             var containerSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
-            
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -672,12 +752,14 @@ fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
                         detectTransformGestures { centroid, pan, zoom, _ ->
                             val oldScale = scale
                             scale = (scale * zoom).coerceIn(1f, 5f)
-                            
                             if (scale > 1f) {
                                 isUiVisible = false
-                                val center = Offset(containerSize.width / 2f, containerSize.height / 2f)
+                                val center = Offset(
+                                    containerSize.width / 2f, containerSize.height / 2f
+                                )
                                 val relativeCentroid = centroid - center
-                                offset = (offset + pan) * (scale / oldScale) + (relativeCentroid * (1 - scale / oldScale))
+                                offset = (offset + pan) * (scale / oldScale) +
+                                        (relativeCentroid * (1 - scale / oldScale))
                             } else {
                                 offset = Offset.Zero
                                 isUiVisible = true
@@ -688,22 +770,19 @@ fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
                         detectTapGestures(
                             onDoubleTap = { tapOffset ->
                                 if (scale > 1f) {
-                                    scale = 1f
-                                    offset = Offset.Zero
-                                    isUiVisible = true
+                                    scale = 1f; offset = Offset.Zero; isUiVisible = true
                                 } else {
                                     scale = 3f
-                                    val center = Offset(containerSize.width / 2f, containerSize.height / 2f)
-                                    val relativeTap = tapOffset - center
-                                    offset = relativeTap * (1 - 3f)
+                                    val center = Offset(
+                                        containerSize.width / 2f, containerSize.height / 2f
+                                    )
+                                    offset = (tapOffset - center) * (1 - 3f)
                                     isUiVisible = false
                                 }
                             },
-                            onTap = { 
+                            onTap = {
                                 if (scale > 1f) {
-                                    scale = 1f
-                                    offset = Offset.Zero
-                                    isUiVisible = true
+                                    scale = 1f; offset = Offset.Zero; isUiVisible = true
                                 } else {
                                     isUiVisible = !isUiVisible
                                 }
@@ -720,10 +799,8 @@ fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
                         .wrapContentHeight()
                         .padding(horizontal = if (isZoomed) 0.dp else 16.dp)
                         .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = offset.x
-                            translationY = offset.y
+                            scaleX = scale; scaleY = scale
+                            translationX = offset.x; translationY = offset.y
                             shape = RoundedCornerShape(imageCornerRadius)
                             clip = true
                         },
@@ -746,49 +823,208 @@ fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
                 ) {
                     IconButton(onClick = onDismiss) {
                         Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            Icons.Default.Close, "Close",
+                            tint = Color.White, modifier = Modifier.size(24.dp)
                         )
                     }
-
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    ImageDownloader.downloadImage(context, url)
-                                }
-                            }
-                        ) {
+                        IconButton(onClick = {
+                            scope.launch { ImageDownloader.downloadImage(context, url) }
+                        }) {
                             Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = "Download",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
+                                Icons.Default.Download, "Download",
+                                tint = Color.White, modifier = Modifier.size(22.dp)
                             )
                         }
-
-                        IconButton(
-                            onClick = {
-                                val sendIntent = Intent().apply {
-                                    action = Intent.ACTION_SEND
-                                    putExtra(Intent.EXTRA_TEXT, "Xem khoảnh khắc từ NewStart Journal: $url")
-                                    type = "text/plain"
-                                }
-                                context.startActivity(Intent.createChooser(sendIntent, null))
+                        IconButton(onClick = {
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(
+                                    Intent.EXTRA_TEXT,
+                                    "Xem khoảnh khắc từ NewStart Journal: $url"
+                                )
+                                type = "text/plain"
                             }
-                        ) {
+                            context.startActivity(Intent.createChooser(sendIntent, null))
+                        }) {
                             Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Share",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
+                                Icons.Default.Share, "Share",
+                                tint = Color.White, modifier = Modifier.size(22.dp)
                             )
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SocialFeedList(
+    socialFeed: List<JournalEntry>,
+    isVietnamese: Boolean,
+    isDark: Boolean,
+    timeFormatter: SimpleDateFormat,
+    onImageClick: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
+        color = if (isDark) Color.Black else MaterialTheme.colorScheme.background
+    ) {
+        if (socialFeed.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    Icons.Default.Group, null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    if (isVietnamese) "Bảng tin cộng đồng sắp ra mắt!" else "Community feed coming soon!",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    if (isVietnamese) "Kết nối với bạn bè để cùng nhau kỷ luật"
+                    else "Connect with friends to stay disciplined together",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp, start = 12.dp, end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(items = socialFeed, key = { it.id }) { entry ->
+                    SocialFeedItem(
+                        entry = entry,
+                        timeFormatted = remember(entry.timestamp) {
+                            entry.timestamp?.let { timeFormatter.format(it) } ?: "--:--"
+                        },
+                        onImageClick = onImageClick
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SocialFeedItem(
+    entry: JournalEntry,
+    timeFormatted: String,
+    onImageClick: (String) -> Unit
+) {
+    val isDark = LocalDarkTheme.current
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (isDark) MaterialTheme.colorScheme.surface
+            else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (isDark) 2.dp else 0.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    modifier = Modifier.size(36.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Person, null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "User ${entry.userId.take(5)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = timeFormatted,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+
+                val moodIcon = remember(entry.emoji) {
+                    when (entry.emoji) {
+                        "😫" -> R.drawable.ic_mood_very_bad
+                        "😔" -> R.drawable.ic_mood_bad
+                        "😐" -> R.drawable.ic_mood_neutral
+                        "😊" -> R.drawable.ic_mood_good
+                        "🥰" -> R.drawable.ic_mood_very_good
+                        else -> null
+                    }
+                }
+
+                if (moodIcon != null) {
+                    androidx.compose.foundation.Image(
+                        painter = painterResource(id = moodIcon),
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp)
+                    )
+                } else {
+                    Text(entry.emoji, fontSize = 24.sp)
+                }
+            }
+
+            if (entry.text.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = entry.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            entry.imageUrl?.let { url ->
+                Spacer(modifier = Modifier.height(12.dp))
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(24.dp))
+                        .clickable { onImageClick(url) },
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+    }
+}
+
+@AppCombinedPreviews
+@Composable
+fun JournalScreenPreview() {
+    NewStartTheme {
+        JournalContent(
+            entries = listOf(
+                JournalEntry(id = "1", emoji = "😊", text = "Một ngày tuyệt vời!", timestamp = Date()),
+                JournalEntry(id = "2", emoji = "🥰", text = "Học Compose thú vị quá", timestamp = Date())
+            ),
+            socialFeed = emptyList(),
+            selectedDateRange = LocalDate.now() to null,
+            currentTab = 0,
+            onTabSelected = {},
+            onDateRangeSelected = { _, _ -> },
+            onQuickFilterSelected = {},
+            onDeleteEntry = {}
+        )
     }
 }
