@@ -94,6 +94,8 @@ dependencies {
 
     // OkHttp
     implementation(libs.okhttp)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.serialization)
 
     // Gemini AI
     implementation(libs.generativeai)

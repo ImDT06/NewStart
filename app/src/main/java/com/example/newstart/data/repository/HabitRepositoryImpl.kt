@@ -29,6 +29,7 @@ class HabitRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
     private val habitDao: HabitDao,
+    private val apiService: com.example.newstart.data.remote.HabitApiService, // Thêm cái này
     @ApplicationContext private val context: Context
 ) : HabitRepository {
 
@@ -158,9 +159,16 @@ class HabitRepositoryImpl @Inject constructor(
     override fun getHabits(date: String): Flow<List<Habit>> {
         val userId = auth.currentUser?.uid ?: ""
         
-        // Kích hoạt việc fetch từ network ngầm
+        // Kích hoạt việc fetch từ SERVER SPRING BOOT ngầm
         if (userId.isNotEmpty()) {
             repositoryScope.launch {
+                try {
+                    println(">>> Đang gọi API lấy dữ liệu từ Spring Boot...")
+                    val remoteHabits = apiService.getHabits(date)
+                    println(">>> Đã nhận được ${remoteHabits.size} thói quen từ Server!")
+                } catch (e: Exception) {
+                    println(">>> Lỗi gọi API: ${e.message}")
+                }
                 syncHabitsFromNetwork(userId, date)
             }
         }
