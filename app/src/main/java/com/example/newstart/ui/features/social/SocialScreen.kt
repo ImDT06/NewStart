@@ -1027,6 +1027,7 @@ fun SquadDetailView(
     var selectedTab by remember { mutableStateOf(0) } // 0: Chat, 1: Members & Habits
     val messages by viewModel.getSquadMessages(squad.id).collectAsState(initial = emptyList())
     var messageText by remember { mutableStateOf("") }
+    var activeTimestampMessageId by remember { mutableStateOf<String?>(null) }
 
     var showAddMemberDialog by remember { mutableStateOf(false) }
     var showCreateHabitDialog by remember { mutableStateOf(false) }
@@ -1215,6 +1216,7 @@ fun SquadDetailView(
                                                 Spacer(modifier = Modifier.height(2.dp))
                                             }
                                             
+                                            val isTimestampVisible = activeTimestampMessageId == message.id
                                             Surface(
                                                 color = if (isMe) MaterialTheme.colorScheme.primary else {
                                                     if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
@@ -1224,6 +1226,13 @@ fun SquadDetailView(
                                                     topEnd = 16.dp,
                                                     bottomStart = if (isMe) 16.dp else 4.dp,
                                                     bottomEnd = if (isMe) 4.dp else 16.dp
+                                                ),
+                                                modifier = Modifier.clickable(
+                                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                                    indication = null,
+                                                    onClick = {
+                                                        activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                                    }
                                                 )
                                             ) {
                                                 Text(
@@ -1234,12 +1243,18 @@ fun SquadDetailView(
                                                 )
                                             }
                                             
-                                            Text(
-                                                text = timeString,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                                modifier = Modifier.padding(top = 2.dp, start = if (isMe) 0.dp else 4.dp, end = if (isMe) 4.dp else 0.dp)
-                                            )
+                                            androidx.compose.animation.AnimatedVisibility(
+                                                visible = isTimestampVisible,
+                                                enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                                                exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                                            ) {
+                                                Text(
+                                                    text = timeString,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                    modifier = Modifier.padding(top = 2.dp, start = if (isMe) 0.dp else 4.dp, end = if (isMe) 4.dp else 0.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1250,33 +1265,42 @@ fun SquadDetailView(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
                             .background(
                                 color = if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(28.dp)
+                                shape = RoundedCornerShape(22.dp)
                             )
                             .border(
                                 width = 1.dp,
                                 color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                                shape = RoundedCornerShape(28.dp)
+                                shape = RoundedCornerShape(22.dp)
                             )
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        OutlinedTextField(
+                        androidx.compose.foundation.text.BasicTextField(
                             value = messageText,
                             onValueChange = { messageText = it },
-                            placeholder = { Text(stringResource(R.string.squad_chat_placeholder), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                                disabledBorderColor = Color.Transparent,
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent
-                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
                             maxLines = 4,
-                            textStyle = MaterialTheme.typography.bodyMedium
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                            decorationBox = { innerTextField ->
+                                Box(contentAlignment = Alignment.CenterStart) {
+                                    if (messageText.isEmpty()) {
+                                        Text(
+                                            text = stringResource(R.string.squad_chat_placeholder),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
                         )
                         
                         val sendButtonScale by animateFloatAsState(
