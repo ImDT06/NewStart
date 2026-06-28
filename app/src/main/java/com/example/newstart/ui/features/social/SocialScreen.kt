@@ -1148,194 +1148,209 @@ fun SquadDetailView(
 
             if (selectedTab == 0) {
                 val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .pointerInput(Unit) {
-                                detectTapGestures(onTap = { focusManager.clearFocus() })
-                            }
-                    ) {
-                        if (messages.isEmpty()) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(stringResource(R.string.squad_chat_empty), color = Color.Gray, fontSize = 13.sp)
-                            }
-                        } else {
-                            LazyColumn(
-                                state = lazyListState,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(Unit) {
-                                        detectTapGestures(onTap = { focusManager.clearFocus() })
-                                    },
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                                contentPadding = PaddingValues(vertical = 12.dp)
-                            ) {
-                                items(messages) { message ->
-                                    val isMe = message.senderId == currentUserId
-                                    val timeString = remember(message.timestamp) { timeFormatter.format(message.timestamp) }
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
-                                    ) {
-                                        if (!isMe) {
-                                            Surface(
-                                                modifier = Modifier.size(32.dp),
-                                                shape = CircleShape,
-                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                            ) {
-                                                val userFlow = remember(message.senderId) { viewModel.getUserById(message.senderId) }
-                                                val userState by userFlow.collectAsState(initial = User())
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    if (!userState.avatarUrl.isNullOrEmpty()) {
-                                                        AsyncImage(
-                                                            model = userState.avatarUrl,
-                                                            contentDescription = null,
-                                                            modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                                            contentScale = ContentScale.Crop
-                                                        )
-                                                    } else {
-                                                        Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp))
-                                                    }
+                
+                // 72.dp accommodates the input bar (56.dp) plus margins
+                val listBottomPadding = unifiedBottomPadding + 72.dp
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .pointerInput(Unit) {
+                            detectTapGestures(onTap = { focusManager.clearFocus() })
+                        }
+                ) {
+                    if (messages.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(stringResource(R.string.squad_chat_empty), color = Color.Gray, fontSize = 13.sp)
+                        }
+                    } else {
+                        LazyColumn(
+                            state = lazyListState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    detectTapGestures(onTap = { focusManager.clearFocus() })
+                                },
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 12.dp,
+                                bottom = listBottomPadding
+                            )
+                        ) {
+                            items(messages) { message ->
+                                val isMe = message.senderId == currentUserId
+                                val timeString = remember(message.timestamp) { timeFormatter.format(message.timestamp) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
+                                ) {
+                                    if (!isMe) {
+                                        Surface(
+                                            modifier = Modifier.size(32.dp),
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                        ) {
+                                            val userFlow = remember(message.senderId) { viewModel.getUserById(message.senderId) }
+                                            val userState by userFlow.collectAsState(initial = User())
+                                            Box(contentAlignment = Alignment.Center) {
+                                                if (!userState.avatarUrl.isNullOrEmpty()) {
+                                                    AsyncImage(
+                                                        model = userState.avatarUrl,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                } else {
+                                                    Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp))
                                                 }
                                             }
-                                            Spacer(modifier = Modifier.width(8.dp))
                                         }
- 
-                                        Column(
-                                            horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
+
+                                    Column(
+                                        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
+                                    ) {
+                                        if (!isMe) {
+                                            Text(
+                                                text = message.senderName, 
+                                                style = MaterialTheme.typography.labelSmall, 
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                        }
+                                        
+                                        val isTimestampVisible = activeTimestampMessageId == message.id
+                                        Surface(
+                                            color = if (isMe) MaterialTheme.colorScheme.primary else {
+                                                if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                            },
+                                            shape = RoundedCornerShape(
+                                                topStart = 16.dp,
+                                                topEnd = 16.dp,
+                                                bottomStart = if (isMe) 16.dp else 4.dp,
+                                                bottomEnd = if (isMe) 4.dp else 16.dp
+                                            ),
+                                            modifier = Modifier.clickable(
+                                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                                indication = null,
+                                                onClick = {
+                                                    activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                                }
+                                            )
                                         ) {
-                                            if (!isMe) {
-                                                Text(
-                                                    text = message.senderName, 
-                                                    style = MaterialTheme.typography.labelSmall, 
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                            }
-                                            
-                                            val isTimestampVisible = activeTimestampMessageId == message.id
-                                            Surface(
-                                                color = if (isMe) MaterialTheme.colorScheme.primary else {
-                                                    if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                                                },
-                                                shape = RoundedCornerShape(
-                                                    topStart = 16.dp,
-                                                    topEnd = 16.dp,
-                                                    bottomStart = if (isMe) 16.dp else 4.dp,
-                                                    bottomEnd = if (isMe) 4.dp else 16.dp
-                                                ),
-                                                modifier = Modifier.clickable(
-                                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                                                    indication = null,
-                                                    onClick = {
-                                                        activeTimestampMessageId = if (isTimestampVisible) null else message.id
-                                                    }
-                                                )
-                                            ) {
-                                                Text(
-                                                    text = message.text,
-                                                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
-                                                )
-                                            }
-                                            
-                                            androidx.compose.animation.AnimatedVisibility(
-                                                visible = isTimestampVisible,
-                                                enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-                                                exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
-                                            ) {
-                                                Text(
-                                                    text = timeString,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                                    modifier = Modifier.padding(top = 2.dp, start = if (isMe) 0.dp else 4.dp, end = if (isMe) 4.dp else 0.dp)
-                                                )
-                                            }
+                                            Text(
+                                                text = message.text,
+                                                color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
+                                            )
+                                        }
+                                        
+                                        androidx.compose.animation.AnimatedVisibility(
+                                            visible = isTimestampVisible,
+                                            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                                            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                                        ) {
+                                            Text(
+                                                text = timeString,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                modifier = Modifier.padding(top = 2.dp, start = if (isMe) 0.dp else 4.dp, end = if (isMe) 4.dp else 0.dp)
+                                            )
                                         }
                                     }
                                 }
                             }
                         }
                     }
- 
-                    Row(
+
+                    // Floating input capsule aligned at the bottom
+                    Box(
                         modifier = Modifier
+                            .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .background(
-                                color = if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(24.dp)
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                                shape = RoundedCornerShape(24.dp)
-                            )
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(bottom = unifiedBottomPadding)
                     ) {
-                        androidx.compose.foundation.text.BasicTextField(
-                            value = messageText,
-                            onValueChange = { messageText = it },
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            maxLines = 4,
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
-                            decorationBox = { innerTextField ->
-                                Box(contentAlignment = Alignment.CenterStart) {
-                                    if (messageText.isEmpty()) {
-                                        Text(
-                                            text = stringResource(R.string.squad_chat_placeholder),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                        )
-                                    }
-                                    innerTextField()
-                                }
-                            }
-                        )
-                        
-                        val sendButtonScale by animateFloatAsState(
-                            targetValue = if (messageText.isNotBlank()) 1f else 0.85f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            ),
-                            label = "SendButtonScale"
-                        )
-                        
-                        IconButton(
-                            onClick = {
-                                if (messageText.isNotBlank()) {
-                                    viewModel.sendSquadMessage(squad.id, messageText.trim())
-                                    messageText = ""
-                                }
-                            },
-                            enabled = messageText.isNotBlank(),
-                            modifier = Modifier
-                                .scale(sendButtonScale)
-                                .size(40.dp)
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .shadow(8.dp, shape = RoundedCornerShape(24.dp))
                                 .background(
-                                    color = if (messageText.isNotBlank()) MaterialTheme.colorScheme.primary 
-                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                    shape = CircleShape
+                                    color = if (isDark) Color(0xFF1E1E22) else Color.White,
+                                    shape = RoundedCornerShape(24.dp)
                                 )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                    shape = RoundedCornerShape(24.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Send, 
-                                contentDescription = "Send", 
-                                tint = if (messageText.isNotBlank()) MaterialTheme.colorScheme.onPrimary 
-                                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
-                                modifier = Modifier.size(18.dp)
+                            androidx.compose.foundation.text.BasicTextField(
+                                value = messageText,
+                                onValueChange = { messageText = it },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                maxLines = 4,
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                    color = MaterialTheme.colorScheme.onSurface
+                                ),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                                decorationBox = { innerTextField ->
+                                    Box(contentAlignment = Alignment.CenterStart) {
+                                        if (messageText.isEmpty()) {
+                                            Text(
+                                                text = stringResource(R.string.squad_chat_placeholder),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                }
                             )
+                            
+                            val sendButtonScale by animateFloatAsState(
+                                targetValue = if (messageText.isNotBlank()) 1f else 0.85f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                ),
+                                label = "SendButtonScale"
+                            )
+                            
+                            IconButton(
+                                onClick = {
+                                    if (messageText.isNotBlank()) {
+                                        viewModel.sendSquadMessage(squad.id, messageText.trim())
+                                        messageText = ""
+                                    }
+                                },
+                                enabled = messageText.isNotBlank(),
+                                modifier = Modifier
+                                    .scale(sendButtonScale)
+                                    .size(40.dp)
+                                    .background(
+                                        color = if (messageText.isNotBlank()) MaterialTheme.colorScheme.primary 
+                                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                        shape = CircleShape
+                                    )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Send, 
+                                    contentDescription = "Send", 
+                                    tint = if (messageText.isNotBlank()) MaterialTheme.colorScheme.onPrimary 
+                                           else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }
