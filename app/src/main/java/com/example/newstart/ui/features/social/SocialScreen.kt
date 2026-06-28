@@ -1065,7 +1065,7 @@ fun SquadDetailView(
         val density = androidx.compose.ui.platform.LocalDensity.current
         val keyboardHeightDp = with(density) { WindowInsets.ime.getBottom(density).toDp() }
         val baseBottomPadding = padding.calculateBottomPadding()
-        val bottomBarHeightDp = if (hasBottomBar) 64.dp else 0.dp
+        val bottomBarHeightDp = if (hasBottomBar) 64.dp else 12.dp
         val unifiedBottomPadding = maxOf(keyboardHeightDp, baseBottomPadding + bottomBarHeightDp)
 
         Column(
@@ -1265,17 +1265,17 @@ fun SquadDetailView(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                             .background(
                                 color = if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(22.dp)
+                                shape = RoundedCornerShape(24.dp)
                             )
                             .border(
                                 width = 1.dp,
                                 color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                                shape = RoundedCornerShape(22.dp)
+                                shape = RoundedCornerShape(24.dp)
                             )
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         androidx.compose.foundation.text.BasicTextField(
@@ -1283,7 +1283,7 @@ fun SquadDetailView(
                             onValueChange = { messageText = it },
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
                             maxLines = 4,
                             textStyle = MaterialTheme.typography.bodyMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurface
