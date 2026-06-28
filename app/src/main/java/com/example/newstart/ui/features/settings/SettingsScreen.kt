@@ -106,7 +106,7 @@ fun ProfileHeaderCard(
                     Icon(
                         imageVector = Icons.Default.CameraAlt,
                         contentDescription = "Edit Avatar",
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.padding(4.dp)
                     )
                 }
@@ -662,13 +662,6 @@ fun SettingsScreen(
                 item { SectionTitle(title = stringResource(id = R.string.settings_community_preferences)) }
                 item {
                     SettingsCard {
-                        SettingsItem(
-                            icon = Icons.Default.Group,
-                            title = stringResource(id = R.string.settings_friends_title),
-                            subtitle = stringResource(id = R.string.settings_friends_desc),
-                            onClick = onNavigateToSocial
-                        )
-                        SettingsDivider()
                         SettingsItem(
                             icon = Icons.Default.Language,
                             titleRes = R.string.settings_language,

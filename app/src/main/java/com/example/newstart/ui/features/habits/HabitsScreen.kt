@@ -1,969 +1,625 @@
 package com.example.newstart.ui.features.habits
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.newstart.R
-import com.example.newstart.domain.model.Habit
+import com.example.newstart.domain.model.JournalEntry
+import com.example.newstart.domain.model.JournalType
+import com.example.newstart.domain.model.Squad
+import com.example.newstart.domain.model.User
 import com.example.newstart.ui.MainViewModel
-import com.example.newstart.ui.navigation.Screen
-import com.example.newstart.ui.components.MonthPickerDialog
-import com.example.newstart.ui.features.habits.components.HabitItem
-import kotlinx.coroutines.launch
-import java.time.DayOfWeek
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.temporal.TemporalAdjusters
-import kotlin.math.roundToInt
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Composable
-fun HabitsScreen(
-    mainViewModel: MainViewModel,
-    navController: NavController,
-    modifier: Modifier = Modifier,
-    viewModel: HabitsViewModel = hiltViewModel(),
-) {
-    val habits by viewModel.habits.collectAsStateWithLifecycle()
-    val selectedDate by mainViewModel.selectedHabitDate.collectAsStateWithLifecycle()
-    val aiState by viewModel.aiState.collectAsStateWithLifecycle()
-    val completedHabitForJournal by viewModel.completedHabitForJournal.collectAsStateWithLifecycle()
-    val isJournalPromptEnabled by mainViewModel.isJournalPromptEnabled.collectAsStateWithLifecycle()
-    
-    val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val haptic = LocalHapticFeedback.current
-    
-    var showMonthPicker by remember { mutableStateOf(false) }
-    var showAiDialog by remember { mutableStateOf(false) }
-    var aiCommand by remember { mutableStateOf("") }
-    val aiSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    // Celebration State
-    var showCelebration by remember { mutableStateOf(false) }
-    val totalCount = habits.size
-    val completedCount = habits.count { it.isCompleted }
-
-    LaunchedEffect(completedCount, totalCount) {
-        if (totalCount > 0 && (completedCount == totalCount)) {
-            showCelebration = true
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        } else {
-            showCelebration = false
-        }
-    }
-
-    val context = LocalContext.current
-    var isListening by remember { mutableStateOf(false) }
-    val speechRecognizer = remember { SpeechRecognizer.createSpeechRecognizer(context) }
-    
-    val speechRecognizerIntent = remember {
-        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN")
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        }
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            isListening = true
-            speechRecognizer.startListening(speechRecognizerIntent)
-        }
-    }
-
-    DisposableEffect(Unit) {
-        val listener = object : RecognitionListener {
-            override fun onReadyForSpeech(params: android.os.Bundle?) {}
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() { isListening = false }
-            override fun onError(error: Int) { isListening = false }
-            override fun onResults(results: android.os.Bundle?) {
-                val data = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                if (!data.isNullOrEmpty()) {
-                    val command = data[0]
-                    aiCommand = command
-                    viewModel.processAiCommand(command)
-                }
-                isListening = false
-            }
-            override fun onPartialResults(partialResults: android.os.Bundle?) {
-                val data = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                if (!data.isNullOrEmpty()) aiCommand = data[0]
-            }
-            override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
-        }
-        speechRecognizer.setRecognitionListener(listener)
-        onDispose { speechRecognizer.destroy() }
-    }
-
-    val today = LocalDate.now()
-    val pagerState = rememberPagerState(pageCount = { 1000 }, initialPage = 500)
-    val locale = context.resources.configuration.locales[0]
-    val isVietnamese = locale.language == "vi"
-
-    LaunchedEffect(selectedDate) {
-        viewModel.onDateSelected(selectedDate)
-    }
-
-    LaunchedEffect(completedHabitForJournal, isJournalPromptEnabled) {
-        if (completedHabitForJournal != null && !isJournalPromptEnabled) {
-            viewModel.clearJournalPrompt()
-        }
-    }
-
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val maxWidth = constraints.maxWidth.toFloat()
-        val maxHeight = constraints.maxHeight.toFloat()
-        val density = LocalDensity.current
-        val buttonSizePx = with(density) { 56.dp.toPx() }
-        val paddingPx = with(density) { 16.dp.toPx() }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .statusBarsPadding()
-        ) {
-            HabitsHeader(
-                selectedDate = selectedDate,
-                today = today,
-                isVietnamese = isVietnamese,
-                locale = locale,
-                navController = navController,
-                onTodayClick = {
-                    mainViewModel.onHabitDateSelected(today)
-                    scope.launch { pagerState.animateScrollToPage(500) }
-                },
-                onShowMonthPicker = { showMonthPicker = true }
-            )
-
-            HorizontalDatePicker(
-                pagerState = pagerState,
-                selectedDate = selectedDate,
-                today = today,
-                isVietnamese = isVietnamese,
-                locale = locale,
-                onDateClick = { mainViewModel.onHabitDateSelected(it) }
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-
-            HabitList(
-                habits = habits,
-                onDelete = { habit ->
-                    scope.launch {
-                        viewModel.deleteHabit(habit.id)
-                        val result = snackbarHostState.showSnackbar(
-                            message = "Đã xóa ${habit.name}",
-                            actionLabel = "Hoàn tác",
-                            duration = SnackbarDuration.Short
-                        )
-                        if (result == SnackbarResult.ActionPerformed) {
-                            viewModel.restoreHabit(habit)
-                        }
-                    }
-                },
-                onToggle = { h, c -> viewModel.toggleHabit(h, c) },
-                onEdit = { mainViewModel.startEditingHabit(it) }
-            )
-        }
-
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 90.dp)
-        )
-
-        AiFloatingButton(
-            maxWidth = maxWidth,
-            maxHeight = maxHeight,
-            buttonSizePx = buttonSizePx,
-            paddingPx = paddingPx,
-            onClick = { showAiDialog = true }
-        )
-
-        if (showAiDialog || aiState is AiState.Drafting) {
-            AiInteractionSheet(
-                aiState = aiState,
-                aiSheetState = aiSheetState,
-                aiCommand = aiCommand,
-                onAiCommandChange = { aiCommand = it },
-                onDismiss = { 
-                    showAiDialog = false
-                    aiCommand = ""
-                    viewModel.clearAiState()
-                },
-                onProcessCommand = { viewModel.processAiCommand(it) },
-                onConfirmHabits = { viewModel.confirmAiHabits(it) },
-                onClearState = { viewModel.clearAiState() },
-                isListening = isListening,
-                onToggleListening = {
-                    if (isListening) {
-                        speechRecognizer.stopListening()
-                        isListening = false
-                    } else {
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                            isListening = true
-                            speechRecognizer.startListening(speechRecognizerIntent)
-                        } else {
-                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                        }
-                    }
-                }
-            )
-        }
-
-        if (showMonthPicker) {
-            MonthPickerDialog(
-                selectedDate = selectedDate,
-                onDateSelected = { date ->
-                    mainViewModel.onHabitDateSelected(date)
-                    showMonthPicker = false
-                    val weekDiff = (date.toEpochDay() - today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toEpochDay()) / 7
-                    scope.launch { pagerState.scrollToPage(500 + weekDiff.toInt()) }
-                },
-                onDismiss = { showMonthPicker = false }
-            )
-        }
-
-        val currentHabit = completedHabitForJournal
-        if (isJournalPromptEnabled && currentHabit != null) {
-            JournalPromptDialog(
-                habitName = currentHabit.name,
-                onDismiss = { viewModel.clearJournalPrompt() },
-                onConfirm = {
-                    viewModel.clearJournalPrompt()
-                    mainViewModel.setShowJournalSheet(true)
-                    navController.navigate(Screen.Journal.route) {
-                        popUpTo(Screen.Home.route) { 
-                            saveState = true 
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
-            )
-        }
-
-        // Celebration Overlay
-        AnimatedVisibility(
-            visible = showCelebration,
-            enter = fadeIn() + scaleIn(initialScale = 0.8f),
-            exit = fadeOut() + scaleOut(targetScale = 0.8f)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f))
-                    .clickable { showCelebration = false },
-                contentAlignment = Alignment.Center
-            ) {
-                Card(
-                    shape = RoundedCornerShape(32.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
-                    modifier = Modifier.padding(32.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(text = "🎉", fontSize = 64.sp)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Thật xuất sắc!",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            text = "Bạn đã hoàn thành tất cả thói quen của ngày hôm nay.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Button(
-                            onClick = { showCelebration = false },
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("Tiếp tục duy trì!")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HabitProgressDashboard(habits: List<Habit>) {
-    val completedCount = habits.count { it.isCompleted }
-    val totalCount = habits.size
-    val progress = if (totalCount > 0) completedCount.toFloat() / totalCount else 0f
-    val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
-
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(60.dp)) {
-                    CircularProgressIndicator(
-                        progress = { 1f },
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        strokeWidth = 6.dp,
-                        strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
-                    CircularProgressIndicator(
-                        progress = { animatedProgress },
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 6.dp,
-                        strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
-                    Text(
-                        text = "${(progress * 100).toInt()}%",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column {
-                    Text(
-                        text = when {
-                            totalCount == 0 -> "Bắt đầu ngày mới!"
-                            progress == 1f -> "Hoàn hảo! 🏆"
-                            progress > 0.5f -> "Sắp xong rồi!"
-                            else -> "Tiến độ hôm nay"
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                    Text(
-                        text = if (totalCount == 0) "Thêm thói quen để bắt đầu"
-                        else if (progress == 1f) "Bạn đã hoàn thành tất cả!"
-                        else "Cố lên, còn ${totalCount - completedCount} mục tiêu nữa",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        if (totalCount > 0) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                val longestStreak = habits.maxOfOrNull { it.streak } ?: 0
-                QuickStatItem(
-                    label = "Chuỗi cao nhất",
-                    value = "$longestStreak ngày",
-                    icon = Icons.Default.Whatshot,
-                    color = Color(0xFFFFA500),
-                    modifier = Modifier.weight(1f)
-                )
-                QuickStatItem(
-                    label = "Đã hoàn thành",
-                    value = "$completedCount/$totalCount",
-                    icon = Icons.Default.CheckCircle,
-                    color = Color(0xFF00C851),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickStatItem(
-    label: String,
-    value: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-    ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(text = value, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-                Text(text = label, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun HabitsHeader(
-    selectedDate: LocalDate,
-    today: LocalDate,
-    isVietnamese: Boolean,
-    locale: java.util.Locale,
-    navController: NavController,
-    onTodayClick: () -> Unit,
-    onShowMonthPicker: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        // Bên trái: Nút Filter
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.align(Alignment.CenterStart)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.habits_filter_all),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Icon(
-                    Icons.Default.KeyboardArrowDown,
-                    null,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
-        }
-
-        // Ở giữa: Ngày tháng
-        val headerDateText = remember(selectedDate, locale) {
-            if (selectedDate == today) null
-            else selectedDate.format(DateTimeFormatter.ofPattern(if (isVietnamese) "dd MMMM" else "MMM dd", locale))
-        }
-
-        Text(
-            text = headerDateText ?: stringResource(R.string.habits_today),
-            color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.ExtraBold,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable { onTodayClick() }
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            textAlign = TextAlign.Center
-        )
-
-        // Bên phải: Nút chọn tháng
-        IconButton(
-            onClick = onShowMonthPicker,
-            modifier = Modifier.align(Alignment.CenterEnd)
-        ) {
-            Icon(
-                Icons.Default.CalendarMonth,
-                null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onBackground
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun HorizontalDatePicker(
-    pagerState: androidx.compose.foundation.pager.PagerState,
-    selectedDate: LocalDate,
-    today: LocalDate,
-    isVietnamese: Boolean,
-    locale: java.util.Locale,
-    onDateClick: (LocalDate) -> Unit
-) {
-    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) { page ->
-        val weekStart = remember(page) {
-            today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks((page - 500).toLong())
-        }
-        val weekDays = remember(weekStart) { (0..6).map { weekStart.plusDays(it.toLong()) } }
-
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            weekDays.forEach { day ->
-                val isSelected = day == selectedDate
-                val isToday = day == today
-                val dayName = remember(day, locale) {
-                    if (isVietnamese) {
-                        when (day.dayOfWeek) {
-                            DayOfWeek.MONDAY -> "T2"
-                            DayOfWeek.TUESDAY -> "T3"
-                            DayOfWeek.WEDNESDAY -> "T4"
-                            DayOfWeek.THURSDAY -> "T5"
-                            DayOfWeek.FRIDAY -> "T6"
-                            DayOfWeek.SATURDAY -> "T7"
-                            DayOfWeek.SUNDAY -> "CN"
-                        }
-                    } else day.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, locale).uppercase()
-                }
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f).clickable { onDateClick(day) }) {
-                    Text(text = dayName, color = if (isSelected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(6.dp))
-                    Surface(
-                        modifier = Modifier.size(32.dp),
-                        shape = CircleShape,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        border = if (!isSelected && isToday) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(text = day.dayOfMonth.toString(), color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground, fontSize = 13.sp, fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HabitList(
-    habits: List<Habit>,
-    onDelete: (Habit) -> Unit,
-    onToggle: (Habit, Boolean) -> Unit,
-    onEdit: (Habit) -> Unit
-) {
-    if (habits.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ListAlt,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.outlineVariant
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = stringResource(R.string.habits_empty),
-                    color = MaterialTheme.colorScheme.outline,
-                    fontSize = 14.sp
-                )
-            }
-        }
-    } else {
-        val groupedHabits = remember(habits) {
-            val morning = mutableListOf<Habit>()
-            val afternoon = mutableListOf<Habit>()
-            val evening = mutableListOf<Habit>()
-            val other = mutableListOf<Habit>()
-
-            habits.forEach { habit ->
-                val time = habit.reminderTime
-                if (time == null) {
-                    other.add(habit)
-                } else {
-                    val hour = time.split(":").firstOrNull()?.toIntOrNull() ?: -1
-                    when (hour) {
-                        in 0..11 -> morning.add(habit)
-                        in 12..17 -> afternoon.add(habit)
-                        in 18..23 -> evening.add(habit)
-                        else -> other.add(habit)
-                    }
-                }
-            }
-            listOf(
-                "Buổi sáng" to morning,
-                "Buổi chiều" to afternoon,
-                "Buổi tối" to evening,
-                "Khác" to other
-            ).filter { it.second.isNotEmpty() }
-        }
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            groupedHabits.forEach { (title, habitsInGroup) ->
-                item {
-                    Text(
-                        text = title.uppercase(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.outline,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 8.dp, top = 8.dp)
-                    )
-                }
-                items(items = habitsInGroup, key = { it.id }) { habit ->
-                    HabitSwipeableItem(
-                        modifier = Modifier.animateItem(),
-                        habit = habit,
-                        onDelete = { onDelete(habit) },
-                        onToggle = onToggle,
-                        onEdit = onEdit
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HabitSwipeableItem(
-    modifier: Modifier = Modifier,
-    habit: Habit,
-    onDelete: () -> Unit,
-    onToggle: (Habit, Boolean) -> Unit,
-    onEdit: (Habit) -> Unit
-) {
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    val anchorWidth = with(density) { 80.dp.toPx() }
-    val dismissThreshold = with(density) { 180.dp.toPx() }
-    
-    val offsetX = remember { Animatable(0f) }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFFFF4444))
-                .clickable { 
-                    scope.launch {
-                        offsetX.animateTo(-1500f, spring(stiffness = Spring.StiffnessMedium))
-                        onDelete()
-                    }
-                },
-            contentAlignment = Alignment.CenterEnd
-        ) {
-            Box(
-                modifier = Modifier.width(80.dp).fillMaxHeight(),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
-                .fillMaxWidth()
-                .pointerInput(habit.id) {
-                    detectHorizontalDragGestures(
-                        onHorizontalDrag = { change, dragAmount ->
-                            val newOffset = (offsetX.value + dragAmount).coerceAtMost(0f)
-                            scope.launch { offsetX.snapTo(newOffset) }
-                            change.consume()
-                        },
-                        onDragEnd = {
-                            scope.launch {
-                                if (offsetX.value < -dismissThreshold) {
-                                    offsetX.animateTo(-1500f, spring(stiffness = Spring.StiffnessMedium))
-                                    onDelete()
-                                } else if (offsetX.value < -anchorWidth / 2) {
-                                    offsetX.animateTo(-anchorWidth, spring(dampingRatio = Spring.DampingRatioNoBouncy))
-                                } else {
-                                    offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy))
-                                }
-                            }
-                        }
-                    )
-                }
-        ) {
-            HabitItem(
-                habit = habit, 
-                onToggle = { onToggle(habit, !habit.isCompleted) }, 
-                onEdit = { onEdit(habit) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun AiFloatingButton(
-    maxWidth: Float,
-    maxHeight: Float,
-    buttonSizePx: Float,
-    paddingPx: Float,
-    onClick: () -> Unit
-) {
-    val scope = rememberCoroutineScope()
-
-    val density = LocalDensity.current
-    val navBarHeightPx = with(density) { 80.dp.toPx() } // Tăng lên để tránh đè lên Navbar
-    
-    val offsetX = remember(maxWidth) { Animatable(maxWidth - buttonSizePx - paddingPx) }
-    val offsetY = remember(maxHeight) { Animatable(maxHeight - buttonSizePx - paddingPx - navBarHeightPx) }
-
-    Surface(
-        modifier = Modifier
-            .size(56.dp) // Đồng bộ với buttonSizePx (56.dp)
-            .offset { IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt()) }
-            .pointerInput(maxWidth, maxHeight) {
-                detectDragGestures(
-                    onDragEnd = {
-                        val centerX = offsetX.value + buttonSizePx / 2
-                        val targetX = if (centerX < maxWidth / 2) paddingPx else maxWidth - buttonSizePx - paddingPx
-                        scope.launch {
-                            offsetX.animateTo(targetX, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow))
-                        }
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        scope.launch {
-                            val newX = (offsetX.value + dragAmount.x).coerceIn(paddingPx, maxWidth - buttonSizePx - paddingPx)
-                            val newY = (offsetY.value + dragAmount.y).coerceIn(paddingPx, maxHeight - buttonSizePx - paddingPx - navBarHeightPx)
-                            offsetX.snapTo(newX)
-                            offsetY.snapTo(newY)
-                        }
-                    }
-                )
-            },
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp,
-        shadowElevation = 6.dp,
-        border = BorderStroke(0.5.dp, Brush.linearGradient(listOf(Color(0xFF007AFF).copy(alpha = 0.5f), Color(0xFF00C851).copy(alpha = 0.5f)))),
-        onClick = onClick
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = Icons.Default.AutoAwesome, 
-                contentDescription = "AI Assistant", 
-                modifier = Modifier.size(24.dp), 
-                tint = Color(0xFF007AFF)
-            )
-        }
-    }
-}
+import com.example.newstart.ui.features.journal.JournalViewModel
+import com.example.newstart.ui.features.social.SocialViewModel
+import com.example.newstart.ui.theme.LocalDarkTheme
+import kotlinx.coroutines.flow.Flow
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AiInteractionSheet(
-    aiState: AiState,
-    aiSheetState: SheetState,
-    aiCommand: String,
-    onAiCommandChange: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onProcessCommand: (String) -> Unit,
-    onConfirmHabits: (List<Habit>) -> Unit,
-    onClearState: () -> Unit,
-    isListening: Boolean,
-    onToggleListening: () -> Unit
+fun HabitsScreen(
+    mainViewModel: MainViewModel,
+    navController: androidx.navigation.NavController,
+    modifier: Modifier = Modifier,
+    socialViewModel: SocialViewModel = hiltViewModel(),
+    journalViewModel: JournalViewModel = hiltViewModel()
 ) {
-    val aiGradient = Brush.linearGradient(
-        colors = listOf(Color(0xFF007AFF), Color(0xFF007AFF), Color(0xFF00C851))
-    )
+    val socialFeed by journalViewModel.socialFeed.collectAsStateWithLifecycle()
+    val searchResults by socialViewModel.searchResults.collectAsStateWithLifecycle()
+    val incomingRequests by socialViewModel.incomingRequests.collectAsStateWithLifecycle()
+    val squads by socialViewModel.squads.collectAsStateWithLifecycle()
+    val isSearching by socialViewModel.isSearching.collectAsStateWithLifecycle()
+    val friends by socialViewModel.friends.collectAsStateWithLifecycle()
+    val sentRequests by socialViewModel.sentRequests.collectAsStateWithLifecycle()
+    val currentUserId = socialViewModel.currentUserId
+    
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Bảng tin, 1: Bạn bè, 2: Nhóm
+    var activeSquadDetail by remember { mutableStateOf<Squad?>(null) }
+    val activeSquad = squads.find { it.id == activeSquadDetail?.id } ?: activeSquadDetail
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = aiSheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    ) {
-        AnimatedContent(targetState = aiState, label = "ai_content_anim") { state ->
-            when (state) {
-                is AiState.Drafting -> AiDraftingView(state.habits, onConfirmHabits, onClearState)
-                else -> AiInputView(state, aiCommand, onAiCommandChange, onProcessCommand, isListening, onToggleListening, aiGradient)
+    val context = LocalContext.current
+    val locale = remember(context) { context.resources.configuration.locales[0] }
+    val isVietnamese = locale.language == "vi"
+    val dateTimeFormatter = remember { SimpleDateFormat("HH:mm - dd/MM/yyyy", locale) }
+    val isDark = LocalDarkTheme.current
+
+    if (activeSquad != null) {
+        com.example.newstart.ui.features.social.SquadDetailViewWrapper(
+            squad = activeSquad,
+            currentUserId = currentUserId ?: "",
+            friends = friends,
+            viewModel = socialViewModel,
+            mainViewModel = mainViewModel,
+            onBack = { activeSquadDetail = null },
+            hasBottomBar = true
+        )
+    } else {
+        val backgroundColor = MaterialTheme.colorScheme.background
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = remember(isDark, backgroundColor) {
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = if (isDark) listOf(Color.Black, Color.Black)
+                            else listOf(backgroundColor, backgroundColor)
+                        )
+                    }
+                )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+            ) {
+                    // Left-aligned header title synchronizing with JournalScreen
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .padding(horizontal = 16.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Text(
+                            text = if (isVietnamese) "Cộng đồng" else "Community",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+
+                    // Modern Segmented Control Style Tabs with smooth sliding animation
+                    val tabs = listOf(
+                        if (isVietnamese) "Bảng tin" else "Feed",
+                        stringResource(R.string.social_tab_friends),
+                        stringResource(R.string.social_tab_squads)
+                    )
+
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .fillMaxWidth()
+                            .height(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isDark) Color(0xFF1E1E1E) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        val totalWidth = maxWidth
+                        val tabWidth = totalWidth / tabs.size
+                        
+                        // Animate indicator offset
+                        val indicatorOffset by androidx.compose.animation.core.animateDpAsState(
+                            targetValue = tabWidth * selectedTab,
+                            animationSpec = androidx.compose.animation.core.spring(
+                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                            ),
+                            label = "TabIndicatorOffset"
+                        )
+
+                        // Sliding indicator background
+                        Box(
+                            modifier = Modifier
+                                .padding(3.dp)
+                                .offset(x = indicatorOffset)
+                                .width(tabWidth - 6.dp)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+
+                        // Row of clickable tabs
+                        Row(
+                            modifier = Modifier.fillMaxSize().padding(3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            tabs.forEachIndexed { index, title ->
+                                val isSelected = selectedTab == index
+                                // Animate text color
+                                val textColor by androidx.compose.animation.animateColorAsState(
+                                    targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary 
+                                                  else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
+                                    label = "TabTextColor"
+                                )
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .clickable(
+                                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                            indication = null,
+                                            onClick = { selectedTab = index }
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = textColor
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Content Area with more breathing room
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        when (selectedTab) {
+                            0 -> SocialFeedList(
+                                socialFeed = socialFeed,
+                                isVietnamese = isVietnamese,
+                                isDark = isDark,
+                                dateTimeFormatter = dateTimeFormatter,
+                                onImageClick = { /* Full screen photo logic */ },
+                                getUserFlow = { journalViewModel.getUserById(it) },
+                                onReactToPost = { postId, emoji -> journalViewModel.reactToPost(postId, emoji) }
+                            )
+                            1 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                com.example.newstart.ui.features.social.FriendsTabWrapper(
+                                    searchQuery = "",
+                                    onSearchQueryChange = { socialViewModel.searchUsers(it) },
+                                    isSearching = isSearching,
+                                    searchResults = searchResults,
+                                    incomingRequests = incomingRequests,
+                                    sentRequests = sentRequests,
+                                    friends = friends,
+                                    currentUserId = currentUserId ?: "",
+                                    onSendRequest = { socialViewModel.sendRequest(it) },
+                                    onAcceptRequest = { socialViewModel.acceptRequest(it) },
+                                    onDeclineRequest = { socialViewModel.declineRequest(it) },
+                                    onRemoveFriend = { socialViewModel.removeFriend(it) },
+                                    getUserFlow = { socialViewModel.getUserById(it) }
+                                )
+                            }
+                            2 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                com.example.newstart.ui.features.social.SquadsTabWrapper(
+                                    squads = squads,
+                                    friends = friends,
+                                    currentUserId = currentUserId ?: "",
+                                    getUserFlow = { id -> socialViewModel.getUserById(id) },
+                                    onCreateSquad = { n, d, m -> socialViewModel.createSquad(n, d, m) },
+                                    onUpdateSquad = { id, n, d -> socialViewModel.updateSquad(id, n, d) },
+                                    onSquadClick = { activeSquadDetail = it }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+    }
+}
+
+@Composable
+private fun SocialFeedList(
+    socialFeed: List<JournalEntry>,
+    isVietnamese: Boolean,
+    isDark: Boolean,
+    dateTimeFormatter: SimpleDateFormat,
+    onImageClick: (String) -> Unit,
+    getUserFlow: (String) -> Flow<User>,
+    onReactToPost: (String, String) -> Unit
+) {
+    if (socialFeed.isEmpty()) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                Icons.Default.Diversity3, 
+                null, 
+                modifier = Modifier.size(90.dp), 
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            )
+            Spacer(Modifier.height(32.dp))
+            Text(
+                if (isVietnamese) "Bảng tin cộng đồng" else "Community Feed",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                if (isVietnamese) "Kết nối với bạn bè để cùng nhau kỷ luật" else "Connect with friends to stay disciplined together",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp, start = 16.dp, end = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            items(items = socialFeed, key = { it.id }) { entry ->
+                SocialFeedItem(
+                    entry = entry,
+                    timeFormatted = remember(entry.timestamp) { entry.timestamp?.let { dateTimeFormatter.format(it) } ?: "--:--" },
+                    onImageClick = onImageClick,
+                    getUserFlow = getUserFlow,
+                    onReactToPost = onReactToPost
+                )
             }
         }
     }
 }
 
 @Composable
-private fun AiDraftingView(habits: List<Habit>, onConfirm: (List<Habit>) -> Unit, onCancel: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(start = 24.dp, end = 24.dp, bottom = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+fun SocialFeedItem(
+    entry: JournalEntry,
+    timeFormatted: String,
+    onImageClick: (String) -> Unit,
+    getUserFlow: (String) -> Flow<User>,
+    onReactToPost: (String, String) -> Unit
+) {
+    val isDark = LocalDarkTheme.current
+    val currentUserId = remember {
+        com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    }
+    
+    val userState by remember(entry.userId) {
+        getUserFlow(entry.userId)
+    }.collectAsState(initial = User(name = "Đang tải..."))
+
+    val displayName = userState.name.ifBlank { "Người dùng" }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) Color(0xFF161618) 
+                             else MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 0.dp else 1.dp)
     ) {
-        Text("Xác nhận thói quen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text("AI đã đề xuất ${habits.size} mục mới cho bạn", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(24.dp))
-        habits.forEach { habit ->
-            Card(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = RoundedCornerShape(20.dp)) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)) {
-                        Box(contentAlignment = Alignment.Center) { Text(habit.icon, fontSize = 24.sp) }
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Surface(
+                        modifier = Modifier.size(46.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (!userState.avatarUrl.isNullOrEmpty()) {
+                                AsyncImage(
+                                    model = userState.avatarUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(Icons.Default.Person, null, modifier = Modifier.size(26.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                     }
-                    Spacer(Modifier.width(16.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(habit.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        habit.reminderTime?.let { time ->
-                            Text(time, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = displayName,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = timeFormatted,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+                
+                val moodIcon = remember(entry.emoji) {
+                    when (entry.emoji) {
+                        "😫" -> R.drawable.ic_mood_very_bad
+                        "😔" -> R.drawable.ic_mood_bad
+                        "😐" -> R.drawable.ic_mood_neutral
+                        "😊" -> R.drawable.ic_mood_good
+                        "🥰" -> R.drawable.ic_mood_very_good
+                        else -> null
+                    }
+                }
+                
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(
+                            color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (moodIcon != null) {
+                        androidx.compose.foundation.Image(
+                            painter = painterResource(id = moodIcon),
+                            contentDescription = null,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    } else {
+                        Text(entry.emoji, fontSize = 20.sp)
+                    }
+                }
+            }
+            
+            if (entry.text.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = entry.text,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        lineHeight = 24.sp,
+                        letterSpacing = 0.2.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            if (entry.type != JournalType.NORMAL) {
+                Spacer(modifier = Modifier.height(12.dp))
+                MetadataSection(entry)
+            }
+            
+            entry.imageUrl?.let { url ->
+                Spacer(modifier = Modifier.height(16.dp))
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1.2f)
+                        .clip(RoundedCornerShape(22.dp))
+                        .clickable { onImageClick(url) }
+                        .border(
+                            width = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(22.dp)
+                        ),
+                    contentScale = ContentScale.Crop
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                val commonEmojis = listOf("❤️", "👍", "🔥", "😂", "👏")
+                commonEmojis.forEach { emoji ->
+                    val count = entry.reactions.values.count { it == emoji }
+                    val hasReacted = entry.reactions[currentUserId] == emoji
+                    
+                    val scale by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (hasReacted) 1.08f else 1f,
+                        animationSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+                        ),
+                        label = "ReactionScale"
+                    )
+
+                    val buttonColor = if (hasReacted) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    }
+                    
+                    val contentColor = if (hasReacted) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    
+                    Surface(
+                        onClick = { onReactToPost(entry.id, emoji) },
+                        shape = RoundedCornerShape(18.dp),
+                        color = buttonColor,
+                        border = if (hasReacted) null else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                        modifier = Modifier
+                            .height(36.dp)
+                            .scale(scale)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(emoji, fontSize = 16.sp)
+                            if (count > 0) {
+                                Text(
+                                    text = count.toString(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = contentColor,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-        Button(onClick = { onConfirm(habits) }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) {
-            Text("Thêm tất cả vào lịch trình", fontWeight = FontWeight.Bold)
-        }
-        TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            Text("Hủy bỏ", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun MetadataSection(entry: JournalEntry) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            when (entry.type) {
+                JournalType.MOVIE -> {
+                    entry.movieDetails?.let { movie ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Movie, 
+                                null, 
+                                modifier = Modifier.size(18.dp), 
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = movie.title, 
+                                style = MaterialTheme.typography.titleSmall, 
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        if (movie.rating > 0) {
+                            Row(modifier = Modifier.padding(top = 6.dp)) {
+                                (1..5).forEach { i ->
+                                    Icon(
+                                        Icons.Default.Star, null,
+                                        tint = if (i <= movie.rating) Color(0xFFFFCC00) else Color.Gray.copy(alpha = 0.2f),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                JournalType.BOOK -> {
+                    entry.bookDetails?.let { book ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.MenuBook, 
+                                null, 
+                                modifier = Modifier.size(18.dp), 
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = book.title, 
+                                style = MaterialTheme.typography.titleSmall, 
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        if (book.rating > 0) {
+                            Row(modifier = Modifier.padding(top = 6.dp)) {
+                                (1..5).forEach { i ->
+                                    Icon(
+                                        Icons.Default.Star, null,
+                                        tint = if (i <= book.rating) Color(0xFFFFCC00) else Color.Gray.copy(alpha = 0.2f),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                JournalType.SUBJECT -> {
+                    entry.subjectDetails?.let { subject ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.School, 
+                                null, 
+                                modifier = Modifier.size(18.dp), 
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = subject.name, 
+                                style = MaterialTheme.typography.titleSmall, 
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Mức độ hiểu: ", 
+                                style = MaterialTheme.typography.bodySmall, 
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            (1..5).forEach { i ->
+                                Icon(
+                                    Icons.Default.Star, null,
+                                    tint = if (i <= subject.understandingLevel) Color(0xFF00C851) else Color.Gray.copy(alpha = 0.2f),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                else -> {}
+            }
         }
     }
 }
 
 @Composable
-private fun AiInputView(
-    state: AiState,
-    command: String,
-    onCommandChange: (String) -> Unit,
-    onSend: (String) -> Unit,
-    isListening: Boolean,
-    onToggleListening: () -> Unit,
-    gradient: Brush
-) {
-    Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(start = 24.dp, end = 24.dp, bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.AutoAwesome, null, tint = Color(0xFF007AFF), modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(12.dp))
-            Text("NewStart AI", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold, brush = gradient))
-        }
-        Text("Tôi có thể giúp bạn lên lịch thói quen chỉ bằng một câu nói.", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(24.dp))
-        OutlinedTextField(
-            value = command,
-            onValueChange = onCommandChange,
-            placeholder = { Text("Bạn đang muốn làm gì?") },
-            modifier = Modifier.fillMaxWidth().border(width = 1.dp, brush = if (command.isNotBlank() || isListening) gradient else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)), shape = RoundedCornerShape(16.dp)),
-            shape = RoundedCornerShape(16.dp),
-            leadingIcon = {
-                IconButton(onClick = { onToggleListening() }) {
-                    Icon(imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicNone, contentDescription = "Voice", tint = if (isListening) Color.Red else Color(0xFF007AFF))
-                }
-            },
-            trailingIcon = {
-                IconButton(onClick = { if (command.isNotBlank()) onSend(command) }, enabled = command.isNotBlank() && state !is AiState.Loading) {
-                    Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = if (command.isNotBlank()) Color(0xFF007AFF) else Color.Gray)
-                }
-            }
-        )
-        if (state is AiState.Loading) {
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
-                    .height(2.dp)
-                    .clip(CircleShape), 
-                color = Color(0xFF007AFF)
-            )
-        }
-        
-        if (state is AiState.Error) {
-            Text(
-                text = state.message,
-                color = MaterialTheme.colorScheme.error,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-        }
-
-        if (state is AiState.Success) {
-            Text(
-                text = state.message,
-                color = Color(0xFF00C851),
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun JournalPromptDialog(habitName: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Tuyệt vời!") },
-        text = { Text("Bạn vừa hoàn thành '$habitName'. Bạn có muốn lưu lại khoảnh khắc này vào nhật ký không?") },
-        confirmButton = {
-            Button(onClick = onConfirm) {
-                Text("Viết nhật ký ngay")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Để sau")
-            }
-        }
+fun SectionTitle(title: String) {
+    Text(
+        text = title,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(vertical = 6.dp)
     )
 }
