@@ -55,6 +55,7 @@ fun JournalArchiveScreen(
     val tags by viewModel.tagGroups.collectAsStateWithLifecycle()
     val moodAnalytics by viewModel.moodAnalytics.collectAsStateWithLifecycle()
 
+    var selectedImageUrl by remember { mutableStateOf<String?>(null) }
     var expandedMovieGroup by remember { mutableStateOf<MovieGroup?>(null) }
     var expandedBookGroup by remember { mutableStateOf<BookGroup?>(null) }
     var expandedSubjectGroup by remember { mutableStateOf<SubjectGroup?>(null) }
@@ -215,7 +216,8 @@ fun JournalArchiveScreen(
                 rating = group.averageRating,
                 entries = group.entries,
                 isDark = isDark,
-                onDismiss = { expandedMovieGroup = null }
+                onDismiss = { expandedMovieGroup = null },
+                onImageClick = { selectedImageUrl = it }
             )
         }
 
@@ -226,7 +228,8 @@ fun JournalArchiveScreen(
                 rating = group.averageRating,
                 entries = group.entries,
                 isDark = isDark,
-                onDismiss = { expandedBookGroup = null }
+                onDismiss = { expandedBookGroup = null },
+                onImageClick = { selectedImageUrl = it }
             )
         }
 
@@ -238,7 +241,8 @@ fun JournalArchiveScreen(
                 entries = group.entries,
                 isDark = isDark,
                 isSubject = true,
-                onDismiss = { expandedSubjectGroup = null }
+                onDismiss = { expandedSubjectGroup = null },
+                onImageClick = { selectedImageUrl = it }
             )
         }
 
@@ -249,8 +253,13 @@ fun JournalArchiveScreen(
                 rating = 0f,
                 entries = group.entries,
                 isDark = isDark,
-                onDismiss = { expandedTagGroup = null }
+                onDismiss = { expandedTagGroup = null },
+                onImageClick = { selectedImageUrl = it }
             )
+        }
+
+        selectedImageUrl?.let { url ->
+            ImagePreviewDialog(url = url, onDismiss = { selectedImageUrl = null })
         }
     }
 }
@@ -552,10 +561,13 @@ private fun ExpandedGroupSheet(
     entries: List<JournalEntry>,
     isDark: Boolean,
     isSubject: Boolean = false,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onImageClick: (String) -> Unit
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = if (isDark) Color(0xFF121212) else MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         dragHandle = { BottomSheetDefaults.DragHandle() }
@@ -563,7 +575,7 @@ private fun ExpandedGroupSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
+                .fillMaxHeight()
         ) {
             // Header info
             Column(
@@ -620,7 +632,7 @@ private fun ExpandedGroupSheet(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(entries, key = { it.id }) { entry ->
-                    ArchiveEntryItem(entry, isDark, isSubject)
+                    ArchiveEntryItem(entry, isDark, isSubject, onImageClick)
                 }
             }
         }
@@ -631,7 +643,8 @@ private fun ExpandedGroupSheet(
 private fun ArchiveEntryItem(
     entry: JournalEntry,
     isDark: Boolean,
-    isSubject: Boolean
+    isSubject: Boolean,
+    onImageClick: (String) -> Unit
 ) {
     val context = LocalContext.current
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -738,7 +751,8 @@ private fun ArchiveEntryItem(
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1.5f)
-                            .clip(RoundedCornerShape(14.dp)),
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { onImageClick(entry.imageUrl) },
                         contentScale = ContentScale.Crop
                     )
                 }

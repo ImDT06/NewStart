@@ -1061,19 +1061,103 @@ fun SquadDetailView(
                     }
                 }
             )
+        },
+        bottomBar = {
+            if (selectedTab == 0) {
+                // Floating input capsule aligned at the bottom using Scaffold's bottomBar
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .imePadding()
+                        .padding(bottom = if (hasBottomBar) 64.dp else 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .shadow(8.dp, shape = RoundedCornerShape(24.dp))
+                            .background(
+                                color = if (isDark) Color(0xFF1E1E22) else Color.White,
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = messageText,
+                            onValueChange = { messageText = it },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            maxLines = 4,
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                            decorationBox = { innerTextField ->
+                                Box(contentAlignment = Alignment.CenterStart) {
+                                    if (messageText.isEmpty()) {
+                                        Text(
+                                            text = stringResource(R.string.squad_chat_placeholder),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
+                        )
+                        
+                        val sendButtonScale by animateFloatAsState(
+                            targetValue = if (messageText.isNotBlank()) 1f else 0.85f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            label = "SendButtonScale"
+                        )
+                        
+                        IconButton(
+                            onClick = {
+                                if (messageText.isNotBlank()) {
+                                    viewModel.sendSquadMessage(squad.id, messageText.trim())
+                                    messageText = ""
+                                }
+                            },
+                            enabled = messageText.isNotBlank(),
+                            modifier = Modifier
+                                .scale(sendButtonScale)
+                                .size(40.dp)
+                                .background(
+                                    color = if (messageText.isNotBlank()) MaterialTheme.colorScheme.primary 
+                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                    shape = CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Send, 
+                                contentDescription = "Send", 
+                                tint = if (messageText.isNotBlank()) MaterialTheme.colorScheme.onPrimary 
+                                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     ) { padding ->
-        val density = androidx.compose.ui.platform.LocalDensity.current
-        val keyboardHeightDp = with(density) { WindowInsets.ime.getBottom(density).toDp() }
-        val baseBottomPadding = padding.calculateBottomPadding()
-        val bottomBarHeightDp = if (hasBottomBar) 64.dp else 12.dp
-        val unifiedBottomPadding = maxOf(keyboardHeightDp, baseBottomPadding + bottomBarHeightDp)
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = padding.calculateTopPadding())
-                .padding(bottom = unifiedBottomPadding)
+                .padding(bottom = if (selectedTab == 0) 0.dp else padding.calculateBottomPadding())
         ) {
             // Modern Segmented Control Style Tabs for Chat vs Members & Habits
             val detailTabs = listOf(
@@ -1123,7 +1207,6 @@ fun SquadDetailView(
                             animationSpec = tween(durationMillis = 200),
                             label = "SquadDetailTabTextColor"
                         )
-                        
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -1149,9 +1232,6 @@ fun SquadDetailView(
 
             if (selectedTab == 0) {
                 val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-                
-                // 72.dp accommodates the input bar (56.dp) plus margins
-                val listBottomPadding = unifiedBottomPadding + 72.dp
 
                 Box(
                     modifier = Modifier
@@ -1178,7 +1258,7 @@ fun SquadDetailView(
                                 start = 16.dp,
                                 end = 16.dp,
                                 top = 12.dp,
-                                bottom = listBottomPadding
+                                bottom = padding.calculateBottomPadding() + 8.dp
                             )
                         ) {
                             items(messages) { message ->
@@ -1268,99 +1348,13 @@ fun SquadDetailView(
                             }
                         }
                     }
-
-                    // Floating input capsule aligned at the bottom
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(bottom = unifiedBottomPadding)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .shadow(8.dp, shape = RoundedCornerShape(24.dp))
-                                .background(
-                                    color = if (isDark) Color(0xFF1E1E22) else Color.White,
-                                    shape = RoundedCornerShape(24.dp)
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                                    shape = RoundedCornerShape(24.dp)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            androidx.compose.foundation.text.BasicTextField(
-                                value = messageText,
-                                onValueChange = { messageText = it },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                maxLines = 4,
-                                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurface
-                                ),
-                                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
-                                decorationBox = { innerTextField ->
-                                    Box(contentAlignment = Alignment.CenterStart) {
-                                        if (messageText.isEmpty()) {
-                                            Text(
-                                                text = stringResource(R.string.squad_chat_placeholder),
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                            )
-                                        }
-                                        innerTextField()
-                                    }
-                                }
-                            )
-                            
-                            val sendButtonScale by animateFloatAsState(
-                                targetValue = if (messageText.isNotBlank()) 1f else 0.85f,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessMedium
-                                ),
-                                label = "SendButtonScale"
-                            )
-                            
-                            IconButton(
-                                onClick = {
-                                    if (messageText.isNotBlank()) {
-                                        viewModel.sendSquadMessage(squad.id, messageText.trim())
-                                        messageText = ""
-                                    }
-                                },
-                                enabled = messageText.isNotBlank(),
-                                modifier = Modifier
-                                    .scale(sendButtonScale)
-                                    .size(40.dp)
-                                    .background(
-                                        color = if (messageText.isNotBlank()) MaterialTheme.colorScheme.primary 
-                                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                        shape = CircleShape
-                                    )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Send, 
-                                    contentDescription = "Send", 
-                                    tint = if (messageText.isNotBlank()) MaterialTheme.colorScheme.onPrimary 
-                                           else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item {
                         Row(
