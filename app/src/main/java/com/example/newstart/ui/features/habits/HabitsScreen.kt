@@ -71,6 +71,17 @@ fun HabitsScreen(
     val dateTimeFormatter = remember { SimpleDateFormat("HH:mm - dd/MM/yyyy", locale) }
     val isDark = LocalDarkTheme.current
 
+    DisposableEffect(activeSquad) {
+        if (activeSquad != null) {
+            mainViewModel.setBottomBarVisible(false)
+        } else {
+            mainViewModel.setBottomBarVisible(true)
+        }
+        onDispose {
+            mainViewModel.setBottomBarVisible(true)
+        }
+    }
+
     if (activeSquad != null) {
         com.example.newstart.ui.features.social.SquadDetailViewWrapper(
             squad = activeSquad,
@@ -79,7 +90,7 @@ fun HabitsScreen(
             viewModel = socialViewModel,
             mainViewModel = mainViewModel,
             onBack = { activeSquadDetail = null },
-            hasBottomBar = true
+            hasBottomBar = false
         )
     } else {
         val backgroundColor = MaterialTheme.colorScheme.background
