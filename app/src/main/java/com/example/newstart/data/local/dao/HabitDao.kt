@@ -9,8 +9,14 @@ interface HabitDao {
     @Query("SELECT * FROM habits WHERE (userId = :userId OR squadId IS NOT NULL) AND date = :date ORDER BY createdAt DESC")
     fun getHabits(userId: String, date: String): Flow<List<HabitEntity>>
 
+    @Query("SELECT * FROM habits WHERE (userId = :userId OR squadId IS NOT NULL) AND date = :date ORDER BY createdAt DESC")
+    suspend fun getHabitsSync(userId: String, date: String): List<HabitEntity>
+
     @Query("SELECT * FROM habits WHERE userId = :userId OR squadId IS NOT NULL ORDER BY date DESC")
     fun getAllHabits(userId: String): Flow<List<HabitEntity>>
+
+    @Query("SELECT * FROM habits WHERE userId = :userId OR squadId IS NOT NULL ORDER BY date DESC")
+    suspend fun getAllHabitsSync(userId: String): List<HabitEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertHabit(habit: HabitEntity)

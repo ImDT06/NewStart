@@ -10,19 +10,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -55,16 +46,20 @@ import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
+import com.example.newstart.ui.navigation.Screen
 import androidx.compose.ui.platform.LocalView
 import android.view.WindowManager
 import android.graphics.Color as AndroidColor
-import androidx.compose.ui.res.painterResource
-import androidx.compose.foundation.Image
 import coil.compose.AsyncImage
 import com.example.newstart.R
 import com.example.newstart.domain.model.JournalEntry
+import com.example.newstart.domain.model.User
+import kotlinx.coroutines.flow.Flow
 import com.example.newstart.ui.components.AdvancedDatePickerDialog
 import com.example.newstart.ui.features.journal.components.TimelineEntryItem
 import com.example.newstart.ui.theme.LocalDarkTheme
@@ -80,27 +75,29 @@ import java.time.temporal.TemporalAdjusters
 import java.util.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import kotlinx.coroutines.flow.flowOf
 
 @Composable
 fun JournalScreen(
+    navController: NavController,
     modifier: Modifier = Modifier,
     viewModel: JournalViewModel = hiltViewModel()
 ) {
     val entries by viewModel.entries.collectAsStateWithLifecycle()
-    val socialFeed by viewModel.socialFeed.collectAsStateWithLifecycle()
     val selectedDateRange by viewModel.selectedDateRange.collectAsStateWithLifecycle()
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
 
     JournalContent(
         modifier = modifier,
         entries = entries,
-        socialFeed = socialFeed,
         selectedDateRange = selectedDateRange,
-        currentTab = currentTab,
-        onTabSelected = { viewModel.onTabSelected(it) },
         onDateRangeSelected = { start, end -> viewModel.onDateRangeSelected(start, end) },
         onQuickFilterSelected = { viewModel.setQuickFilter(it) },
-        onDeleteEntry = { viewModel.deleteEntry(it) }
+        onDeleteEntry = { viewModel.deleteEntry(it) },
+        onArchiveClick = { navController.navigate(Screen.JournalArchive.route) }
     )
 }
 
@@ -109,13 +106,11 @@ fun JournalScreen(
 fun JournalContent(
     modifier: Modifier = Modifier,
     entries: List<JournalEntry>,
-    socialFeed: List<JournalEntry>,
     selectedDateRange: Pair<LocalDate, LocalDate?>,
-    currentTab: Int,
-    onTabSelected: (Int) -> Unit,
     onDateRangeSelected: (LocalDate, LocalDate?) -> Unit,
     onQuickFilterSelected: (String) -> Unit,
-    onDeleteEntry: (String) -> Unit
+    onDeleteEntry: (String) -> Unit,
+    onArchiveClick: () -> Unit
 ) {
     val isDark = LocalDarkTheme.current
     var selectedImageUrl by remember { mutableStateOf<String?>(null) }
@@ -197,7 +192,7 @@ fun JournalContent(
             ) {
                 val constraintsScope = this
                 val availableWidth = constraintsScope.maxWidth
-                val searchIconSize = 44.dp
+                val searchIconSize = 48.dp
 
                 val startOffset = availableWidth - (searchIconSize * 2)
                 val endOffset = (-8).dp
@@ -370,52 +365,41 @@ fun JournalContent(
                             }"
                         }
                     }
-
-                    Text(
-                        text = headerDateText,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { onQuickFilterSelected("Today") }
-                    )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    QuickFiltersSection(
-                        selectedDateRange = selectedDateRange,
-                        onQuickFilterSelected = {
-                            onQuickFilterSelected(it)
-                            if (isSearchActive) previousDateRange = null
-                        },
-                        isVietnamese = isVietnamese,
-                        isDark = isDark
-                    )
                 }
+
+                Text(
+                    text = headerDateText,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { onQuickFilterSelected("Today") }
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                QuickFiltersSection(
+                    selectedDateRange = selectedDateRange,
+                    onQuickFilterSelected = {
+                        onQuickFilterSelected(it)
+                        if (isSearchActive) previousDateRange = null
+                    },
+                    isVietnamese = isVietnamese,
+                    isDark = isDark
+                )
             }
 
-            if (currentTab == 0) {
-                JournalList(
-                    filteredEntries = filteredEntries,
-                    isDark = isDark,
-                    searchQuery = searchQuery,
-                    isVietnamese = isVietnamese,
-                    locale = locale,
-                    timeFormatter = timeFormatter,
-                    onOptionsClick = { entryForOptions = it },
-                    onImageClick = { selectedImageUrl = it }
-                )
-            } else {
-                SocialFeedList(
-                    socialFeed = socialFeed,
-                    isVietnamese = isVietnamese,
-                    isDark = isDark,
-                    timeFormatter = timeFormatter,
-                    onImageClick = { selectedImageUrl = it }
-                )
-            }
+            JournalList(
+                filteredEntries = filteredEntries,
+                isDark = isDark,
+                searchQuery = searchQuery,
+                isVietnamese = isVietnamese,
+                locale = locale,
+                timeFormatter = timeFormatter,
+                onOptionsClick = { entryForOptions = it },
+                onImageClick = { selectedImageUrl = it }
+            )
         }
 
-        // Dialogs
         if (showDatePicker) {
             AdvancedDatePickerDialog(
                 initialStartDate = selectedDateRange.first,
@@ -685,7 +669,7 @@ private fun DeleteConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
 }
 
 @Composable
-private fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
+fun ImagePreviewDialog(url: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val view = LocalView.current

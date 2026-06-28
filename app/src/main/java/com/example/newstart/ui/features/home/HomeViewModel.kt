@@ -1,5 +1,6 @@
 package com.example.newstart.ui.features.home
 
+import java.util.Date
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.newstart.domain.model.Habit
@@ -56,9 +57,9 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun addTodo(task: String, priority: Priority = Priority.MEDIUM) {
+    fun addTodo(task: String, priority: Priority = Priority.MEDIUM, dueDate: Date? = null) {
         viewModelScope.launch {
-            todoRepository.insertTodo(Todo(task = task, priority = priority))
+            todoRepository.insertTodo(Todo(task = task, priority = priority, dueDate = dueDate))
         }
     }
 

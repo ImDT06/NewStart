@@ -4,8 +4,12 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.newstart.domain.model.JournalEntry
+import com.example.newstart.domain.model.JournalType
 import com.example.newstart.domain.repository.JournalRepository
 import com.example.newstart.domain.usecase.SaveJournalEntryUseCase
+import com.example.newstart.domain.repository.UserRepository
+import com.example.newstart.domain.model.User
+import kotlinx.coroutines.flow.Flow
 import com.example.newstart.domain.repository.SocialRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -26,8 +30,17 @@ import javax.inject.Inject
 class JournalViewModel @Inject constructor(
     private val journalRepository: JournalRepository,
     private val socialRepository: SocialRepository,
-    private val saveJournalEntryUseCase: SaveJournalEntryUseCase
+    private val saveJournalEntryUseCase: SaveJournalEntryUseCase,
+    private val userRepository: UserRepository
 ) : ViewModel() {
+
+    fun getUserById(userId: String): Flow<User> = userRepository.getUserById(userId)
+
+    fun reactToPost(postId: String, emoji: String) {
+        viewModelScope.launch {
+            socialRepository.reactToPost(postId, emoji)
+        }
+    }
 
     private val _selectedDateRange = MutableStateFlow<Pair<LocalDate, LocalDate?>>(LocalDate.now() to null)
     val selectedDateRange: StateFlow<Pair<LocalDate, LocalDate?>> = _selectedDateRange.asStateFlow()
@@ -51,6 +64,40 @@ class JournalViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+    val uniqueMovieTitles: StateFlow<List<String>> = journalRepository.getJournalEntries()
+        .map { entries ->
+            entries.filter { it.type == JournalType.MOVIE && it.movieDetails != null }
+                .map { it.movieDetails!!.title.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .sorted()
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val uniqueBookTitles: StateFlow<List<String>> = journalRepository.getJournalEntries()
+        .map { entries ->
+            entries.filter { it.type == JournalType.BOOK && it.bookDetails != null }
+                .map { it.bookDetails!!.title.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .sorted()
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val uniqueSubjectNames: StateFlow<List<String>> = journalRepository.getJournalEntries()
+        .map { entries ->
+            entries.filter { it.type == JournalType.SUBJECT && it.subjectDetails != null }
+                .map { it.subjectDetails!!.name.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .sorted()
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val entries: StateFlow<List<JournalEntry>> = _selectedDateRange

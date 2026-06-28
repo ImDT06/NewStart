@@ -8,6 +8,10 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import com.example.newstart.domain.model.JournalEntry
+import com.example.newstart.domain.model.JournalType
+import com.example.newstart.domain.model.MovieDetails
+import com.example.newstart.domain.model.BookDetails
+import com.example.newstart.domain.model.SubjectDetails
 import com.example.newstart.domain.repository.JournalRepository
 import com.example.newstart.util.AppConstants
 import com.google.firebase.auth.FirebaseAuth
@@ -42,7 +46,16 @@ class JournalRepositoryImpl @Inject constructor(
 
     private val client = OkHttpClient()
 
-    override suspend fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?, imageSource: String?): Result<Unit> {
+    override suspend fun saveJournalEntry(
+        emoji: String,
+        text: String,
+        imageUri: Uri?,
+        imageSource: String?,
+        type: JournalType,
+        movieDetails: MovieDetails?,
+        bookDetails: BookDetails?,
+        subjectDetails: SubjectDetails?
+    ): Result<Unit> {
         return try {
             val userId = auth.currentUser?.uid ?: throw Exception("User not logged in")
             var imageUrl: String? = null
@@ -59,6 +72,10 @@ class JournalRepositoryImpl @Inject constructor(
                 text = text,
                 imageUrl = imageUrl,
                 imageSource = imageSource,
+                type = type,
+                movieDetails = movieDetails,
+                bookDetails = bookDetails,
+                subjectDetails = subjectDetails,
                 timestamp = Date()
             )
 

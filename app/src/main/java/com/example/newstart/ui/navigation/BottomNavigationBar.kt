@@ -46,7 +46,7 @@ fun MainBottomBar(
         BottomNavItem(Screen.Home, R.string.nav_home, R.drawable.ic_home),
         BottomNavItem(Screen.Journal, R.string.nav_journal, R.drawable.ic_notebook),
         BottomNavItem(Screen.Home, 0, Icons.Default.Add), // Placeholder
-        BottomNavItem(Screen.Habits, R.string.nav_habits, R.drawable.ic_list_check),
+        BottomNavItem(Screen.Habits, R.string.home_category_community, Icons.Default.Group),
         BottomNavItem(Screen.Profile, R.string.nav_profile, R.drawable.ic_user)
     )
 

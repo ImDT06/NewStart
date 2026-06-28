@@ -32,7 +32,7 @@ import java.time.format.DateTimeFormatter
 data class HabitPreset(
     val name: String,
     val icon: String,
-    val color: Color = Color(0xFF1D1D1F),
+    val color: Color = Color.Black,
     val time: String? = null,
     val minsBefore: Int = 0
 )
@@ -50,7 +50,6 @@ fun NewHabitSheet(
     
     if (editingHabit != null) {
         Column(modifier = Modifier.fillMaxWidth().imePadding().padding(bottom = 32.dp)) {
-            Box(modifier = Modifier.padding(top = 8.dp).width(40.dp).height(4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)).align(Alignment.CenterHorizontally))
             Row(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null) }
                 Text(text = stringResource(R.string.habits_custom_dialog_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -94,8 +93,7 @@ fun NewHabitSheet(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).imePadding().padding(top = 8.dp)) {
-        Box(modifier = Modifier.width(40.dp).height(4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)).align(Alignment.CenterHorizontally))
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).imePadding().padding(top = 0.dp)) {
         Row(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurface) }
             Text(text = stringResource(R.string.habits_new_title), color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -213,7 +211,7 @@ fun HabitConfigContent(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { if (name.isNotBlank() && selectedTime != null) onConfirm(name, icon, selectedTime, minsBefore, Color(0xFF1D1D1F), selectedDate, selectedSquadId) }, enabled = name.isNotBlank() && selectedTime != null, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) { Text(stringResource(R.string.habits_btn_create), fontWeight = FontWeight.Bold) }
+        Button(onClick = { if (name.isNotBlank() && selectedTime != null) onConfirm(name, icon, selectedTime, minsBefore, Color.Black, selectedDate, selectedSquadId) }, enabled = name.isNotBlank() && selectedTime != null, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) { Text(stringResource(R.string.habits_btn_create), fontWeight = FontWeight.Bold) }
     }
 }
 
