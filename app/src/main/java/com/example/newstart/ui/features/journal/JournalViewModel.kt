@@ -157,7 +157,10 @@ class JournalViewModel @Inject constructor(
     fun refreshSocialFeed() {
         viewModelScope.launch {
             socialRepository.getSocialFeed().collect { entries ->
-                _socialFeed.value = entries
+                // Chỉ hiển thị các bài viết không phải PRIVATE trên Bảng tin
+                _socialFeed.value = entries.filter { 
+                    it.privacy != com.example.newstart.domain.model.JournalPrivacy.PRIVATE 
+                }
             }
         }
     }
@@ -207,6 +210,7 @@ class JournalViewModel @Inject constructor(
             val result = saveJournalEntryUseCase(emoji, text, imageUri, imageSource)
             _isUploading.value = false
             if (result.isSuccess) {
+                socialRepository.refreshSocialFeed()
                 onSuccess()
             }
         }

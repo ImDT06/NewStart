@@ -21,6 +21,9 @@ import com.example.newstart.data.local.toDomain
 import com.example.newstart.data.local.toEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 
 
@@ -210,28 +213,38 @@ class SocialRepositoryImpl @Inject constructor(
         // Tạm thời để trống hoặc gọi API update nếu có
     }
 
-    override fun getSocialFeed(): Flow<List<JournalEntry>> = kotlinx.coroutines.flow.flow {
-        try {
-            val response = apiService.getSocialFeed()
-            val entries = response.map { dto ->
-                JournalEntry(
-                    id = dto.id ?: "",
-                    userId = dto.userId ?: "",
-                    emoji = dto.emoji,
-                    text = dto.text,
-                    imageUrl = dto.imageUrl,
-                    reactions = dto.reactions,
-                    timestamp = dto.timestamp.toEpochMilliseconds()?.let { java.util.Date(it) }
-                )
+    private val refreshTrigger = MutableSharedFlow<Unit>(replay = 1).apply { tryEmit(Unit) }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    override fun getSocialFeed(): Flow<List<JournalEntry>> = refreshTrigger.flatMapLatest {
+        flow {
+            try {
+                val response = apiService.getSocialFeed()
+                val entries = response.map { dto ->
+                    JournalEntry(
+                        id = dto.id ?: "",
+                        userId = dto.userId ?: "",
+                        emoji = dto.emoji,
+                        text = dto.text,
+                        imageUrl = dto.imageUrl,
+                        privacy = try { com.example.newstart.domain.model.JournalPrivacy.valueOf(dto.privacy) } catch (e: Exception) { com.example.newstart.domain.model.JournalPrivacy.FRIENDS },
+                        reactions = dto.reactions,
+                        timestamp = dto.timestamp.toEpochMilliseconds()?.let { java.util.Date(it) }
+                    )
+                }
+                emit(entries)
+            } catch (e: Exception) {
+                android.util.Log.e("SocialRepository", "API Feed error: ${e.message}", e)
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(context, "Lỗi tải bảng tin: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                }
+                emit(emptyList())
             }
-            emit(entries)
-        } catch (e: Exception) {
-            android.util.Log.e("SocialRepository", "API Feed error: ${e.message}", e)
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context, "Lỗi tải bảng tin: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-            }
-            emit(emptyList())
         }
+    }
+
+    override suspend fun refreshSocialFeed() {
+        refreshTrigger.emit(Unit)
     }
 
     override suspend fun reactToPost(postId: String, emoji: String) {

@@ -387,6 +387,7 @@ class MainViewModel @Inject constructor(
                     emoji, text, imageUri, imageSource, type, movieDetails, bookDetails, subjectDetails, privacy
                 )
                 if (result.isSuccess) {
+                    socialRepository.refreshSocialFeed()
                     onSuccess()
                 }
             } finally {

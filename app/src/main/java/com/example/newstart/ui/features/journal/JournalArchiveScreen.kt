@@ -702,6 +702,7 @@ private fun ArchiveEntryItem(
                 ) {
                     // Date Chip Badge
                     Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .background(
                                 MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
@@ -714,6 +715,21 @@ private fun ArchiveEntryItem(
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        Spacer(modifier = Modifier.width(6.dp))
+                        
+                        val privacyIcon = when (entry.privacy) {
+                            com.example.newstart.domain.model.JournalPrivacy.PRIVATE -> Icons.Default.Lock
+                            com.example.newstart.domain.model.JournalPrivacy.FRIENDS -> Icons.Default.Groups
+                            com.example.newstart.domain.model.JournalPrivacy.SQUAD -> Icons.Default.GroupWork
+                        }
+                        
+                        Icon(
+                            imageVector = privacyIcon,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                         )
                     }
 

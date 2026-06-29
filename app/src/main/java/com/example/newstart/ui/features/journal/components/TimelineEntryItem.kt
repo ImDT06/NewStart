@@ -9,6 +9,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.GroupWork
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -128,12 +131,34 @@ fun TimelineEntryItem(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = timeFormatted,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = timeFormatted,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                            )
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            // Hiển thị trạng thái quyền riêng tư
+                            val (privacyIcon, privacyColor) = when (entry.privacy) {
+                                com.example.newstart.domain.model.JournalPrivacy.PRIVATE -> 
+                                    Icons.Default.Lock to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                com.example.newstart.domain.model.JournalPrivacy.FRIENDS -> 
+                                    Icons.Default.Groups to MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                com.example.newstart.domain.model.JournalPrivacy.SQUAD -> 
+                                    Icons.Default.GroupWork to MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
+                            }
+                            
+                            Icon(
+                                imageVector = privacyIcon,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = privacyColor
+                            )
+                        }
+
                         IconButton(
                             onClick = onOptionsClick,
                             modifier = Modifier.size(24.dp)
