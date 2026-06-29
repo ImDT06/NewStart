@@ -223,6 +223,7 @@ fun FriendsTabWrapper(
     getUserFlow: (String) -> Flow<User>
 ) {
     Column {
+        android.util.Log.d("SocialScreen", "FriendsTabWrapper recomposed with searchQuery = '$searchQuery'")
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearchQueryChange,
@@ -254,6 +255,8 @@ fun FriendsTabWrapper(
                 }
             },
             colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = Color.Transparent,
                 disabledBorderColor = Color.Transparent,
