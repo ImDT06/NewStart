@@ -125,11 +125,13 @@ fun HabitItem(
                         }
                     }
 
-                    Text(
-                        text = if (habit.reminderTime != null) "${habit.progress}/${habit.goal} • 🔔 ${habit.reminderTime}" else "${habit.progress}/${habit.goal}",
-                        color = if (habit.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        fontSize = 11.sp
-                    )
+                    if (habit.reminderTime != null) {
+                        Text(
+                            text = "🔔 ${habit.reminderTime}",
+                            color = if (habit.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            fontSize = 11.sp
+                        )
+                    }
                 }
 
                 // CHECK BUTTON
