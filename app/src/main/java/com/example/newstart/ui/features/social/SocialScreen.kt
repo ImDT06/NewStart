@@ -1042,6 +1042,13 @@ fun SquadDetailView(
         }
     }
 
+    val isKeyboardVisible = WindowInsets.isImeVisible
+    LaunchedEffect(isKeyboardVisible) {
+        if (isKeyboardVisible && messages.isNotEmpty()) {
+            lazyListState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
     LaunchedEffect(lazyListState.isScrollInProgress) {
         if (lazyListState.isScrollInProgress) {
             focusManager.clearFocus()
@@ -1159,7 +1166,7 @@ fun SquadDetailView(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = padding.calculateTopPadding())
-                .padding(bottom = if (selectedTab == 0) 0.dp else padding.calculateBottomPadding())
+                .padding(bottom = padding.calculateBottomPadding())
         ) {
             // Modern Segmented Control Style Tabs for Chat vs Members & Habits
             val detailTabs = listOf(
@@ -1260,7 +1267,7 @@ fun SquadDetailView(
                                 start = 16.dp,
                                 end = 16.dp,
                                 top = 12.dp,
-                                bottom = padding.calculateBottomPadding() + 8.dp
+                                bottom = 8.dp
                             )
                         ) {
                             items(messages) { message ->
