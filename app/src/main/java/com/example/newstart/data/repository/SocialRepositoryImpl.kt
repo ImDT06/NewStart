@@ -1,5 +1,10 @@
 package com.example.newstart.data.repository
 
+import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.example.newstart.data.remote.dto.*
 import com.example.newstart.domain.model.*
 import com.example.newstart.domain.repository.SocialRepository
@@ -16,7 +21,8 @@ import javax.inject.Singleton
 class SocialRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
-    private val apiService: com.example.newstart.data.remote.NewStartApiService
+    private val apiService: com.example.newstart.data.remote.NewStartApiService,
+    @ApplicationContext private val context: Context
 ) : SocialRepository {
 
     override fun getFriends(): Flow<List<Friendship>> = kotlinx.coroutines.flow.flow {
@@ -31,6 +37,10 @@ class SocialRepositoryImpl @Inject constructor(
             }
             emit(friendships)
         } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "API getFriends error: ${e.message}", e)
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, "Lỗi tải bạn bè: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+            }
             emit(emptyList())
         }
     }
@@ -105,6 +115,10 @@ class SocialRepositoryImpl @Inject constructor(
             }
             emit(squads)
         } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "API getSquads error: ${e.message}", e)
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, "Lỗi tải nhóm: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+            }
             emit(emptyList())
         }
     }
@@ -159,7 +173,10 @@ class SocialRepositoryImpl @Inject constructor(
             }
             emit(entries)
         } catch (e: Exception) {
-            android.util.Log.e("SocialRepository", "API Feed error: ${e.message}")
+            android.util.Log.e("SocialRepository", "API Feed error: ${e.message}", e)
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, "Lỗi tải bảng tin: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+            }
             emit(emptyList())
         }
     }
