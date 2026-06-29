@@ -240,22 +240,42 @@ class SocialRepositoryImpl @Inject constructor(
             .update("members", com.google.firebase.firestore.FieldValue.arrayRemove(memberId)).await()
     }
 
-    override fun getSquadMessages(squadId: String): Flow<List<com.example.newstart.domain.model.SquadMessage>> = kotlinx.coroutines.flow.flow {
-        try {
-            val response = apiService.getSquadMessages(squadId)
-            val messages = response.map { dto ->
-                com.example.newstart.domain.model.SquadMessage(
-                    id = dto.id ?: "",
-                    senderId = dto.senderId ?: "",
-                    senderName = dto.senderName ?: "Người dùng",
-                    text = dto.text,
-                    timestamp = dto.timestamp.toEpochMilliseconds()?.let { java.util.Date(it) } ?: java.util.Date()
-                )
+    override fun getSquadMessages(squadId: String): Flow<List<com.example.newstart.domain.model.SquadMessage>> = callbackFlow {
+        val listener = firestore.collection("squads")
+            .document(squadId)
+            .collection("messages")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("SocialRepository", "Error listening to squad messages: ${error.message}")
+                    return@addSnapshotListener
+                }
+                
+                if (snapshot != null) {
+                    val messages = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            val id = doc.id
+                            val senderId = doc.getString("senderId") ?: ""
+                            val senderName = doc.getString("senderName") ?: "Người dùng"
+                            val text = doc.getString("text") ?: ""
+                            val timestampDate = doc.getTimestamp("timestamp")?.toDate() ?: java.util.Date()
+                            
+                            com.example.newstart.domain.model.SquadMessage(
+                                id = id,
+                                senderId = senderId,
+                                senderName = senderName,
+                                text = text,
+                                timestamp = timestampDate
+                            )
+                        } catch (e: Exception) {
+                            android.util.Log.e("SocialRepository", "Error parsing message: ${e.message}")
+                            null
+                        }
+                    }
+                    trySend(messages)
+                }
             }
-            emit(messages)
-        } catch (e: Exception) {
-            emit(emptyList())
-        }
+        awaitClose { listener.remove() }
     }
 
     override suspend fun sendSquadMessage(squadId: String, text: String) {
