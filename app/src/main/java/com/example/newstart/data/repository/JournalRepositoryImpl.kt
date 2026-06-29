@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
+import com.example.newstart.data.remote.dto.*
 import com.example.newstart.domain.model.JournalEntry
 import com.example.newstart.domain.model.JournalType
 import com.example.newstart.domain.model.MovieDetails
@@ -67,27 +68,51 @@ class JournalRepositoryImpl @Inject constructor(
                 if (imageUrl == null) throw Exception("Failed to upload image to Cloudinary")
             }
 
-            // 2. Xác: Chuẩn bị dữ liệu gửi lên Server
-            val entryMap = mutableMapOf<String, Any>(
-                "emoji" to emoji,
-                "text" to text,
-                "imageSource" to (imageSource ?: ""),
-                "type" to type.name
+            // 2. Xác: Chuẩn bị dữ liệu gửi lên Server dưới dạng DTO
+            val entryDto = JournalEntryDto(
+                emoji = emoji,
+                text = text,
+                imageUrl = imageUrl,
+                imageSource = imageSource ?: "",
+                type = type.name,
+                movieDetails = movieDetails?.let {
+                    MovieDetailsDto(
+                        title = it.title,
+                        director = it.director,
+                        actors = it.actors,
+                        rating = it.rating
+                    )
+                },
+                bookDetails = bookDetails?.let {
+                    BookDetailsDto(
+                        title = it.title,
+                        author = it.author,
+                        pagesRead = it.pagesRead,
+                        rating = it.rating
+                    )
+                },
+                subjectDetails = subjectDetails?.let {
+                    SubjectDetailsDto(
+                        name = it.name,
+                        topic = it.topic,
+                        score = it.score,
+                        understandingLevel = it.understandingLevel
+                    )
+                }
             )
-            imageUrl?.let { entryMap["imageUrl"] = it }
-            movieDetails?.let { entryMap["movieDetails"] = it }
-            bookDetails?.let { entryMap["bookDetails"] = it }
-            subjectDetails?.let { entryMap["subjectDetails"] = it }
 
             // 3. Gửi lên Spring Boot API
             println(">>> Đang gửi Nhật ký lên Server...")
-            apiService.createJournalEntry(entryMap)
+            apiService.createJournalEntry(entryDto)
             
             android.util.Log.d("JournalRepository", "Entry saved via API successfully")
             Result.success(Unit)
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             android.util.Log.e("JournalRepository", "Error saving entry via API: ${e.message}", e)
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, "Lỗi lưu nhật ký: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+            }
             Result.failure(e)
         }
     }
