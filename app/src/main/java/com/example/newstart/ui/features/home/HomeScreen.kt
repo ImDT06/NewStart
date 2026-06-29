@@ -192,6 +192,18 @@ fun HomeScreen(
         habitsViewModel.onDateSelected(selectedDate)
     }
 
+    // Tự động focus vào Thứ 2 khi chuyển tuần và cập nhật ngày hiển thị
+    LaunchedEffect(pagerState.currentPage) {
+        val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            .plusWeeks((pagerState.currentPage - 500).toLong())
+        val currentWeekEnd = weekStart.plusDays(6)
+        
+        // Chỉ cập nhật nếu ngày hiện tại không nằm trong tuần mới đang hiển thị
+        if (selectedDate.isBefore(weekStart) || selectedDate.isAfter(currentWeekEnd)) {
+            mainViewModel.onHabitDateSelected(weekStart)
+        }
+    }
+
     LaunchedEffect(completedHabitForJournal, isJournalPromptEnabled) {
         if (completedHabitForJournal != null && !isJournalPromptEnabled) {
             habitsViewModel.clearJournalPrompt()
