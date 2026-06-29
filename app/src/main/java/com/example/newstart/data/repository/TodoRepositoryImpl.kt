@@ -3,6 +3,7 @@ package com.example.newstart.data.repository
 import com.example.newstart.data.local.dao.TodoDao
 import com.example.newstart.data.local.toDomain
 import com.example.newstart.data.local.toEntity
+import com.example.newstart.data.remote.NewStartApiService
 import com.example.newstart.domain.model.Todo
 import com.example.newstart.domain.repository.TodoRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -25,6 +26,7 @@ class TodoRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
     private val todoDao: TodoDao,
+    private val apiService: NewStartApiService,
     @ApplicationContext private val context: Context
 ) : TodoRepository {
 
@@ -34,6 +36,12 @@ class TodoRepositoryImpl @Inject constructor(
         val userId = auth.currentUser?.uid ?: ""
         if (userId.isNotEmpty()) {
             repositoryScope.launch {
+                try {
+                    val remoteTodos = apiService.getTodos()
+                    println(">>> Đã lấy được ${remoteTodos.size} việc cần làm từ Server!")
+                } catch (e: Exception) {
+                    println(">>> Lỗi lấy Todo: ${e.message}")
+                }
                 syncTodosFromNetwork(userId)
             }
         }

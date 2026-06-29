@@ -6,6 +6,7 @@ import androidx.work.*
 import com.example.newstart.data.local.dao.HabitDao
 import com.example.newstart.data.local.toDomain
 import com.example.newstart.data.local.toEntity
+import com.example.newstart.data.remote.NewStartApiService
 import com.example.newstart.data.worker.SyncWorker
 import com.example.newstart.domain.model.Habit
 import com.example.newstart.domain.repository.HabitRepository
@@ -29,7 +30,7 @@ class HabitRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
     private val habitDao: HabitDao,
-    private val apiService: com.example.newstart.data.remote.HabitApiService, // Thêm cái này
+    private val apiService: NewStartApiService,
     @ApplicationContext private val context: Context
 ) : HabitRepository {
 

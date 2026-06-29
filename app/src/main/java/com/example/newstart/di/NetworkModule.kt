@@ -1,7 +1,7 @@
 package com.example.newstart.di
 
 import com.example.newstart.data.remote.AuthInterceptor
-import com.example.newstart.data.remote.HabitApiService
+import com.example.newstart.data.remote.NewStartApiService
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import dagger.Module
 import dagger.Provides
@@ -36,7 +36,7 @@ object NetworkModule {
         val contentType = "application/json".toMediaType()
         
         return Retrofit.Builder()
-            .baseUrl("http://10.0.2.2:8080/") // IP for Android Emulator
+            .baseUrl("https://newstart-backend-production.up.railway.app/")
             .client(okHttpClient)
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()
@@ -44,7 +44,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideHabitApiService(retrofit: Retrofit): HabitApiService {
-        return retrofit.create(HabitApiService::class.java)
+    fun provideNewStartApiService(retrofit: Retrofit): NewStartApiService {
+        return retrofit.create(NewStartApiService::class.java)
     }
 }

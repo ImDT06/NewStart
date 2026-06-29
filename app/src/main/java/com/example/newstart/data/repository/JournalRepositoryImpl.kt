@@ -41,6 +41,7 @@ import javax.inject.Singleton
 class JournalRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
+    private val apiService: com.example.newstart.data.remote.NewStartApiService,
     @ApplicationContext private val context: Context,
 ) : JournalRepository {
 
@@ -60,45 +61,43 @@ class JournalRepositoryImpl @Inject constructor(
             val userId = auth.currentUser?.uid ?: throw Exception("User not logged in")
             var imageUrl: String? = null
 
-            // Upload ảnh lên Cloudinary nếu có
+            // 1. Hồn: Upload ảnh lên Cloudinary nếu có
             if (imageUri != null) {
                 imageUrl = uploadToCloudinary(imageUri)
                 if (imageUrl == null) throw Exception("Failed to upload image to Cloudinary")
             }
 
-            val entry = JournalEntry(
-                userId = userId,
-                emoji = emoji,
-                text = text,
-                imageUrl = imageUrl,
-                imageSource = imageSource,
-                type = type,
-                movieDetails = movieDetails,
-                bookDetails = bookDetails,
-                subjectDetails = subjectDetails,
-                timestamp = Date()
+            // 2. Xác: Chuẩn bị dữ liệu gửi lên Server
+            val entryMap = mutableMapOf<String, Any>(
+                "emoji" to emoji,
+                "text" to text,
+                "imageSource" to (imageSource ?: ""),
+                "type" to type.name
             )
+            imageUrl?.let { entryMap["imageUrl"] = it }
+            movieDetails?.let { entryMap["movieDetails"] = it }
+            bookDetails?.let { entryMap["bookDetails"] = it }
+            subjectDetails?.let { entryMap["subjectDetails"] = it }
 
-            // Sử dụng document() để lấy reference trước, lấy ID sau đó mới set data
-            val docRef = firestore.collection("journals").document()
-            val entryWithId = entry.copy(id = docRef.id)
+            // 3. Gửi lên Spring Boot API
+            println(">>> Đang gửi Nhật ký lên Server...")
+            apiService.createJournalEntry(entryMap)
             
-            docRef.set(entryWithId).await()
-            android.util.Log.d("JournalRepository", "Entry saved successfully with ID: ${docRef.id}")
+            android.util.Log.d("JournalRepository", "Entry saved via API successfully")
             Result.success(Unit)
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            android.util.Log.e("JournalRepository", "Error saving entry: ${e.message}", e)
+            android.util.Log.e("JournalRepository", "Error saving entry via API: ${e.message}", e)
             Result.failure(e)
         }
     }
 
     override suspend fun deleteJournalEntry(entryId: String): Result<Unit> {
         return try {
-            firestore.collection("journals").document(entryId).delete().await()
+            apiService.deleteJournalEntry(entryId)
             Result.success(Unit)
         } catch (e: Exception) {
-            android.util.Log.e("JournalRepository", "Error deleting entry: ${e.message}", e)
+            android.util.Log.e("JournalRepository", "Error deleting entry via API: ${e.message}", e)
             Result.failure(e)
         }
     }

@@ -1,14 +1,13 @@
 package com.example.newstart.data.repository
 
-import com.example.newstart.data.remote.HabitApiService
+import com.example.newstart.data.remote.NewStartApiService
 import com.example.newstart.data.remote.dto.HabitDto
-import com.example.newstart.domain.model.Habit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 
 class HabitRemoteRepository @Inject constructor(
-    private val apiService: HabitApiService
+    private val apiService: NewStartApiService
 ) {
     // Hàm lấy thói quen từ Server Spring Boot
     fun getHabitsFromServer(date: String): Flow<List<HabitDto>> = flow {
