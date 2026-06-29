@@ -6,6 +6,8 @@ import com.example.newstart.data.local.NewStartDatabase
 import com.example.newstart.data.local.dao.HabitDao
 import com.example.newstart.data.local.dao.TodoDao
 import com.example.newstart.data.local.dao.JournalDao
+import com.example.newstart.data.local.dao.SocialDao
+import com.example.newstart.data.local.dao.UserDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -43,4 +45,16 @@ object DatabaseModule {
     fun provideJournalDao(database: NewStartDatabase): JournalDao {
         return database.journalDao()
     }
+
+    @Provides
+    fun provideSocialDao(database: NewStartDatabase): SocialDao {
+        return database.socialDao()
+    }
+
+    @Provides
+    fun provideUserDao(database: NewStartDatabase): UserDao {
+        return database.userDao()
+    }
 }
+
+

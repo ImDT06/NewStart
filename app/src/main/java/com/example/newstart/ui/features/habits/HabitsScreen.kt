@@ -565,11 +565,7 @@ fun SocialFeedItem(
                         }
                     }
                     
-                    val textPadding = if (entry.reactions.keys.take(3).isNotEmpty()) {
-                        ((entry.reactions.keys.take(3).size - 1) * 16 + 32).dp
-                    } else {
-                        0.dp
-                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                     
                     Text(
                         text = if (locale.language == "vi") {
@@ -579,8 +575,7 @@ fun SocialFeedItem(
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(start = textPadding)
+                        fontWeight = FontWeight.Medium
                     )
                 }
 

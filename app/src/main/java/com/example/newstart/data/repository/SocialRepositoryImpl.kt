@@ -16,32 +16,61 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.newstart.data.local.dao.SocialDao
+import com.example.newstart.data.local.toDomain
+import com.example.newstart.data.local.toEntity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+
 
 @Singleton
 class SocialRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
+    private val socialDao: SocialDao,
     private val apiService: com.example.newstart.data.remote.NewStartApiService,
     @ApplicationContext private val context: Context
 ) : SocialRepository {
 
-    override fun getFriends(): Flow<List<Friendship>> = kotlinx.coroutines.flow.flow {
-        try {
-            val response = apiService.getFriends()
-            val friendships = response.map { dto ->
-                Friendship(
-                    id = dto.id,
-                    userIds = dto.userIds,
-                    status = dto.status
-                )
+    override fun getFriends(): Flow<List<Friendship>> = callbackFlow {
+        val userId = auth.currentUser?.uid ?: ""
+        if (userId.isEmpty()) {
+            trySend(emptyList())
+            return@callbackFlow
+        }
+
+        // 1. Phát ra dữ liệu từ Room cache cục bộ trước
+        val localJob = launch {
+            socialDao.getFriends(userId).collect { entities ->
+                trySend(entities.map { it.toDomain() })
             }
-            emit(friendships)
-        } catch (e: Exception) {
-            android.util.Log.e("SocialRepository", "API getFriends error: ${e.message}", e)
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context, "Lỗi tải bạn bè: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+        }
+
+        // 2. Chạy ngầm gọi API để cập nhật cache
+        launch(Dispatchers.IO) {
+            try {
+                val response = apiService.getFriends()
+                val friendshipEntities = response.map { dto ->
+                    Friendship(
+                        id = dto.id,
+                        userIds = dto.userIds,
+                        status = dto.status
+                    ).toEntity(cachedForUserId = userId)
+                }
+                
+                // Xóa cache cũ của user và ghi đè mới
+                socialDao.clearFriends(userId)
+                if (friendshipEntities.isNotEmpty()) {
+                    socialDao.insertFriends(friendshipEntities)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SocialRepository", "API getFriends error: ${e.message}", e)
             }
-            emit(emptyList())
+        }
+
+        awaitClose {
+            localJob.cancel()
         }
     }
 
@@ -99,27 +128,48 @@ class SocialRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getSquads(): Flow<List<Squad>> = kotlinx.coroutines.flow.flow {
-        try {
-            val response = apiService.getSquads()
-            val squads = response.map { dto ->
-                Squad(
-                    id = dto.id ?: "",
-                    name = dto.name,
-                    description = dto.description,
-                    habitCategory = dto.habitCategory,
-                    members = dto.members,
-                    adminId = dto.adminId ?: "",
-                    createdAt = dto.createdAt.toEpochMilliseconds()?.let { java.util.Date(it) }
-                )
+    override fun getSquads(): Flow<List<Squad>> = callbackFlow {
+        val userId = auth.currentUser?.uid ?: ""
+        if (userId.isEmpty()) {
+            trySend(emptyList())
+            return@callbackFlow
+        }
+
+        // 1. Phát ra dữ liệu từ Room cache cục bộ trước
+        val localJob = launch {
+            socialDao.getSquads(userId).collect { entities ->
+                trySend(entities.map { it.toDomain() })
             }
-            emit(squads)
-        } catch (e: Exception) {
-            android.util.Log.e("SocialRepository", "API getSquads error: ${e.message}", e)
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context, "Lỗi tải nhóm: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+        }
+
+        // 2. Chạy ngầm gọi API để cập nhật cache
+        launch(Dispatchers.IO) {
+            try {
+                val response = apiService.getSquads()
+                val squadEntities = response.map { dto ->
+                    Squad(
+                        id = dto.id ?: "",
+                        name = dto.name,
+                        description = dto.description,
+                        habitCategory = dto.habitCategory,
+                        members = dto.members,
+                        adminId = dto.adminId ?: "",
+                        createdAt = dto.createdAt.toEpochMilliseconds()?.let { java.util.Date(it) }
+                    ).toEntity(cachedForUserId = userId)
+                }
+
+                // Xóa cache cũ của user và ghi đè mới
+                socialDao.clearSquads(userId)
+                if (squadEntities.isNotEmpty()) {
+                    socialDao.insertSquads(squadEntities)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SocialRepository", "API getSquads error: ${e.message}", e)
             }
-            emit(emptyList())
+        }
+
+        awaitClose {
+            localJob.cancel()
         }
     }
 
@@ -147,6 +197,9 @@ class SocialRepositoryImpl @Inject constructor(
 
     override suspend fun leaveSquad(squadId: String) {
         try {
+            // Xóa nhanh dưới local cache trước
+            socialDao.deleteSquad(squadId)
+            
             apiService.leaveSquad(squadId)
         } catch (e: Exception) {
             android.util.Log.e("SocialRepository", "API Leave Squad error: ${e.message}")
@@ -191,6 +244,9 @@ class SocialRepositoryImpl @Inject constructor(
 
     override suspend fun removeFriend(friendshipId: String) {
         try {
+            // Xóa nhanh dưới local cache trước
+            socialDao.deleteFriend(friendshipId)
+            
             val doc = firestore.collection("friendships").document(friendshipId).get().await()
             val userIds = doc.get("userIds") as? List<String> ?: emptyList()
             

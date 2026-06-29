@@ -16,6 +16,7 @@ class UserPreferencesRepository @Inject constructor(
     val themeColorFlow: Flow<AppThemeColor> = dataStore.data.map { it.themeColor }
     val commonPomoTimesFlow: Flow<List<Int>> = dataStore.data.map { it.commonPomoTimes }
     val isJournalPromptEnabledFlow: Flow<Boolean> = dataStore.data.map { it.isJournalPromptEnabled }
+    val isSearchableFlow: Flow<Boolean> = dataStore.data.map { it.isSearchable }
 
     suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.updateData { it.copy(themeMode = mode) }
@@ -31,5 +32,9 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setJournalPromptEnabled(enabled: Boolean) {
         dataStore.updateData { it.copy(isJournalPromptEnabled = enabled) }
+    }
+
+    suspend fun setSearchable(enabled: Boolean) {
+        dataStore.updateData { it.copy(isSearchable = enabled) }
     }
 }

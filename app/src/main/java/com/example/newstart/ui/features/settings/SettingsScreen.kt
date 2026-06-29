@@ -224,6 +224,7 @@ fun SettingsScreen(
     val journalCount by mainViewModel.journalCount.collectAsStateWithLifecycle()
     val habitStats by mainViewModel.habitStats.collectAsStateWithLifecycle()
     val isJournalPromptEnabled by mainViewModel.isJournalPromptEnabled.collectAsStateWithLifecycle()
+    val isSearchable by mainViewModel.isSearchable.collectAsStateWithLifecycle()
 
     var userEmailText by remember { mutableStateOf(currentUser?.email ?: "tranvanchinh555@gmail.com") }
     var birthdayText by remember { mutableStateOf("27 Tháng 6") }
@@ -711,16 +712,12 @@ fun SettingsScreen(
                 item { SectionTitle(title = stringResource(id = R.string.settings_privacy_security)) }
                 item {
                     SettingsCard {
-                        SettingsItem(
-                            icon = Icons.Default.Block,
-                            title = stringResource(id = R.string.settings_blocked_users),
-                            onClick = { /* Block list */ }
-                        )
-                        SettingsDivider()
-                        SettingsItem(
+                        SettingsToggleItem(
                             icon = Icons.Default.Lock,
-                            title = stringResource(id = R.string.settings_privacy_data),
-                            onClick = { /* Privacy details */ }
+                            title = stringResource(id = R.string.settings_allow_search),
+                            subtitle = stringResource(id = R.string.settings_allow_search_desc),
+                            checked = isSearchable,
+                            onCheckedChange = { mainViewModel.setSearchable(it) }
                         )
                     }
                 }
@@ -788,242 +785,237 @@ fun SettingsScreen(
 
     if (showChangeEmailDialog) {
         var tempEmail by remember { mutableStateOf(userEmailText) }
+        val isDark = isSystemInDarkTheme()
         
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showChangeEmailDialog = false },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-            modifier = Modifier.fillMaxWidth().padding(24.dp),
-            confirmButton = {},
-            title = {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 36.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = if (emailChangeStep == 1) "Xác thực bảo mật" else "Địa chỉ email mới",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                if (emailChangeStep == 1) {
                     Text(
-                        text = if (emailChangeStep == 1) "Xác thực bảo mật" else "Địa chỉ email mới",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        "Vui lòng nhập mật khẩu tài khoản của bạn để tiếp tục.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    if (emailChangeStep == 1) {
-                        Text(
-                            "Vui lòng nhập mật khẩu tài khoản của bạn để tiếp tục.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                        
-                        TextField(
-                            value = emailPasswordText,
-                            onValueChange = { emailPasswordText = it },
-                            placeholder = { Text("Mật khẩu", color = Color.Gray) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFF252528),
-                                unfocusedContainerColor = Color(0xFF252528),
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
-                            ),
-                            singleLine = true,
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    
+                    TextField(
+                        value = emailPasswordText,
+                        onValueChange = { emailPasswordText = it },
+                        placeholder = { Text("Mật khẩu", color = Color.Gray) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        TextButton(
+                            onClick = { showChangeEmailDialog = false },
+                            modifier = Modifier.weight(1f).height(48.dp)
                         ) {
-                            TextButton(
-                                onClick = { showChangeEmailDialog = false },
-                                modifier = Modifier.weight(1f).height(48.dp)
-                            ) {
-                                Text("Hủy", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Button(
-                                onClick = { emailChangeStep = 2 },
-                                enabled = emailPasswordText.isNotBlank(),
-                                modifier = Modifier.weight(1f).height(48.dp),
-                                shape = RoundedCornerShape(25.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFFFB000),
-                                    contentColor = Color.Black,
-                                    disabledContainerColor = Color(0xFFFFB000).copy(alpha = 0.4f),
-                                    disabledContentColor = Color.Black.copy(alpha = 0.5f)
-                                )
-                            ) {
-                                Text("Xác nhận", fontWeight = FontWeight.Bold)
-                            }
+                            Text("Hủy", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                    } else {
-                        Text(
-                            "Nhập địa chỉ email mới của bạn dưới đây:",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                        
-                        TextField(
-                            value = tempEmail,
-                            onValueChange = { tempEmail = it },
-                            placeholder = { Text("Địa chỉ email", color = Color.Gray) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFF252528),
-                                unfocusedContainerColor = Color(0xFF252528),
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
-                            ),
-                            singleLine = true
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        Button(
+                            onClick = { emailChangeStep = 2 },
+                            enabled = emailPasswordText.isNotBlank(),
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(25.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                                disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
+                            )
                         ) {
-                            TextButton(
-                                onClick = { emailChangeStep = 1 },
-                                modifier = Modifier.weight(1f).height(48.dp)
-                            ) {
-                                Text("Quay lại", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Button(
-                                onClick = {
-                                    userEmailText = tempEmail
-                                    showChangeEmailDialog = false
-                                },
-                                enabled = tempEmail.isNotBlank() && tempEmail != userEmailText,
-                                modifier = Modifier.weight(1f).height(48.dp),
-                                shape = RoundedCornerShape(25.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFFFB000),
-                                    contentColor = Color.Black,
-                                    disabledContainerColor = Color(0xFFFFB000).copy(alpha = 0.4f),
-                                    disabledContentColor = Color.Black.copy(alpha = 0.5f)
-                                )
-                            ) {
-                                Text("Lưu", fontWeight = FontWeight.Bold)
-                            }
+                            Text("Xác nhận", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    Text(
+                        "Nhập địa chỉ email mới của bạn dưới đây:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    
+                    TextField(
+                        value = tempEmail,
+                        onValueChange = { tempEmail = it },
+                        placeholder = { Text("Địa chỉ email", color = Color.Gray) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        singleLine = true
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        TextButton(
+                            onClick = { emailChangeStep = 1 },
+                            modifier = Modifier.weight(1f).height(48.dp)
+                        ) {
+                            Text("Quay lại", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Button(
+                            onClick = {
+                                userEmailText = tempEmail
+                                showChangeEmailDialog = false
+                            },
+                            enabled = tempEmail.isNotBlank() && tempEmail != userEmailText,
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(25.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                                disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Text("Lưu", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
-        )
+        }
     }
 
     if (showBirthdayDialog) {
         val parts = remember(birthdayText) { birthdayText.split(" ", limit = 2) }
         var tempDay by remember { mutableStateOf(parts.getOrNull(0) ?: "27") }
         var tempMonth by remember { mutableStateOf(parts.getOrNull(1) ?: "Tháng 6") }
+        val isDark = isSystemInDarkTheme()
         
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showBirthdayDialog = false },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-            modifier = Modifier.fillMaxWidth().padding(24.dp),
-            confirmButton = {},
-            title = {
-                Column(
+            containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 36.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "When is your birthday?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Let us know so we can celebrate! 🥳",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        "When is your birthday?",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    TextField(
+                        value = tempMonth,
+                        onValueChange = { tempMonth = it },
+                        placeholder = { Text("Tháng", color = Color.Gray) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        singleLine = true
                     )
-                    Text(
-                        "Let us know so we can celebrate! 🥳",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    
+                    TextField(
+                        value = tempDay,
+                        onValueChange = { tempDay = it },
+                        placeholder = { Text("Ngày", color = Color.Gray) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        singleLine = true
                     )
                 }
-            },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Button(
+                    onClick = {
+                        birthdayText = "$tempDay $tempMonth"
+                        showBirthdayDialog = false
+                    },
+                    enabled = tempDay.isNotBlank() && tempMonth.isNotBlank(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(25.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
+                    )
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        TextField(
-                            value = tempMonth,
-                            onValueChange = { tempMonth = it },
-                            placeholder = { Text("Tháng", color = Color.Gray) },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFF252528),
-                                unfocusedContainerColor = Color(0xFF252528),
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
-                            ),
-                            singleLine = true
-                        )
-                        
-                        TextField(
-                            value = tempDay,
-                            onValueChange = { tempDay = it },
-                            placeholder = { Text("Ngày", color = Color.Gray) },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFF252528),
-                                unfocusedContainerColor = Color(0xFF252528),
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
-                            ),
-                            singleLine = true
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Button(
-                        onClick = {
-                            birthdayText = "$tempDay $tempMonth"
-                            showBirthdayDialog = false
-                        },
-                        enabled = tempDay.isNotBlank() && tempMonth.isNotBlank(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(25.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFFFB000),
-                            contentColor = Color.Black,
-                            disabledContainerColor = Color(0xFFFFB000).copy(alpha = 0.4f),
-                            disabledContentColor = Color.Black.copy(alpha = 0.5f)
-                        )
-                    ) {
-                        Text("Lưu", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    }
+                    Text("Lưu", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
-        )
+        }
     }
 }
 
@@ -1037,90 +1029,95 @@ fun EditProfileDialog(
     val nameParts = remember(currentName) { currentName.split(" ", limit = 2) }
     var firstName by remember { mutableStateOf(nameParts.getOrNull(0) ?: "") }
     var lastName by remember { mutableStateOf(nameParts.getOrNull(1) ?: "") }
+    val isDark = isSystemInDarkTheme()
     
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-        modifier = Modifier.fillMaxWidth().padding(24.dp),
-        confirmButton = {},
-        title = {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text("Sửa tên của bạn", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
-            }
-        },
-        text = {
-            Column(
+        containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 36.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "Sửa tên của bạn",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            TextField(
+                value = firstName,
+                onValueChange = { firstName = it },
+                placeholder = { Text("Tên", color = Color.Gray) },
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                shape = RoundedCornerShape(16.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                ),
+                singleLine = true
+            )
+            
+            TextField(
+                value = lastName,
+                onValueChange = { lastName = it },
+                placeholder = { Text("Họ (không bắt buộc)", color = Color.Gray) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                ),
+                singleLine = true
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                TextField(
-                    value = firstName,
-                    onValueChange = { firstName = it },
-                    placeholder = { Text("Tên", color = Color.Gray) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFF252528),
-                        unfocusedContainerColor = Color(0xFF252528),
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
-                    singleLine = true
-                )
-                
-                TextField(
-                    value = lastName,
-                    onValueChange = { lastName = it },
-                    placeholder = { Text("Họ (không bắt buộc)", color = Color.Gray) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFF252528),
-                        unfocusedContainerColor = Color(0xFF252528),
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
-                    singleLine = true
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(48.dp)
                 ) {
-                    TextButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f).height(48.dp)
-                    ) {
-                        Text("Hủy", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Button(
-                        onClick = {
-                            val fullName = listOf(firstName, lastName).filter { it.isNotBlank() }.joinToString(" ")
-                            onConfirm(fullName)
-                        },
-                        enabled = firstName.isNotBlank(),
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        shape = RoundedCornerShape(25.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFFFB000),
-                            contentColor = Color.Black,
-                            disabledContainerColor = Color(0xFFFFB000).copy(alpha = 0.4f),
-                            disabledContentColor = Color.Black.copy(alpha = 0.5f)
-                        )
-                    ) {
-                        Text("Lưu", fontWeight = FontWeight.Bold)
-                    }
+                    Text("Hủy", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Button(
+                    onClick = {
+                        val fullName = listOf(firstName, lastName).filter { it.isNotBlank() }.joinToString(" ")
+                        onConfirm(fullName)
+                    },
+                    enabled = firstName.isNotBlank(),
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(25.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Text("Lưu", fontWeight = FontWeight.Bold)
                 }
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -1564,7 +1561,8 @@ fun SettingsToggleItem(
     icon: ImageVector,
     title: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    subtitle: String? = null
 ) {
     Row(
         modifier = Modifier
@@ -1587,12 +1585,22 @@ fun SettingsToggleItem(
             )
         }
         Spacer(modifier = Modifier.width(14.dp))
-        Text(
-            text = title,
-            fontSize = 15.sp, // Đồng bộ size chữ
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 15.sp, // Đồng bộ size chữ
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium
+            )
+            if (subtitle != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                )
+            }
+        }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,

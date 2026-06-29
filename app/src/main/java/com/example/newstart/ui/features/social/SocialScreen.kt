@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -1250,6 +1251,7 @@ fun SquadDetailView(
                             Text(stringResource(R.string.squad_chat_empty), color = Color.Gray, fontSize = 13.sp)
                         }
                     } else {
+                        val reversedMessages = remember(messages) { messages.asReversed() }
                         LazyColumn(
                             state = lazyListState,
                             reverseLayout = true,
@@ -1258,7 +1260,7 @@ fun SquadDetailView(
                                 .pointerInput(Unit) {
                                     detectTapGestures(onTap = { focusManager.clearFocus() })
                                 },
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(0.dp),
                             contentPadding = PaddingValues(
                                 start = 16.dp,
                                 end = 16.dp,
@@ -1266,41 +1268,66 @@ fun SquadDetailView(
                                 bottom = 8.dp
                             )
                         ) {
-                            items(messages.asReversed()) { message ->
+                            itemsIndexed(reversedMessages) { indexInReversed, message ->
+                                val originalIndex = messages.size - 1 - indexInReversed
                                 val isMe = message.senderId == currentUserId
                                 val timeString = remember(message.timestamp) { timeFormatter.format(message.timestamp) }
+                                
+                                // Kiểm tra tin nhắn trước đó (cũ hơn - phía trên)
+                                val prevMessage = if (originalIndex > 0) messages[originalIndex - 1] else null
+                                val isPrevSameSenderAndClose = prevMessage != null && 
+                                        prevMessage.senderId == message.senderId && 
+                                        (message.timestamp.time - prevMessage.timestamp.time < 3 * 60 * 1000)
+                                
+                                // Kiểm tra tin nhắn tiếp theo (mới hơn - phía dưới)
+                                val nextMessage = if (originalIndex < messages.size - 1) messages[originalIndex + 1] else null
+                                val isNextSameSender = nextMessage != null && nextMessage.senderId == message.senderId
+                                val isNextSameSenderAndClose = isNextSameSender && (nextMessage.timestamp.time - message.timestamp.time < 3 * 60 * 1000)
+                                
+                                val showAvatar = !isMe && !isNextSameSenderAndClose
+                                val showUsername = !isMe && !isPrevSameSenderAndClose
+                                
+                                val bottomSpacing = if (isNextSameSender) 10.dp else 18.dp
+
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = bottomSpacing),
+                                    horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+                                    verticalAlignment = Alignment.Bottom
                                 ) {
                                     if (!isMe) {
-                                        Surface(
-                                            modifier = Modifier.size(32.dp),
-                                            shape = CircleShape,
-                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                        ) {
-                                            val userFlow = remember(message.senderId) { viewModel.getUserById(message.senderId) }
-                                            val userState by userFlow.collectAsState(initial = User())
-                                            Box(contentAlignment = Alignment.Center) {
-                                                if (!userState.avatarUrl.isNullOrEmpty()) {
-                                                    AsyncImage(
-                                                        model = userState.avatarUrl,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                                        contentScale = ContentScale.Crop
-                                                    )
-                                                } else {
-                                                    Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp))
+                                        if (showAvatar) {
+                                            Surface(
+                                                modifier = Modifier.size(32.dp),
+                                                shape = CircleShape,
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                            ) {
+                                                val userFlow = remember(message.senderId) { viewModel.getUserById(message.senderId) }
+                                                val userState by userFlow.collectAsState(initial = User())
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    if (!userState.avatarUrl.isNullOrEmpty()) {
+                                                        AsyncImage(
+                                                            model = userState.avatarUrl,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                                            contentScale = ContentScale.Crop
+                                                        )
+                                                    } else {
+                                                        Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp))
+                                                    }
                                                 }
                                             }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        } else {
+                                            Spacer(modifier = Modifier.width(40.dp)) // 32.dp size + 8.dp spacing
                                         }
-                                        Spacer(modifier = Modifier.width(8.dp))
                                     }
 
                                     Column(
                                         horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
                                     ) {
-                                        if (!isMe) {
+                                        if (showUsername) {
                                             Text(
                                                 text = message.senderName, 
                                                 style = MaterialTheme.typography.labelSmall, 

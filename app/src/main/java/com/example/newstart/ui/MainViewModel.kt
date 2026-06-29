@@ -199,6 +199,13 @@ class MainViewModel @Inject constructor(
             initialValue = true
         )
 
+    val isSearchable: StateFlow<Boolean> = userPreferencesRepository.isSearchableFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
     val avatarUri: StateFlow<Uri?> = currentUser
         .map { user -> 
             user?.avatarUrl?.let { Uri.parse(it) } 
@@ -231,6 +238,17 @@ class MainViewModel @Inject constructor(
     fun setJournalPromptEnabled(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setJournalPromptEnabled(enabled)
+        }
+    }
+
+    fun setSearchable(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setSearchable(enabled)
+            try {
+                userRepository.updateProfileFields(mapOf("searchable" to enabled.toString()))
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Update searchable status failed: ${e.message}")
+            }
         }
     }
 

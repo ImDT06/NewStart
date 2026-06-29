@@ -28,44 +28,69 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.newstart.data.local.dao.UserDao
+import com.example.newstart.data.local.toDomain
+import com.example.newstart.data.local.toEntity
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
+
 
 @Singleton
 class UserRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
+    private val userDao: UserDao,
     private val apiService: com.example.newstart.data.remote.NewStartApiService,
     @ApplicationContext private val context: Context
 ) : UserRepository {
     
     private val client = OkHttpClient()
 
-    override fun getUserById(id: String): Flow<User> = kotlinx.coroutines.flow.flow {
+    override fun getUserById(id: String): Flow<User> = callbackFlow {
         if (id.isBlank()) {
-            emit(User())
-            return@flow
+            trySend(User())
+            close()
+            return@callbackFlow
         }
-        try {
-            val dto = apiService.getUserById(id)
-            emit(User(
-                id = dto.id ?: "",
-                userId = dto.userId ?: "",
-                name = dto.name,
-                email = dto.email,
-                avatarUrl = dto.avatarUrl
-            ))
-        } catch (e: Exception) {
-            android.util.Log.e("UserRepository", "API getUserById error: ${e.message}")
-            val firebaseUser = auth.currentUser
-            if (firebaseUser != null && firebaseUser.uid == id) {
-                emit(User(
-                    id = firebaseUser.uid,
-                    name = firebaseUser.displayName ?: "",
-                    email = firebaseUser.email ?: "",
-                    avatarUrl = firebaseUser.photoUrl?.toString()
-                ))
-            } else {
-                emit(User(id = id))
+
+        // 1. Phát ra dữ liệu từ Room cache cục bộ trước (chỉ phát khi không phải null để giữ trạng thái đang tải ban đầu)
+        val localJob = launch {
+            userDao.getUserById(id).collect { entity ->
+                if (entity != null) {
+                    trySend(entity.toDomain())
+                }
             }
+        }
+
+        // 2. Chạy ngầm gọi API để cập nhật cache
+        launch(Dispatchers.IO) {
+            try {
+                val dto = apiService.getUserById(id)
+                val user = User(
+                    id = dto.id ?: "",
+                    userId = dto.userId ?: "",
+                    name = dto.name,
+                    email = dto.email,
+                    avatarUrl = dto.avatarUrl
+                )
+                userDao.insertUser(user.toEntity())
+            } catch (e: Exception) {
+                android.util.Log.e("UserRepository", "API getUserById error: ${e.message}")
+                val firebaseUser = auth.currentUser
+                if (firebaseUser != null && firebaseUser.uid == id) {
+                    val selfUser = User(
+                        id = firebaseUser.uid,
+                        name = firebaseUser.displayName ?: "",
+                        email = firebaseUser.email ?: "",
+                        avatarUrl = firebaseUser.photoUrl?.toString()
+                    )
+                    userDao.insertUser(selfUser.toEntity())
+                }
+            }
+        }
+
+        awaitClose {
+            localJob.cancel()
         }
     }
 
@@ -200,6 +225,16 @@ class UserRepositoryImpl @Inject constructor(
             Result.success(Unit)
         } catch (e: Exception) {
             android.util.Log.e("UserRepository", "API updateFcmToken error: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun updateProfileFields(updates: Map<String, String>): Result<Unit> {
+        return try {
+            apiService.updateProfile(updates)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("UserRepository", "API updateProfileFields error: ${e.message}")
             Result.failure(e)
         }
     }
