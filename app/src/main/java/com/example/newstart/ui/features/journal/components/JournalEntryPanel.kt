@@ -80,7 +80,7 @@ import java.util.concurrent.Executors
 @Composable
 fun JournalEntryPanel(
     onDismiss: () -> Unit,
-    onPost: (String, String, Uri?, String?, JournalType, MovieDetails?, BookDetails?, SubjectDetails?) -> Unit,
+    onPost: (String, String, Uri?, String?, JournalType, MovieDetails?, BookDetails?, SubjectDetails?, com.example.newstart.domain.model.JournalPrivacy) -> Unit,
     isUploading: Boolean = false,
     suggestedEmojis: List<String> = emptyList(),
     isSuggesting: Boolean = false,
@@ -97,6 +97,7 @@ fun JournalEntryPanel(
     var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
     var isCapturedImage by remember { mutableStateOf(false) }
     var isTextOnlyMode by remember { mutableStateOf(false) }
+    var selectedPrivacy by remember { mutableStateOf(com.example.newstart.domain.model.JournalPrivacy.FRIENDS) }
 
     val lastWord = remember(text) { text.split(Regex("\\s+")).lastOrNull() ?: "" }
     val isTypingTag = remember(lastWord) { lastWord.startsWith("#") }
@@ -655,6 +656,36 @@ fun JournalEntryPanel(
                     }
                 }
 
+                // Lựa chọn Quyền riêng tư (Đăng riêng tư / Bạn bè)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (selectedPrivacy == com.example.newstart.domain.model.JournalPrivacy.PRIVATE) "🔒 Chỉ mình tôi" else "👥 Cộng đồng (Bạn bè)",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Switch(
+                        checked = selectedPrivacy == com.example.newstart.domain.model.JournalPrivacy.FRIENDS,
+                        onCheckedChange = { isChecked ->
+                            selectedPrivacy = if (isChecked) com.example.newstart.domain.model.JournalPrivacy.FRIENDS else com.example.newstart.domain.model.JournalPrivacy.PRIVATE
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.scale(0.8f)
+                    )
+                }
+
                 // Ô nhập văn bản + Nút Gửi (Chỉ hiện nút gửi khi có bàn phím hoặc đã có nội dung)
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -697,7 +728,7 @@ fun JournalEntryPanel(
                                     }
 
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onPost(selectedEmoji, text, capturedImageUri, if (capturedImageUri != null) (if (isCapturedImage) "CAMERA" else "GALLERY") else null, selectedType, if (selectedType == JournalType.MOVIE) MovieDetails(title = movieTitle.trim(), rating = movieRating) else null, if (selectedType == JournalType.BOOK) BookDetails(title = bookTitle.trim(), rating = bookRating) else null, if (selectedType == JournalType.SUBJECT) SubjectDetails(name = subjectName.trim(), understandingLevel = understandingLevel) else null)
+                                    onPost(selectedEmoji, text, capturedImageUri, if (capturedImageUri != null) (if (isCapturedImage) "CAMERA" else "GALLERY") else null, selectedType, if (selectedType == JournalType.MOVIE) MovieDetails(title = movieTitle.trim(), rating = movieRating) else null, if (selectedType == JournalType.BOOK) BookDetails(title = bookTitle.trim(), rating = bookRating) else null, if (selectedType == JournalType.SUBJECT) SubjectDetails(name = subjectName.trim(), understandingLevel = understandingLevel) else null, selectedPrivacy)
                                 },
                                 modifier = Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary)
                             ) {
@@ -1056,4 +1087,4 @@ private fun processImageToSquare(file: File) { try { val bitmap = BitmapFactory.
 
 @AppCombinedPreviews
 @Composable
-fun JournalEntryPanelPreview() { NewStartTheme { Surface(color = MaterialTheme.colorScheme.background) { JournalEntryPanel(onDismiss = {}, onPost = { _, _, _, _, _, _, _, _ -> }) } } }
+fun JournalEntryPanelPreview() { NewStartTheme { Surface(color = MaterialTheme.colorScheme.background) { JournalEntryPanel(onDismiss = {}, onPost = { _, _, _, _, _, _, _, _, _ -> }) } } }

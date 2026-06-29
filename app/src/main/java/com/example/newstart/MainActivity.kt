@@ -416,9 +416,9 @@ class MainActivity : AppCompatActivity() {
                                                     showBottomSheet = false
                                                     mainViewModel.setShowJournalSheet(false)
                                                 },
-                                                onPost = { emoji, text, uri, source, type, movie, book, subject ->
+                                                onPost = { emoji, text, uri, source, type, movie, book, subject, privacy ->
                                                     mainViewModel.saveJournalEntry(
-                                                        emoji, text, uri, source, type, movie, book, subject
+                                                        emoji, text, uri, source, type, movie, book, subject, privacy
                                                     ) {
                                                         showBottomSheet = false
                                                         mainViewModel.setShowJournalSheet(false)

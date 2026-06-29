@@ -1,10 +1,7 @@
 package com.example.newstart.domain.usecase
 
 import android.net.Uri
-import com.example.newstart.domain.model.JournalType
-import com.example.newstart.domain.model.MovieDetails
-import com.example.newstart.domain.model.BookDetails
-import com.example.newstart.domain.model.SubjectDetails
+import com.example.newstart.domain.model.*
 import com.example.newstart.domain.repository.JournalRepository
 import javax.inject.Inject
 
@@ -19,10 +16,11 @@ class SaveJournalEntryUseCase @Inject constructor(
         type: JournalType = JournalType.NORMAL,
         movieDetails: MovieDetails? = null,
         bookDetails: BookDetails? = null,
-        subjectDetails: SubjectDetails? = null
+        subjectDetails: SubjectDetails? = null,
+        privacy: JournalPrivacy = JournalPrivacy.FRIENDS
     ): Result<Unit> {
         return journalRepository.saveJournalEntry(
-            emoji, text, imageUri, imageSource, type, movieDetails, bookDetails, subjectDetails
+            emoji, text, imageUri, imageSource, type, movieDetails, bookDetails, subjectDetails, privacy
         )
     }
 }

@@ -313,6 +313,7 @@ class MainViewModel @Inject constructor(
         movieDetails: MovieDetails? = null,
         bookDetails: BookDetails? = null,
         subjectDetails: SubjectDetails? = null,
+        privacy: JournalPrivacy = JournalPrivacy.FRIENDS,
         onSuccess: () -> Unit
     ) {
         uploadJob?.cancel()
@@ -320,7 +321,7 @@ class MainViewModel @Inject constructor(
             try {
                 _isUploading.value = true
                 val result = saveJournalEntryUseCase(
-                    emoji, text, imageUri, imageSource, type, movieDetails, bookDetails, subjectDetails
+                    emoji, text, imageUri, imageSource, type, movieDetails, bookDetails, subjectDetails, privacy
                 )
                 if (result.isSuccess) {
                     onSuccess()

@@ -17,7 +17,8 @@ interface JournalRepository {
         type: JournalType = JournalType.NORMAL,
         movieDetails: MovieDetails? = null,
         bookDetails: BookDetails? = null,
-        subjectDetails: SubjectDetails? = null
+        subjectDetails: SubjectDetails? = null,
+        privacy: com.example.newstart.domain.model.JournalPrivacy = com.example.newstart.domain.model.JournalPrivacy.FRIENDS
     ): Result<Unit>
     suspend fun deleteJournalEntry(entryId: String): Result<Unit>
     fun getJournalEntries(): Flow<List<JournalEntry>>

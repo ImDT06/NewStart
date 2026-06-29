@@ -56,7 +56,8 @@ class JournalRepositoryImpl @Inject constructor(
         type: JournalType,
         movieDetails: MovieDetails?,
         bookDetails: BookDetails?,
-        subjectDetails: SubjectDetails?
+        subjectDetails: SubjectDetails?,
+        privacy: JournalPrivacy
     ): Result<Unit> {
         return try {
             val userId = auth.currentUser?.uid ?: throw Exception("User not logged in")
@@ -75,6 +76,7 @@ class JournalRepositoryImpl @Inject constructor(
                 imageUrl = imageUrl,
                 imageSource = imageSource ?: "",
                 type = type.name,
+                privacy = privacy.name,
                 movieDetails = movieDetails?.let {
                     MovieDetailsDto(
                         title = it.title,

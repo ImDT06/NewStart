@@ -36,6 +36,7 @@ data class JournalEntryDto(
     val imageUrl: String? = null,
     val imageSource: String? = null,
     val type: String = "NORMAL",
+    val privacy: String = "FRIENDS",
     val movieDetails: MovieDetailsDto? = null,
     val bookDetails: BookDetailsDto? = null,
     val subjectDetails: SubjectDetailsDto? = null,
