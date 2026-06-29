@@ -263,13 +263,16 @@ fun JournalContent(
                                 )
                             },
                             trailingIcon = {
-                                IconButton(onClick = { 
-                                    if (searchQuery.isNotEmpty()) searchQuery = ""
-                                    else {
-                                        isSearchActive = false
-                                        focusManager.clearFocus()
-                                    }
-                                }) {
+                                IconButton(
+                                    onClick = { 
+                                        if (searchQuery.isNotEmpty()) searchQuery = ""
+                                        else {
+                                            isSearchActive = false
+                                            focusManager.clearFocus()
+                                        }
+                                    },
+                                    modifier = Modifier.offset(x = 12.dp)
+                                ) {
                                     Icon(Icons.Default.Close, null, modifier = Modifier.size(22.dp))
                                 }
                             },
