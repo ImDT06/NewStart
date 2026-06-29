@@ -190,6 +190,35 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
+                LaunchedEffect(authState) {
+                    if (authState == AuthState.Authenticated) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            if (ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.POST_NOTIFICATIONS
+                                ) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        }
+                        try {
+                            com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                                .addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        task.result?.let { token ->
+                                            android.util.Log.d("MainActivity", "FCM Token: $token")
+                                            mainViewModel.updateFcmToken(token)
+                                        }
+                                    } else {
+                                        android.util.Log.e("MainActivity", "Failed to fetch FCM token", task.exception)
+                                    }
+                                }
+                        } catch (e: Exception) {
+                            android.util.Log.e("MainActivity", "FirebaseMessaging failed: ${e.message}")
+                        }
+                    }
+                }
+
                 var isJournalDirty by remember { mutableStateOf(false) }
                 
                 LaunchedEffect(showBottomSheet) {

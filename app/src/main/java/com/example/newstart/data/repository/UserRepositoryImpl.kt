@@ -194,6 +194,16 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updateFcmToken(token: String): Result<Unit> {
+        return try {
+            apiService.updateProfile(mapOf("fcmToken" to token))
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("UserRepository", "API updateFcmToken error: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
     private fun compressImage(uri: Uri): ByteArray? {
         return try {
             val inputStream = context.contentResolver.openInputStream(uri)

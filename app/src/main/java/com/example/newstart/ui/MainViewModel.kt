@@ -284,6 +284,12 @@ class MainViewModel @Inject constructor(
             userRepository.updateProfile(userId, newName)
         }
     }
+
+    fun updateFcmToken(token: String) {
+        viewModelScope.launch {
+            userRepository.updateFcmToken(token)
+        }
+    }
     
     fun logout() {
         viewModelScope.launch {

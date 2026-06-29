@@ -52,6 +52,14 @@
             android:name=".widget.WidgetPinnedReceiver"
             android:exported="false" />
 
+        <service
+            android:name=".data.service.NewStartFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <!-- Service to enable backward compatibility for Per-App Language -->
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
