@@ -13,6 +13,7 @@ import com.example.newstart.domain.repository.UserRepository
 import com.example.newstart.ui.theme.AppThemeColor
 import com.example.newstart.ui.theme.ThemeMode
 import com.example.newstart.domain.model.JournalType
+import com.example.newstart.domain.model.JournalPrivacy
 import com.example.newstart.domain.model.MovieDetails
 import com.example.newstart.domain.model.BookDetails
 import com.example.newstart.domain.model.SubjectDetails

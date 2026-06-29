@@ -10,6 +10,7 @@ import android.widget.Toast
 import com.example.newstart.data.remote.dto.*
 import com.example.newstart.domain.model.JournalEntry
 import com.example.newstart.domain.model.JournalType
+import com.example.newstart.domain.model.JournalPrivacy
 import com.example.newstart.domain.model.MovieDetails
 import com.example.newstart.domain.model.BookDetails
 import com.example.newstart.domain.model.SubjectDetails
