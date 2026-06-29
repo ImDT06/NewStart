@@ -1049,11 +1049,6 @@ fun SquadDetailView(
         }
     }
 
-    LaunchedEffect(lazyListState.isScrollInProgress) {
-        if (lazyListState.isScrollInProgress) {
-            focusManager.clearFocus()
-        }
-    }
 
     Scaffold(
         topBar = {
