@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.example.newstart.data.local.NewStartDatabase
 import com.example.newstart.data.local.dao.HabitDao
 import com.example.newstart.data.local.dao.TodoDao
+import com.example.newstart.data.local.dao.JournalDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -36,5 +37,10 @@ object DatabaseModule {
     @Provides
     fun provideTodoDao(database: NewStartDatabase): TodoDao {
         return database.todoDao()
+    }
+
+    @Provides
+    fun provideJournalDao(database: NewStartDatabase): JournalDao {
+        return database.journalDao()
     }
 }
