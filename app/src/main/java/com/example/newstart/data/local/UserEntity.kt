@@ -11,7 +11,8 @@ data class UserEntity(
     val userId: String,
     val name: String,
     val email: String,
-    val avatarUrl: String?
+    val avatarUrl: String?,
+    val birthday: String?
 )
 
 fun UserEntity.toDomain() = User(
@@ -19,7 +20,8 @@ fun UserEntity.toDomain() = User(
     userId = userId,
     name = name,
     email = email,
-    avatarUrl = avatarUrl
+    avatarUrl = avatarUrl,
+    birthday = birthday
 )
 
 fun User.toEntity() = UserEntity(
@@ -27,5 +29,6 @@ fun User.toEntity() = UserEntity(
     userId = userId,
     name = name,
     email = email,
-    avatarUrl = avatarUrl
+    avatarUrl = avatarUrl,
+    birthday = birthday
 )

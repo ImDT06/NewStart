@@ -98,7 +98,7 @@ fun JournalEntryPanel(
     var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
     var isCapturedImage by remember { mutableStateOf(false) }
     var isTextOnlyMode by remember { mutableStateOf(false) }
-    var selectedPrivacy by remember { mutableStateOf(com.example.newstart.domain.model.JournalPrivacy.FRIENDS) }
+    var selectedPrivacy by remember { mutableStateOf(com.example.newstart.domain.model.JournalPrivacy.PRIVATE) }
 
     val lastWord = remember(text) { text.split(Regex("\\s+")).lastOrNull() ?: "" }
     val isTypingTag = remember(lastWord) { lastWord.startsWith("#") }

@@ -27,6 +27,7 @@ interface SocialRepository {
     
     // Feed
     fun getSocialFeed(): Flow<List<JournalEntry>>
+    suspend fun refreshSocialFeed()
     suspend fun reactToPost(postId: String, emoji: String)
     suspend fun removeFriend(friendshipId: String)
     suspend fun declineFriendRequest(requestId: String)

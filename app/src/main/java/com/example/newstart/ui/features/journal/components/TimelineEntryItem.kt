@@ -9,6 +9,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.GroupWork
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -30,6 +33,7 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Star
+import com.example.newstart.ui.components.RatingBar
 import com.example.newstart.ui.theme.LocalDarkTheme
 
 @Composable
@@ -127,12 +131,34 @@ fun TimelineEntryItem(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = timeFormatted,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = timeFormatted,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                            )
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            // Hiển thị trạng thái quyền riêng tư
+                            val (privacyIcon, privacyColor) = when (entry.privacy) {
+                                com.example.newstart.domain.model.JournalPrivacy.PRIVATE -> 
+                                    Icons.Default.Lock to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                com.example.newstart.domain.model.JournalPrivacy.FRIENDS -> 
+                                    Icons.Default.Groups to MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                com.example.newstart.domain.model.JournalPrivacy.SQUAD -> 
+                                    Icons.Default.GroupWork to MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
+                            }
+                            
+                            Icon(
+                                imageVector = privacyIcon,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = privacyColor
+                            )
+                        }
+
                         IconButton(
                             onClick = onOptionsClick,
                             modifier = Modifier.size(24.dp)
@@ -145,19 +171,24 @@ fun TimelineEntryItem(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = entry.text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        lineHeight = 22.sp
-                    )
+                    if (entry.text.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = entry.text,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 22.sp
+                        )
+                    }
                 }
 
                 // Hiển thị thông tin mở rộng (Phim, Sách, Môn học)
                 if (entry.type != JournalType.NORMAL) {
-                    MetadataSection(entry)
+                    val topPadding = if (entry.text.isEmpty()) 0.dp else 4.dp
+                    Box(modifier = Modifier.padding(top = topPadding)) {
+                        MetadataSection(entry)
+                    }
                 }
 
                 if (entry.imageUrl != null) {
@@ -198,15 +229,11 @@ private fun MetadataSection(entry: JournalEntry) {
                             Text(movie.title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                         if (movie.rating > 0) {
-                            Row(modifier = Modifier.padding(top = 4.dp)) {
-                                (1..5).forEach { i ->
-                                    Icon(
-                                        Icons.Default.Star, null,
-                                        tint = if (i <= movie.rating) Color(0xFFFFCC00) else Color.Gray.copy(alpha = 0.2f),
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                }
-                            }
+                            RatingBar(
+                                rating = movie.rating,
+                                starSize = 14.dp,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
                         }
                     }
                 }
@@ -218,15 +245,11 @@ private fun MetadataSection(entry: JournalEntry) {
                             Text(book.title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                         if (book.rating > 0) {
-                            Row(modifier = Modifier.padding(top = 4.dp)) {
-                                (1..5).forEach { i ->
-                                    Icon(
-                                        Icons.Default.Star, null,
-                                        tint = if (i <= book.rating) Color(0xFFFFCC00) else Color.Gray.copy(alpha = 0.2f),
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                }
-                            }
+                            RatingBar(
+                                rating = book.rating,
+                                starSize = 14.dp,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
                         }
                     }
                 }

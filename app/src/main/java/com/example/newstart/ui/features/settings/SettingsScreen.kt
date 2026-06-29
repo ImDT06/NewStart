@@ -6,34 +6,20 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.Help
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,7 +36,6 @@ import android.widget.Toast
 import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import com.example.newstart.R
 import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.theme.AppThemeColor
@@ -58,136 +43,12 @@ import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.theme.ThemeMode
 import com.example.newstart.ui.util.AppCombinedPreviews
 import com.example.newstart.ui.util.LanguagePickerDialog
-
-@Composable
-fun ProfileHeaderCard(
-    name: String,
-    email: String,
-    avatarUri: Uri?,
-    onEditAvatar: () -> Unit
-) {
-    ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(contentAlignment = Alignment.BottomEnd) {
-                Surface(
-                    modifier = Modifier.size(64.dp),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (avatarUri != null) {
-                            AsyncImage(
-                                model = avatarUri,
-                                contentDescription = "Avatar",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Text(
-                                text = name.take(1).uppercase(),
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-                
-                Surface(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clickable(onClick = onEditAvatar),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = "Edit Avatar",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.padding(4.dp)
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column {
-                Text(
-                    text = name,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = email,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Surface(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(6.dp)
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.settings_premium_member),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun QuickStatsRow(
-    journalCount: Int,
-    completionPercent: Int,
-    streakDays: Int
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        StatItem(label = stringResource(id = R.string.settings_stat_journal), value = journalCount.toString(), modifier = Modifier.weight(1f))
-        StatItem(label = stringResource(id = R.string.settings_stat_habit), value = "$completionPercent%", modifier = Modifier.weight(1f))
-        StatItem(label = stringResource(id = R.string.settings_stat_streak), value = stringResource(id = R.string.settings_stat_days, streakDays), modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
-fun StatItem(label: String, value: String, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-    ) {
-        Column(
-            modifier = Modifier.padding(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(text = value, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-            Text(text = label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
+import com.example.newstart.ui.features.settings.components.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalFocusManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -206,6 +67,7 @@ fun SettingsScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
+    var showNotificationSettingsDialog by remember { mutableStateOf(false) }
 
     var deleteAccountStep by remember { mutableStateOf(1) }
     var selectedReason by remember { mutableStateOf("") }
@@ -216,7 +78,6 @@ fun SettingsScreen(
     val sharedPrefs = remember(context) { context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE) }
     var isStreakWidgetEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("is_streak_widget_enabled", true)) }
     val scope = rememberCoroutineScope()
-    var isNotificationEnabled by remember { mutableStateOf(true) }
     var showChangeEmailDialog by remember { mutableStateOf(false) }
     var showBirthdayDialog by remember { mutableStateOf(false) }
     var showChangePasswordBottomSheet by remember { mutableStateOf(false) }
@@ -233,14 +94,30 @@ fun SettingsScreen(
     val habitStats by mainViewModel.habitStats.collectAsStateWithLifecycle()
     val isJournalPromptEnabled by mainViewModel.isJournalPromptEnabled.collectAsStateWithLifecycle()
     val isSearchable by mainViewModel.isSearchable.collectAsStateWithLifecycle()
+    val isHabitNotifEnabled by mainViewModel.isHabitNotificationsEnabled.collectAsStateWithLifecycle()
+    val isCommunityNotifEnabled by mainViewModel.isCommunityNotificationsEnabled.collectAsStateWithLifecycle()
 
-    var userEmailText by remember { mutableStateOf(currentUser?.email ?: "tranvanchinh555@gmail.com") }
+    var userEmailText by remember(currentUser) { mutableStateOf(currentUser?.email ?: "") }
     
     val locale = remember(context) { context.resources.configuration.locales[0] }
     val isVi = remember(locale) { locale.language == "vi" }
     
-    var birthdayDay by remember { mutableStateOf(27) }
-    var birthdayMonth by remember { mutableStateOf(6) } // 1-12
+    var birthdayDay by remember { 
+        mutableIntStateOf(currentUser?.birthday?.split("/")?.getOrNull(0)?.toIntOrNull() ?: 27) 
+    }
+    var birthdayMonth by remember { 
+        mutableIntStateOf(currentUser?.birthday?.split("/")?.getOrNull(1)?.toIntOrNull() ?: 6) 
+    } // 1-12
+    
+    // Đồng bộ lại khi currentUser load xong
+    LaunchedEffect(currentUser?.birthday) {
+        currentUser?.birthday?.split("/")?.let { parts ->
+            if (parts.size == 2) {
+                parts[0].toIntOrNull()?.let { birthdayDay = it }
+                parts[1].toIntOrNull()?.let { birthdayMonth = it }
+            }
+        }
+    }
     
     val monthsList = listOf(
         "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", 
@@ -661,11 +538,11 @@ fun SettingsScreen(
                 item { SectionTitle(title = stringResource(id = R.string.settings_general_section)) }
                 item {
                     SettingsCard {
-                        SettingsToggleItem(
+                        SettingsItem(
                             icon = Icons.Default.Notifications,
                             title = stringResource(id = R.string.settings_notifications),
-                            checked = isNotificationEnabled,
-                            onCheckedChange = { isNotificationEnabled = it }
+                            subtitle = if (isVi) "Quản lý các loại thông báo" else "Manage notification types",
+                            onClick = { showNotificationSettingsDialog = true }
                         )
                         SettingsDivider()
                         SettingsItem(
@@ -811,6 +688,17 @@ fun SettingsScreen(
         )
     }
 
+    if (showNotificationSettingsDialog) {
+        NotificationSettingsDialog(
+            isHabitEnabled = isHabitNotifEnabled,
+            isCommunityEnabled = isCommunityNotifEnabled,
+            isVi = isVi,
+            onHabitToggle = { mainViewModel.setHabitNotificationsEnabled(it) },
+            onCommunityToggle = { mainViewModel.setCommunityNotificationsEnabled(it) },
+            onDismiss = { showNotificationSettingsDialog = false }
+        )
+    }
+
     if (showEditProfileDialog) {
         EditProfileDialog(
             currentName = currentUser?.name ?: "",
@@ -830,7 +718,7 @@ fun SettingsScreen(
         ModalBottomSheet(
             onDismissRequest = { showChangeEmailDialog = false },
             sheetState = emailSheetState,
-            containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
             val focusManager = LocalFocusManager.current
@@ -871,8 +759,8 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = TextFieldDefaults.colors(
-                            focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -924,8 +812,8 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = TextFieldDefaults.colors(
-                            focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -948,7 +836,7 @@ fun SettingsScreen(
                         }
                         Button(
                             onClick = {
-                                userEmailText = tempEmail
+                                mainViewModel.updateEmail(tempEmail)
                                 showChangeEmailDialog = false
                             },
                             enabled = tempEmail.isNotBlank() && tempEmail != userEmailText,
@@ -989,7 +877,7 @@ fun SettingsScreen(
                 showBirthdayDialog = false 
                 activePickerState = 0
             },
-            containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
             AnimatedContent(
@@ -1029,7 +917,7 @@ fun SettingsScreen(
                                     onClick = { activePickerState = 1 },
                                     modifier = Modifier.weight(1f).height(56.dp),
                                     shape = RoundedCornerShape(16.dp),
-                                    color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
                                 ) {
                                     Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -1051,7 +939,7 @@ fun SettingsScreen(
                                     onClick = { activePickerState = 2 },
                                     modifier = Modifier.weight(1f).height(56.dp),
                                     shape = RoundedCornerShape(16.dp),
-                                    color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
                                 ) {
                                     Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -1070,6 +958,7 @@ fun SettingsScreen(
                                 onClick = {
                                     birthdayDay = tempDay
                                     birthdayMonth = tempMonth
+                                    mainViewModel.updateBirthday("$tempDay/$tempMonth")
                                     showBirthdayDialog = false
                                 },
                                 modifier = Modifier
@@ -1169,7 +1058,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .heightIn(max = 280.dp)
                             ) {
-                                items(daysList) { day ->
+                                items(items = daysList) { day ->
                                     val isSelected = day == tempDay
                                     Box(
                                         modifier = Modifier
@@ -1227,7 +1116,7 @@ fun SettingsScreen(
                 confirmPasswordError = null
             },
             sheetState = changePasswordSheetState,
-            containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
             val focusManager = LocalFocusManager.current
@@ -1267,9 +1156,9 @@ fun SettingsScreen(
                     supportingText = currentPasswordError?.let { { Text(it, color = Color(0xFFE53935)) } },
                     shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        errorContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        errorContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent,
                         errorBorderColor = Color(0xFFE53935),
@@ -1294,9 +1183,9 @@ fun SettingsScreen(
                     supportingText = newPasswordError?.let { { Text(it, color = Color(0xFFE53935)) } },
                     shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        errorContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        errorContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent,
                         errorBorderColor = Color(0xFFE53935),
@@ -1321,9 +1210,9 @@ fun SettingsScreen(
                     supportingText = confirmPasswordError?.let { { Text(it, color = Color(0xFFE53935)) } },
                     shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        errorContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        errorContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent,
                         errorBorderColor = Color(0xFFE53935),
@@ -1414,642 +1303,6 @@ fun SettingsScreen(
             }
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun EditProfileDialog(
-    currentName: String,
-    onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val nameParts = remember(currentName) { currentName.split(" ", limit = 2) }
-    var firstName by remember { mutableStateOf(nameParts.getOrNull(0) ?: "") }
-    var lastName by remember { mutableStateOf(nameParts.getOrNull(1) ?: "") }
-    val isDark = isSystemInDarkTheme()
-    
-    val editProfileSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = editProfileSheetState,
-        containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        val focusManager = LocalFocusManager.current
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .imePadding()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = { focusManager.clearFocus() }
-                )
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 36.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "Sửa tên của bạn",
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            
-            TextField(
-                value = firstName,
-                onValueChange = { firstName = it },
-                placeholder = { Text("Tên", color = Color.Gray) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                ),
-                singleLine = true
-            )
-            
-            TextField(
-                value = lastName,
-                onValueChange = { lastName = it },
-                placeholder = { Text("Họ (không bắt buộc)", color = Color.Gray) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                ),
-                singleLine = true
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f).height(48.dp)
-                ) {
-                    Text("Hủy", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Button(
-                    onClick = {
-                        val fullName = listOf(firstName, lastName).filter { it.isNotBlank() }.joinToString(" ")
-                        onConfirm(fullName)
-                    },
-                    enabled = firstName.isNotBlank(),
-                    modifier = Modifier.weight(1f).height(48.dp),
-                    shape = RoundedCornerShape(25.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                        disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Text("Lưu", fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ProfileHeader(
-    name: String,
-    email: String
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = name.take(1).uppercase(),
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        }
-        
-        Spacer(modifier = Modifier.width(20.dp))
-        
-        Column {
-            Text(
-                text = name,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = email,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ThemeSelectionDialog(
-    currentMode: ThemeMode,
-    onModeSelected: (ThemeMode) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp)
-        ) {
-            Text(
-                text = stringResource(id = R.string.settings_theme_select),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            
-            ThemeOption(
-                label = stringResource(id = R.string.settings_theme_light),
-                icon = Icons.Default.LightMode,
-                isSelected = currentMode == ThemeMode.LIGHT
-            ) {
-                onModeSelected(ThemeMode.LIGHT)
-            }
-            ThemeOption(
-                label = stringResource(id = R.string.settings_theme_dark),
-                icon = Icons.Default.DarkMode,
-                isSelected = currentMode == ThemeMode.DARK
-            ) {
-                onModeSelected(ThemeMode.DARK)
-            }
-            ThemeOption(
-                label = stringResource(id = R.string.settings_theme_system),
-                icon = Icons.Default.SettingsBrightness,
-                isSelected = currentMode == ThemeMode.SYSTEM
-            ) {
-                onModeSelected(ThemeMode.SYSTEM)
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ColorSelectionDialog(
-    currentColor: AppThemeColor,
-    onColorSelected: (AppThemeColor) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var selectedColorState by remember { mutableStateOf(currentColor) }
-
-    val previewColor = when (selectedColorState) {
-        AppThemeColor.BLUE -> Color(0xFF1D5FE2)
-        AppThemeColor.ROYAL_GREEN -> Color(0xFF006B3F)
-        AppThemeColor.RED -> Color(0xFFB91D1D)
-        AppThemeColor.BLACK -> Color(0xFF1B1B1F)
-    }
-
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 36.dp, start = 24.dp, end = 24.dp, top = 8.dp)
-        ) {
-            Text(
-                text = stringResource(id = R.string.settings_color_select),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            // Live Preview Card Mockup
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 20.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = previewColor.copy(alpha = 0.08f)),
-                border = BorderStroke(1.dp, previewColor.copy(alpha = 0.2f))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(previewColor),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Palette,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Bản xem trước giao diện",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = previewColor
-                        )
-                        Text(
-                            text = "Chủ đề này sẽ thay đổi màu sắc chủ đạo của toàn bộ ứng dụng.",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                        )
-                    }
-                }
-            }
-
-            // 2x2 Color Grid
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ColorOptionCard(
-                        title = "Ocean Blue",
-                        desc = "Thanh lịch & Tập trung",
-                        color = Color(0xFF1D5FE2),
-                        isSelected = selectedColorState == AppThemeColor.BLUE,
-                        modifier = Modifier.weight(1f),
-                        onClick = { selectedColorState = AppThemeColor.BLUE }
-                    )
-                    ColorOptionCard(
-                        title = "Deep Emerald",
-                        desc = "Cân bằng & Tự nhiên",
-                        color = Color(0xFF006B3F),
-                        isSelected = selectedColorState == AppThemeColor.ROYAL_GREEN,
-                        modifier = Modifier.weight(1f),
-                        onClick = { selectedColorState = AppThemeColor.ROYAL_GREEN }
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ColorOptionCard(
-                        title = "Sunset Crimson",
-                        desc = "Nhiệt huyết & Động lực",
-                        color = Color(0xFFB91D1D),
-                        isSelected = selectedColorState == AppThemeColor.RED,
-                        modifier = Modifier.weight(1f),
-                        onClick = { selectedColorState = AppThemeColor.RED }
-                    )
-                    ColorOptionCard(
-                        title = "Carbon Black",
-                        desc = "Huyền bí & Tối giản",
-                        color = Color(0xFF1B1B1F),
-                        isSelected = selectedColorState == AppThemeColor.BLACK,
-                        modifier = Modifier.weight(1f),
-                        onClick = { selectedColorState = AppThemeColor.BLACK }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Save / Apply Button
-            Button(
-                onClick = { onColorSelected(selectedColorState) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(14.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
-            ) {
-                Text("Áp dụng", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
-        }
-    }
-}
-
-@Composable
-fun ColorOptionCard(
-    title: String,
-    desc: String,
-    color: Color,
-    isSelected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) color.copy(alpha = 0.04f) else MaterialTheme.colorScheme.surface
-        ),
-        border = BorderStroke(
-            width = if (isSelected) 2.dp else 1.dp,
-            color = if (isSelected) color else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(color),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isSelected) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            }
-            
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = title,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isSelected) color else MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = desc,
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    maxLines = 1
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ThemeOption(
-    label: String,
-    icon: ImageVector,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = label, 
-            fontSize = 16.sp,
-            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            modifier = Modifier.weight(1f)
-        )
-        RadioButton(
-            selected = isSelected,
-            onClick = onClick,
-            colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
-        )
-    }
-}
-
-@Composable
-fun SectionTitle(titleRes: Int) {
-    SectionTitle(title = stringResource(id = titleRes))
-}
-
-@Composable
-fun SectionTitle(title: String) {
-    Text(
-        text = title,
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-        modifier = Modifier.padding(start = 8.dp, bottom = 4.dp, top = 16.dp)
-    )
-}
-
-@Composable
-fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 1.dp
-    ) {
-        Column(content = content)
-    }
-}
-
-@Composable
-fun SettingsItem(
-    icon: ImageVector,
-    title: String,
-    subtitle: String? = null,
-    isDestructive: Boolean = false,
-    onClick: () -> Unit
-) {
-    val tintColor = if (isDestructive) Color.Red else MaterialTheme.colorScheme.primary
-    val textColor = if (isDestructive) Color.Red else MaterialTheme.colorScheme.onSurface
-    
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(tintColor.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = tintColor,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Spacer(modifier = Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 15.sp,
-                fontWeight = if (isDestructive) FontWeight.Bold else FontWeight.Medium,
-                color = textColor
-            )
-            if (subtitle != null) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
-                )
-            }
-        }
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = if (isDestructive) Color.Red.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant,
-            modifier = Modifier.size(20.dp)
-        )
-    }
-}
-
-@Composable
-fun SettingsItem(
-    icon: ImageVector,
-    titleRes: Int,
-    subtitle: String? = null,
-    isDestructive: Boolean = false,
-    onClick: () -> Unit
-) {
-    SettingsItem(
-        icon = icon,
-        title = stringResource(id = titleRes),
-        subtitle = subtitle,
-        isDestructive = isDestructive,
-        onClick = onClick
-    )
-}
-
-@Composable
-fun SettingsToggleItem(
-    icon: ImageVector,
-    title: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    subtitle: String? = null
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(14.dp), // Đồng bộ padding với SettingsItem
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp) // Đồng bộ size với SettingsItem
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = if (isSystemInDarkTheme()) 0.15f else 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Spacer(modifier = Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 15.sp, // Đồng bộ size chữ
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium
-            )
-            if (subtitle != null) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
-                )
-            }
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                // Khi bật: Thumb đen (onPrimary) trên nền Track trắng (Primary) để có độ tương phản
-                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                // Khi tắt: Thumb màu xám (outline), Track xám tối hơn
-                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                uncheckedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-            ),
-            modifier = Modifier.scale(0.8f) // Thu nhỏ nhẹ để thanh thoát hơn
-        )
-    }
-}
-
-@Composable
-fun SettingsToggleItem(
-    icon: ImageVector,
-    titleRes: Int,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    SettingsToggleItem(
-        icon = icon,
-        title = stringResource(id = titleRes),
-        checked = checked,
-        onCheckedChange = onCheckedChange
-    )
-}
-
-@Composable
-fun SettingsDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 16.dp),
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-    )
 }
 
 @AppCombinedPreviews

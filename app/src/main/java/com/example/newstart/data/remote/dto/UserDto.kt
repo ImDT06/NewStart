@@ -8,5 +8,6 @@ data class UserDto(
     val userId: String? = null,
     val name: String = "",
     val email: String = "",
-    val avatarUrl: String? = null
+    val avatarUrl: String? = null,
+    val birthday: String? = null
 )

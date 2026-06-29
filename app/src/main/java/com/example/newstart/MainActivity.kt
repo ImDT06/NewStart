@@ -306,18 +306,18 @@ class MainActivity : AppCompatActivity() {
                                                     modifier = Modifier.fillMaxWidth(),
                                                     contentAlignment = Alignment.BottomCenter
                                                 ) {
-                                                    // Left: Camera (Journal)
+                                                    // Left: Habit
                                                     FloatingActionButton(
                                                         onClick = {
                                                             showMenu = false
-                                                            if (currentRoute != Screen.Journal.route) {
-                                                                navController.navigate(Screen.Journal.route) {
+                                                            if (currentRoute != Screen.Home.route) {
+                                                                navController.navigate(Screen.Home.route) {
                                                                     popUpTo(Screen.Home.route) { saveState = true }
                                                                     launchSingleTop = true
                                                                     restoreState = true
                                                                 }
                                                             }
-                                                            sheetContentType = SheetContent.JournalEntry
+                                                            sheetContentType = SheetContent.HabitSelection
                                                             showBottomSheet = true
                                                         },
                                                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -333,7 +333,7 @@ class MainActivity : AppCompatActivity() {
                                                                         slideOut(targetOffset = { with(density) { IntOffset(80.dp.roundToPx(), 70.dp.roundToPx()) } })
                                                             )
                                                     ) {
-                                                        Icon(Icons.Default.PhotoCamera, "Journal", modifier = Modifier.size(24.dp))
+                                                        Icon(Icons.Default.AddCircle, "Habit", modifier = Modifier.size(24.dp))
                                                     }
 
                                                     // Middle: Pomodoro
@@ -357,18 +357,18 @@ class MainActivity : AppCompatActivity() {
                                                         Icon(Icons.Default.Timer, "Pomodoro", modifier = Modifier.size(28.dp))
                                                     }
 
-                                                    // Right: Habit
+                                                    // Right: Camera (Journal)
                                                     FloatingActionButton(
                                                         onClick = {
                                                             showMenu = false
-                                                            if (currentRoute != Screen.Habits.route) {
-                                                                navController.navigate(Screen.Habits.route) {
+                                                            if (currentRoute != Screen.Journal.route) {
+                                                                navController.navigate(Screen.Journal.route) {
                                                                     popUpTo(Screen.Home.route) { saveState = true }
                                                                     launchSingleTop = true
                                                                     restoreState = true
                                                                 }
                                                             }
-                                                            sheetContentType = SheetContent.HabitSelection
+                                                            sheetContentType = SheetContent.JournalEntry
                                                             showBottomSheet = true
                                                         },
                                                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -384,7 +384,7 @@ class MainActivity : AppCompatActivity() {
                                                                         slideOut(targetOffset = { with(density) { IntOffset((-80).dp.roundToPx(), 70.dp.roundToPx()) } })
                                                             )
                                                     ) {
-                                                        Icon(Icons.Default.AddCircle, "Habit", modifier = Modifier.size(24.dp))
+                                                        Icon(Icons.Default.PhotoCamera, "Journal", modifier = Modifier.size(24.dp))
                                                     }
                                                 }
                                             }

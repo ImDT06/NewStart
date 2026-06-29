@@ -11,4 +11,5 @@ interface UserRepository {
     suspend fun searchUsers(query: String): List<User>
     suspend fun updateFcmToken(token: String): Result<Unit>
     suspend fun updateProfileFields(updates: Map<String, String>): Result<Unit>
+    suspend fun updateEmail(newEmail: String): Result<Unit>
 }

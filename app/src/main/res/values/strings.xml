@@ -237,8 +237,8 @@
     <string name="settings_privacy_security">Riêng tư &amp; Bảo mật</string>
     <string name="settings_blocked_users">Tài khoản bị chặn</string>
     <string name="settings_privacy_data">Quyền riêng tư &amp; Dữ liệu</string>
-    <string name="settings_allow_search">Cho phép tìm kiếm theo tên</string>
-    <string name="settings_allow_search_desc">Cho phép người khác tìm thấy bạn bằng tên hoặc email</string>
+    <string name="settings_allow_search">Tìm kiếm theo tên</string>
+    <string name="settings_allow_search_desc">Cho phép người khác tìm thấy bạn</string>
     <string name="settings_danger_zone">Vùng nguy hiểm</string>
     <string name="settings_delete_account">Xóa tài khoản</string>
     <string name="settings_delete_account_desc">Xóa vĩnh viễn toàn bộ dữ liệu</string>

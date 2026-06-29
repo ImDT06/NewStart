@@ -36,6 +36,7 @@ import com.example.newstart.domain.model.JournalType
 import com.example.newstart.domain.model.Squad
 import com.example.newstart.domain.model.User
 import com.example.newstart.ui.MainViewModel
+import com.example.newstart.ui.components.RatingBar
 import com.example.newstart.ui.features.journal.JournalViewModel
 import com.example.newstart.ui.features.social.SocialViewModel
 import com.example.newstart.ui.theme.LocalDarkTheme
@@ -431,12 +432,14 @@ fun SocialFeedItem(
             }
 
             if (entry.type != JournalType.NORMAL) {
-                Spacer(modifier = Modifier.height(12.dp))
+                val topPadding = if (entry.text.isEmpty()) 4.dp else 12.dp
+                Spacer(modifier = Modifier.height(topPadding))
                 MetadataSection(entry)
             }
             
             entry.imageUrl?.let { url ->
-                Spacer(modifier = Modifier.height(16.dp))
+                val topPadding = if (entry.text.isEmpty() && entry.type == JournalType.NORMAL) 4.dp else 16.dp
+                Spacer(modifier = Modifier.height(topPadding))
                 AsyncImage(
                     model = url,
                     contentDescription = null,
@@ -648,15 +651,11 @@ private fun MetadataSection(entry: JournalEntry) {
                             )
                         }
                         if (movie.rating > 0) {
-                            Row(modifier = Modifier.padding(top = 6.dp)) {
-                                (1..5).forEach { i ->
-                                    Icon(
-                                        Icons.Default.Star, null,
-                                        tint = if (i <= movie.rating) Color(0xFFFFCC00) else Color.Gray.copy(alpha = 0.2f),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
+                            RatingBar(
+                                rating = movie.rating,
+                                starSize = 14.dp,
+                                modifier = Modifier.padding(top = 6.dp)
+                            )
                         }
                     }
                 }
@@ -677,15 +676,11 @@ private fun MetadataSection(entry: JournalEntry) {
                             )
                         }
                         if (book.rating > 0) {
-                            Row(modifier = Modifier.padding(top = 6.dp)) {
-                                (1..5).forEach { i ->
-                                    Icon(
-                                        Icons.Default.Star, null,
-                                        tint = if (i <= book.rating) Color(0xFFFFCC00) else Color.Gray.copy(alpha = 0.2f),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
+                            RatingBar(
+                                rating = book.rating,
+                                starSize = 14.dp,
+                                modifier = Modifier.padding(top = 6.dp)
+                            )
                         }
                     }
                 }
