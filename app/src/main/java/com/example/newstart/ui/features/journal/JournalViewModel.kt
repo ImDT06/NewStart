@@ -37,8 +37,30 @@ class JournalViewModel @Inject constructor(
     fun getUserById(userId: String): Flow<User> = userRepository.getUserById(userId)
 
     fun reactToPost(postId: String, emoji: String) {
+        val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return
+        
+        // 1. Cập nhật UI lập tức (Optimistic Update)
+        _socialFeed.value = _socialFeed.value.map { entry ->
+            if (entry.id == postId) {
+                val newReactions = entry.reactions.toMutableMap()
+                if (newReactions[uid] == emoji) {
+                    newReactions.remove(uid) // Bỏ thả tim nếu đã thả cùng loại
+                } else {
+                    newReactions[uid] = emoji
+                }
+                entry.copy(reactions = newReactions)
+            } else {
+                entry
+            }
+        }
+
+        // 2. Gửi API lên server ngầm
         viewModelScope.launch {
-            socialRepository.reactToPost(postId, emoji)
+            try {
+                socialRepository.reactToPost(postId, emoji)
+            } catch (e: Exception) {
+                refreshSocialFeed()
+            }
         }
     }
 
@@ -125,12 +147,20 @@ class JournalViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-    val socialFeed: StateFlow<List<JournalEntry>> = socialRepository.getSocialFeed()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    private val _socialFeed = MutableStateFlow<List<JournalEntry>>(emptyList())
+    val socialFeed: StateFlow<List<JournalEntry>> = _socialFeed.asStateFlow()
+
+    init {
+        refreshSocialFeed()
+    }
+
+    fun refreshSocialFeed() {
+        viewModelScope.launch {
+            socialRepository.getSocialFeed().collect { entries ->
+                _socialFeed.value = entries
+            }
+        }
+    }
 
     fun onDateSelected(date: LocalDate) {
         _selectedDateRange.value = date to null
