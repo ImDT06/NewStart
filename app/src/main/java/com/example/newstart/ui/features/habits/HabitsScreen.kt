@@ -310,6 +310,7 @@ private fun SocialFeedList(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SocialFeedItem(
     entry: JournalEntry,
@@ -513,6 +514,113 @@ fun SocialFeedItem(
                     }
                 }
             }
+
+            if (entry.reactions.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                var showReactionSheet by remember { mutableStateOf(false) }
+                val context = LocalContext.current
+                val locale = remember(context) { context.resources.configuration.locales[0] }
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null,
+                            onClick = { showReactionSheet = true }
+                        )
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.height(24.dp)) {
+                        val userIds = entry.reactions.keys.take(3).toList()
+                        userIds.forEachIndexed { index, rUserId ->
+                            val userState by remember(rUserId) { getUserFlow(rUserId) }.collectAsState(initial = null)
+                            val avatarUrl = userState?.avatarUrl
+                            
+                            Surface(
+                                modifier = Modifier
+                                    .padding(start = (index * 16).dp)
+                                    .size(24.dp)
+                                    .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                            ) {
+                                if (!avatarUrl.isNullOrEmpty()) {
+                                    AsyncImage(
+                                        model = avatarUrl,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.Person, 
+                                        null, 
+                                        modifier = Modifier.padding(4.dp), 
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    val textPadding = if (entry.reactions.keys.take(3).isNotEmpty()) {
+                        ((entry.reactions.keys.take(3).size - 1) * 16 + 32).dp
+                    } else {
+                        0.dp
+                    }
+                    
+                    Text(
+                        text = if (locale.language == "vi") {
+                            "${entry.reactions.size} người đã bày tỏ cảm xúc"
+                        } else {
+                            "${entry.reactions.size} people reacted"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(start = textPadding)
+                    )
+                }
+
+                if (showReactionSheet) {
+                    ModalBottomSheet(
+                        onDismissRequest = { showReactionSheet = false },
+                        sheetState = rememberModalBottomSheetState(),
+                        containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
+                        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) }
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .padding(bottom = 36.dp)
+                        ) {
+                            Text(
+                                text = if (locale.language == "vi") "Người đã bày tỏ cảm xúc" else "Reactions",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LazyColumn(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(entry.reactions.toList()) { (rUserId, emoji) ->
+                                    ReactedUserRow(
+                                        userId = rUserId,
+                                        emoji = emoji,
+                                        getUserFlow = getUserFlow
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -634,4 +742,59 @@ fun SectionTitle(title: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(vertical = 6.dp)
     )
+}
+
+@Composable
+private fun ReactedUserRow(
+    userId: String,
+    emoji: String,
+    getUserFlow: (String) -> Flow<User>
+) {
+    val userState by remember(userId) { getUserFlow(userId) }.collectAsState(initial = User(name = "Đang tải..."))
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+            ) {
+                if (!userState.avatarUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = userState.avatarUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = userState.name.ifBlank { "Người dùng" },
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        Text(
+            text = emoji,
+            fontSize = 20.sp,
+            modifier = Modifier.padding(end = 8.dp)
+        )
+    }
 }
