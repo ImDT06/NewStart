@@ -18,12 +18,20 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import com.example.newstart.domain.model.SquadMessage
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.Flow
+import java.util.UUID
+import java.util.Date
+
 @HiltViewModel
 class SocialViewModel @Inject constructor(
     private val socialRepository: SocialRepository,
     private val userRepository: UserRepository,
     private val auth: FirebaseAuth
 ) : ViewModel() {
+
+    private val _sendingMessages = MutableStateFlow<Map<String, List<SquadMessage>>>(emptyMap())
 
     val friends: StateFlow<List<Friendship>> = socialRepository.getFriends()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -118,11 +126,41 @@ class SocialViewModel @Inject constructor(
         }
     }
 
-    fun getSquadMessages(squadId: String) = socialRepository.getSquadMessages(squadId)
+    fun getSquadMessages(squadId: String): Flow<List<SquadMessage>> {
+        return socialRepository.getSquadMessages(squadId).combine(_sendingMessages) { realMessages, sendingMap ->
+            val sendingForSquad = sendingMap[squadId] ?: emptyList()
+            val realTexts = realMessages.takeLast(10).map { it.text }
+            val uniqueSending = sendingForSquad.filter { it.text !in realTexts }
+            realMessages + uniqueSending
+        }
+    }
 
     fun sendSquadMessage(squadId: String, text: String) {
+        val uid = currentUserId ?: return
+        val tempMsg = SquadMessage(
+            id = UUID.randomUUID().toString(),
+            senderId = uid,
+            senderName = "Tôi",
+            text = text,
+            timestamp = Date()
+        )
+        
+        // Add to sending messages map
+        val currentMap = _sendingMessages.value.toMutableMap()
+        val currentList = currentMap[squadId] ?: emptyList()
+        currentMap[squadId] = currentList + tempMsg
+        _sendingMessages.value = currentMap
+        
         viewModelScope.launch {
-            socialRepository.sendSquadMessage(squadId, text)
+            try {
+                socialRepository.sendSquadMessage(squadId, text)
+            } finally {
+                // Clean up the temp message after send is complete/failed
+                val updatedMap = _sendingMessages.value.toMutableMap()
+                val updatedList = updatedMap[squadId] ?: emptyList()
+                updatedMap[squadId] = updatedList.filter { it.id != tempMsg.id }
+                _sendingMessages.value = updatedMap
+            }
         }
     }
 
