@@ -53,6 +53,7 @@ fun HabitsScreen(
     journalViewModel: JournalViewModel = hiltViewModel()
 ) {
     val socialFeed by journalViewModel.socialFeed.collectAsStateWithLifecycle()
+    val searchQuery by socialViewModel.searchQuery.collectAsStateWithLifecycle()
     val searchResults by socialViewModel.searchResults.collectAsStateWithLifecycle()
     val incomingRequests by socialViewModel.incomingRequests.collectAsStateWithLifecycle()
     val squads by socialViewModel.squads.collectAsStateWithLifecycle()
@@ -220,8 +221,8 @@ fun HabitsScreen(
                             )
                             1 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 com.example.newstart.ui.features.social.FriendsTabWrapper(
-                                    searchQuery = "",
-                                    onSearchQueryChange = { socialViewModel.searchUsers(it) },
+                                    searchQuery = searchQuery,
+                                    onSearchQueryChange = { socialViewModel.onSearchQueryChange(it) },
                                     isSearching = isSearching,
                                     searchResults = searchResults,
                                     incomingRequests = incomingRequests,

@@ -40,21 +40,33 @@ class SocialViewModel @Inject constructor(
     val squads: StateFlow<List<Squad>> = socialRepository.getSquads()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
     private val _searchResults = MutableStateFlow<List<User>>(emptyList())
     val searchResults: StateFlow<List<User>> = _searchResults.asStateFlow()
 
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
-    fun searchUsers(query: String) {
+    private var searchJob: kotlinx.coroutines.Job? = null
+
+    fun onSearchQueryChange(query: String) {
+        _searchQuery.value = query
+        searchJob?.cancel()
         if (query.isBlank()) {
             _searchResults.value = emptyList()
+            _isSearching.value = false
             return
         }
-        viewModelScope.launch {
+        searchJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(500)
             _isSearching.value = true
-            _searchResults.value = userRepository.searchUsers(query)
-            _isSearching.value = false
+            try {
+                _searchResults.value = userRepository.searchUsers(query)
+            } finally {
+                _isSearching.value = false
+            }
         }
     }
 

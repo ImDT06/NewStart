@@ -57,7 +57,7 @@ fun SocialScreen(
     onNavigateBack: () -> Unit,
     viewModel: SocialViewModel = hiltViewModel()
 ) {
-    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
     val incomingRequests by viewModel.incomingRequests.collectAsStateWithLifecycle()
     val squads by viewModel.squads.collectAsStateWithLifecycle()
@@ -174,8 +174,7 @@ fun SocialScreen(
                         FriendsTabWrapper(
                             searchQuery = searchQuery,
                             onSearchQueryChange = { 
-                                searchQuery = it
-                                viewModel.searchUsers(it)
+                                viewModel.onSearchQueryChange(it)
                             },
                             isSearching = isSearching,
                             searchResults = searchResults,
