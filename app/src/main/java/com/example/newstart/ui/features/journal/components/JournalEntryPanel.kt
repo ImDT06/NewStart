@@ -18,21 +18,23 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -48,7 +50,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -59,7 +60,14 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.concurrent.futures.await
 import coil.compose.AsyncImage
 import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.style.TextAlign
 import com.example.newstart.R
+import com.example.newstart.domain.model.JournalType
+import com.example.newstart.domain.model.MovieDetails
+import com.example.newstart.domain.model.BookDetails
+import com.example.newstart.domain.model.SubjectDetails
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.util.AppCombinedPreviews
 import kotlinx.coroutines.launch
@@ -73,10 +81,14 @@ import java.util.concurrent.Executors
 @Composable
 fun JournalEntryPanel(
     onDismiss: () -> Unit,
-    onPost: (String, String, Uri?, String?) -> Unit,
+    onPost: (String, String, Uri?, String?, JournalType, MovieDetails?, BookDetails?, SubjectDetails?, com.example.newstart.domain.model.JournalPrivacy) -> Unit,
     isUploading: Boolean = false,
     suggestedEmojis: List<String> = emptyList(),
     isSuggesting: Boolean = false,
+    suggestedMovieTitles: List<String> = emptyList(),
+    suggestedBookTitles: List<String> = emptyList(),
+    suggestedSubjectNames: List<String> = emptyList(),
+    suggestedTags: List<String> = emptyList(),
     onTextChanged: (String) -> Unit = {},
     onCancelUpload: () -> Unit = {},
     onDirtyStateChanged: (Boolean) -> Unit = {}
@@ -86,27 +98,28 @@ fun JournalEntryPanel(
     var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
     var isCapturedImage by remember { mutableStateOf(false) }
     var isTextOnlyMode by remember { mutableStateOf(false) }
-    
+    var selectedPrivacy by remember { mutableStateOf(com.example.newstart.domain.model.JournalPrivacy.FRIENDS) }
+
+    val lastWord = remember(text) { text.split(Regex("\\s+")).lastOrNull() ?: "" }
+    val isTypingTag = remember(lastWord) { lastWord.startsWith("#") }
+    val tagSuggestions = remember(isTypingTag, lastWord, suggestedTags) {
+        if (isTypingTag) {
+            suggestedTags.filter { it.startsWith(lastWord, ignoreCase = true) && it != lastWord }
+        } else {
+            emptyList()
+        }
+    }
+
+    var selectedType by remember { mutableStateOf(JournalType.NORMAL) }
+    var movieTitle by remember { mutableStateOf("") }
+    var movieRating by remember { mutableFloatStateOf(0f) }
+    var bookTitle by remember { mutableStateOf("") }
+    var bookRating by remember { mutableFloatStateOf(0f) }
+    var subjectName by remember { mutableStateOf("") }
+    var understandingLevel by remember { mutableIntStateOf(3) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var emojiOffset by remember { mutableStateOf(Offset.Zero) }
     val bounceAnim = remember { Animatable(1f) }
-    
-    // Theo dõi trạng thái "Dirty" (có dữ liệu chưa lưu)
-    LaunchedEffect(text, capturedImageUri, isTextOnlyMode) {
-        val isDirty = text.isNotBlank() || capturedImageUri != null || isTextOnlyMode
-        onDirtyStateChanged(isDirty)
-    }
-    
-    LaunchedEffect(selectedEmoji) {
-        bounceAnim.snapTo(0.6f)
-        bounceAnim.animateTo(
-            targetValue = 1.0f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
-            )
-        )
-    }
     
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -116,141 +129,62 @@ fun JournalEntryPanel(
     val imageCapture = remember { ImageCapture.Builder().build() }
     
     val journalEmojis = listOf("😫", "😔", "😐", "😊", "🥰")
-    
-    val moodIcons = remember {
-        mapOf(
-            "😫" to R.drawable.ic_mood_very_bad,
-            "😔" to R.drawable.ic_mood_bad,
-            "😐" to R.drawable.ic_mood_neutral,
-            "😊" to R.drawable.ic_mood_good,
-            "🥰" to R.drawable.ic_mood_very_good
-        )
-    }
-    
-    LaunchedEffect(Unit) {
-        mediaActionSound.load(MediaActionSound.SHUTTER_CLICK)
-        mediaActionSound.load(MediaActionSound.FOCUS_COMPLETE)
-    }
+    val moodIcons = mapOf("😫" to R.drawable.ic_mood_very_bad, "😔" to R.drawable.ic_mood_bad, "😐" to R.drawable.ic_mood_neutral, "😊" to R.drawable.ic_mood_good, "🥰" to R.drawable.ic_mood_very_good)
     
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var flashMode by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
-    
     var currentCameraInfo by remember { mutableStateOf<CameraInfo?>(null) }
     var currentCameraControl by remember { mutableStateOf<CameraControl?>(null) }
     var currentZoomRatio by remember { mutableFloatStateOf(1f) }
-    
     val scope = rememberCoroutineScope()
-    
-    val isKeyboardVisible = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
 
-    val uploadTransition = rememberInfiniteTransition(label = "uploading")
-    val uploadRotation by uploadTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "uploadRotation"
-    )
-    val uploadPulseScale by uploadTransition.animateFloat(
-        initialValue = 0.92f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "uploadPulseScale"
-    )
+    val keyboardHeight = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    val isKeyboardVisible = keyboardHeight > 0.dp
+    val bottomPadding = if (keyboardHeight < 102.dp) 110.dp - keyboardHeight else 8.dp
 
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            capturedImageUri = uri
-            isCapturedImage = false
-            isTextOnlyMode = false
-        }
+    LaunchedEffect(text, capturedImageUri, isTextOnlyMode, movieTitle) {
+        onDirtyStateChanged(text.isNotBlank() || capturedImageUri != null || isTextOnlyMode || movieTitle.isNotBlank())
     }
 
-    var hasCameraPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        )
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) { capturedImageUri = uri; isCapturedImage = false; isTextOnlyMode = false }
     }
 
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { granted -> hasCameraPermission = granted }
-    )
+    var hasCameraPermission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasCameraPermission = it }
+    LaunchedEffect(Unit) { if (!hasCameraPermission) launcher.launch(Manifest.permission.CAMERA) }
 
-    LaunchedEffect(Unit) {
-        if (!hasCameraPermission) {
-            launcher.launch(Manifest.permission.CAMERA)
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface)
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = { focusManager.clearFocus() })
-                }
-                .navigationBarsPadding()
-                .imePadding(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top Header
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = {
+                    focusManager.clearFocus()
+                })
+            }
+    ) {
+        // LAYER 1: Header & Camera (Cố định, không đẩy)
+        Column(modifier = Modifier.fillMaxSize()) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = {
-                    if (text.isNotBlank() || capturedImageUri != null) {
-                        showDiscardDialog = true
-                    } else {
-                        onDismiss()
-                    }
-                }) {
-                    Icon(Icons.Default.Close, "Close", tint = MaterialTheme.colorScheme.onSurface)
+                IconButton(onClick = { if (text.isNotBlank() || capturedImageUri != null) showDiscardDialog = true else onDismiss() }) {
+                    Icon(Icons.Default.Close, null)
                 }
-                Text(
-                    text = stringResource(R.string.journal_panel_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(text = stringResource(R.string.journal_panel_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.size(48.dp))
             }
 
-            // Camera Preview / Selected Image
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(if (isTextOnlyMode) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f) else Color.Black),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).aspectRatio(1f).clip(RoundedCornerShape(24.dp)).background(if (isTextOnlyMode) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f) else Color.Black),
                 contentAlignment = Alignment.Center
             ) {
                 if (capturedImageUri != null) {
-                    AsyncImage(
-                        model = capturedImageUri,
-                        contentDescription = "Selected Image",
-                        modifier = Modifier.fillMaxWidth(),
-                        contentScale = if (isCapturedImage) ContentScale.Crop else ContentScale.Fit
-                    )
+                    AsyncImage(model = capturedImageUri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 } else if (isTextOnlyMode) {
-                    Icon(
-                        Icons.Default.EditNote, 
-                        null, 
-                        modifier = Modifier.size(100.dp),
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                    )
+                    Icon(Icons.Default.EditNote, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                 } else if (hasCameraPermission) {
                     CameraPreview(
                         modifier = Modifier.fillMaxSize(),
@@ -265,19 +199,26 @@ fun JournalEntryPanel(
                     )
                     
                     Box(modifier = Modifier.fillMaxSize()) {
+                        // Flash & Flip Buttons
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             IconButton(
                                 onClick = { 
                                     flashMode = if (flashMode == ImageCapture.FLASH_MODE_OFF) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
                                 },
-                                modifier = Modifier.background(Color.Black.copy(alpha = 0.3f), CircleShape).size(40.dp)
+                                modifier = Modifier
+                                    .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                                    .size(40.dp)
                             ) {
                                 Icon(
-                                    if (flashMode == ImageCapture.FLASH_MODE_OFF) Icons.Default.FlashOff else Icons.Default.FlashOn,
-                                    "Flash", tint = Color.White, modifier = Modifier.size(20.dp)
+                                    imageVector = if (flashMode == ImageCapture.FLASH_MODE_OFF) Icons.Default.FlashOff else Icons.Default.FlashOn,
+                                    contentDescription = "Flash",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
 
@@ -286,12 +227,20 @@ fun JournalEntryPanel(
                                     lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) 
                                         CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK 
                                 },
-                                modifier = Modifier.background(Color.Black.copy(alpha = 0.3f), CircleShape).size(40.dp)
+                                modifier = Modifier
+                                    .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                                    .size(40.dp)
                             ) {
-                                Icon(Icons.Default.FlipCameraAndroid, "Flip", tint = Color.White, modifier = Modifier.size(20.dp))
+                                Icon(
+                                    imageVector = Icons.Default.FlipCameraAndroid,
+                                    contentDescription = "Flip",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         }
 
+                        // Zoom Controls
                         Row(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
@@ -336,289 +285,701 @@ fun JournalEntryPanel(
                     }
                 }
 
-                // 1. Draggable Emoji Stamp
-                if (capturedImageUri != null || isTextOnlyMode) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(16.dp)
-                            .offset { IntOffset(emojiOffset.x.roundToInt(), emojiOffset.y.roundToInt()) }
-                            .graphicsLayer {
-                                scaleX = bounceAnim.value
-                                scaleY = bounceAnim.value
-                            }
-                            .pointerInput(Unit) {
-                                detectDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    emojiOffset += dragAmount
-                                }
-                            }
-                            .pointerInput(Unit) {
-                                detectTapGestures(onDoubleTap = { emojiOffset = Offset.Zero })
-                            }
-                            .background(Color.Black.copy(alpha = 0.35f), CircleShape)
-                            .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
-                            .padding(8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = moodIcons[selectedEmoji] ?: R.drawable.ic_mood_neutral),
-                            contentDescription = null,
-                            modifier = Modifier.size(40.dp)
-                        )
-                    }
-                }
-
-                // 2. Floating Text field & Emoji Selector
+                // Category metadata overlay (shows directly on the image/preview and is interactive)
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = capturedImageUri != null || isTextOnlyMode,
-                    enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
-                    exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
+                    visible = selectedType != JournalType.NORMAL,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically(),
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 16.dp, vertical = 16.dp)
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.7f),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                                .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        Column(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            journalEmojis.forEach { emoji ->
-                                val isSelected = selectedEmoji == emoji
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            selectedEmoji = emoji
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Image(
-                                        painter = painterResource(id = moodIcons[emoji] ?: R.drawable.ic_mood_neutral),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(if (isSelected) 36.dp else 28.dp)
-                                            .graphicsLayer {
-                                                if (isSelected) {
-                                                    scaleX = 1.15f
-                                                    scaleY = 1.15f
+                            when (selectedType) {
+                                JournalType.MOVIE -> {
+                                    InteractiveRatingBar(
+                                        rating = movieRating,
+                                        onRatingChanged = { movieRating = it }
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("“", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                        BasicTextField(
+                                            value = movieTitle,
+                                            onValueChange = { movieTitle = it },
+                                            textStyle = LocalTextStyle.current.copy(
+                                                color = Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                textAlign = TextAlign.Center
+                                            ),
+                                            cursorBrush = SolidColor(Color.White),
+                                            modifier = Modifier.width(IntrinsicSize.Min).defaultMinSize(minWidth = if (movieTitle.isEmpty()) 120.dp else 0.dp),
+                                            decorationBox = { innerTextField ->
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    if (movieTitle.isEmpty()) {
+                                                        Text(
+                                                            text = "Nhập tên phim...",
+                                                            color = Color.White.copy(alpha = 0.5f),
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            textAlign = TextAlign.Center,
+                                                            maxLines = 1,
+                                                            softWrap = false
+                                                        )
+                                                    }
+                                                    innerTextField()
                                                 }
                                             }
-                                    )
-                                }
-                            }
-                        }
-
-                        Surface(
-                            color = (if (isTextOnlyMode) MaterialTheme.colorScheme.primary else Color.Black).copy(alpha = 0.6f),
-                            shape = RoundedCornerShape(20.dp),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                            modifier = Modifier
-                                .padding(horizontal = 32.dp)
-                                .wrapContentWidth()
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 16.dp, vertical = 10.dp)
-                                    .wrapContentSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                val placeholder = stringResource(R.string.journal_panel_placeholder)
-                                Text(
-                                    text = text.ifEmpty { placeholder },
-                                    color = Color.Transparent, 
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(horizontal = 4.dp)
-                                )
-
-                                BasicTextField(
-                                    value = text,
-                                    onValueChange = { 
-                                        if (it.length <= 150) {
-                                            text = it
-                                            onTextChanged(it)
-                                        }
-                                    },
-                                    textStyle = LocalTextStyle.current.copy(
-                                        color = Color.White, 
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        textAlign = TextAlign.Center
-                                    ),
-                                    cursorBrush = SolidColor(Color.White),
-                                    modifier = Modifier.matchParentSize(),
-                                    decorationBox = { innerTextField ->
-                                        if (text.isEmpty()) {
-                                            Text(placeholder, color = Color.White.copy(alpha = 0.6f), fontSize = 15.sp, textAlign = TextAlign.Center)
-                                        }
-                                        innerTextField()
+                                        )
+                                        Text("”", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                     }
-                                )
+                                    if (movieTitle.isEmpty() && suggestedMovieTitles.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            contentPadding = PaddingValues(horizontal = 4.dp),
+                                            modifier = Modifier.height(26.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            item {
+                                                Text(
+                                                    text = "Gợi ý:",
+                                                    color = Color.White.copy(alpha = 0.5f),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                            items(suggestedMovieTitles) { title ->
+                                                Surface(
+                                                    onClick = { movieTitle = title },
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = Color.White.copy(alpha = 0.15f),
+                                                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.2f))
+                                                ) {
+                                                    Text(
+                                                        text = title,
+                                                        color = Color.White,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                JournalType.BOOK -> {
+                                    InteractiveRatingBar(
+                                        rating = bookRating,
+                                        onRatingChanged = { bookRating = it }
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("“", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                        BasicTextField(
+                                            value = bookTitle,
+                                            onValueChange = { bookTitle = it },
+                                            textStyle = LocalTextStyle.current.copy(
+                                                color = Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                textAlign = TextAlign.Center
+                                            ),
+                                            cursorBrush = SolidColor(Color.White),
+                                            modifier = Modifier.width(IntrinsicSize.Min).defaultMinSize(minWidth = if (bookTitle.isEmpty()) 120.dp else 0.dp),
+                                            decorationBox = { innerTextField ->
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    if (bookTitle.isEmpty()) {
+                                                        Text(
+                                                            text = "Nhập tên sách...",
+                                                            color = Color.White.copy(alpha = 0.5f),
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            textAlign = TextAlign.Center,
+                                                            maxLines = 1,
+                                                            softWrap = false
+                                                        )
+                                                    }
+                                                    innerTextField()
+                                                }
+                                            }
+                                        )
+                                        Text("”", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    if (bookTitle.isEmpty() && suggestedBookTitles.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            contentPadding = PaddingValues(horizontal = 4.dp),
+                                            modifier = Modifier.height(26.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            item {
+                                                Text(
+                                                    text = "Gợi ý:",
+                                                    color = Color.White.copy(alpha = 0.5f),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                            items(suggestedBookTitles) { title ->
+                                                Surface(
+                                                    onClick = { bookTitle = title },
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = Color.White.copy(alpha = 0.15f),
+                                                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.2f))
+                                                ) {
+                                                    Text(
+                                                        text = title,
+                                                        color = Color.White,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                JournalType.SUBJECT -> {
+                                    InteractiveRatingBar(
+                                        rating = understandingLevel.toFloat(),
+                                        onRatingChanged = { understandingLevel = it.roundToInt() }
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("“", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                        BasicTextField(
+                                            value = subjectName,
+                                            onValueChange = { subjectName = it },
+                                            textStyle = LocalTextStyle.current.copy(
+                                                color = Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                textAlign = TextAlign.Center
+                                            ),
+                                            cursorBrush = SolidColor(Color.White),
+                                            modifier = Modifier.width(IntrinsicSize.Min).defaultMinSize(minWidth = if (subjectName.isEmpty()) 120.dp else 0.dp),
+                                            decorationBox = { innerTextField ->
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    if (subjectName.isEmpty()) {
+                                                        Text(
+                                                            text = "Nhập tên môn...",
+                                                            color = Color.White.copy(alpha = 0.5f),
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            textAlign = TextAlign.Center,
+                                                            maxLines = 1,
+                                                            softWrap = false
+                                                        )
+                                                    }
+                                                    innerTextField()
+                                                }
+                                            }
+                                        )
+                                        Text("”", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    if (subjectName.isEmpty() && suggestedSubjectNames.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            contentPadding = PaddingValues(horizontal = 4.dp),
+                                            modifier = Modifier.height(26.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            item {
+                                                Text(
+                                                    text = "Gợi ý:",
+                                                    color = Color.White.copy(alpha = 0.5f),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                            items(suggestedSubjectNames) { name ->
+                                                Surface(
+                                                    onClick = { subjectName = name },
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = Color.White.copy(alpha = 0.15f),
+                                                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.2f))
+                                                ) {
+                                                    Text(
+                                                        text = name,
+                                                        color = Color.White,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                else -> {}
                             }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            AnimatedVisibility(
-                visible = !isKeyboardVisible,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    val hasContent = capturedImageUri != null || text.isNotBlank()
-                    if (capturedImageUri != null || isTextOnlyMode) {
-                        FilledIconButton(
-                            onClick = { 
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                val source = if (capturedImageUri != null) (if (isCapturedImage) "CAMERA" else "GALLERY") else null
-                                onPost(selectedEmoji, text, capturedImageUri, source)
-                            },
-                            enabled = hasContent && !isUploading,
-                            modifier = Modifier.size(88.dp), 
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            )
-                        ) {
-                            if (isUploading) {
-                                CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
-                            } else {
-                                Icon(Icons.AutoMirrored.Filled.Send, "Send", modifier = Modifier.size(36.dp))
-                            }
-                        }
-                    } else {
-                        val gradientBrush = Brush.linearGradient(colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary))
-                        Box(
-                            modifier = Modifier.size(88.dp).clip(CircleShape).border(width = 5.dp, brush = gradientBrush, shape = CircleShape).padding(8.dp).clip(CircleShape).background(Color.White)
-                                .pointerInput(Unit) {
-                                    detectTapGestures(onPress = {
-                                        try { mediaActionSound.play(MediaActionSound.SHUTTER_CLICK) } catch (e: Exception) {}
-                                        takePhoto(context, imageCapture, executor, { uri -> capturedImageUri = uri; isCapturedImage = true; isTextOnlyMode = false }, { Log.e("Camera", "Capture failed", it) })
-                                    })
-                                }
+                // Nút chụp lại (reset ảnh) góc dưới bên phải preview
+                if (capturedImageUri != null || isTextOnlyMode) {
+                    IconButton(
+                        onClick = { 
+                            capturedImageUri = null
+                            isTextOnlyMode = false
+                            selectedType = JournalType.NORMAL
+                            movieTitle = ""
+                            movieRating = 0f
+                            bookTitle = ""
+                            bookRating = 0f
+                            subjectName = ""
+                            understandingLevel = 3
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp)
+                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                            .size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Chụp lại",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-
-                    if (capturedImageUri != null || isTextOnlyMode) {
-                        IconButton(
-                            onClick = { capturedImageUri = null; isTextOnlyMode = false },
-                            modifier = Modifier.align(Alignment.CenterStart).padding(start = 48.dp).size(48.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                        ) {
-                            Icon(if (capturedImageUri != null) Icons.Default.Refresh else Icons.Default.PhotoCamera, "Camera")
-                        }
-                    }
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            AnimatedVisibility(
-                visible = capturedImageUri == null && !isTextOnlyMode && !isKeyboardVisible,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Button(
-                        onClick = { galleryLauncher.launch("image/*") },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), contentColor = MaterialTheme.colorScheme.primary),
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
-                    ) {
-                        Icon(Icons.Default.PhotoLibrary, null, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(stringResource(R.string.journal_panel_gallery), fontWeight = FontWeight.Bold)
-                    }
-                    TextButton(onClick = { isTextOnlyMode = true }) {
-                        Text(stringResource(R.string.journal_panel_skip), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+            // Đặt cụm nút chụp căn giữa hoàn hảo trong khoảng trống giữa preview và đáy
+            if (!isKeyboardVisible && capturedImageUri == null && !isTextOnlyMode) {
+                Spacer(modifier = Modifier.weight(1f))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { galleryLauncher.launch("image/*") }, modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape).size(56.dp)) { Icon(Icons.Default.PhotoLibrary, null, tint = MaterialTheme.colorScheme.primary) }
+                        Box(modifier = Modifier.size(80.dp).clip(CircleShape).border(4.dp, MaterialTheme.colorScheme.primary, CircleShape).padding(6.dp).clip(CircleShape).background(Color.White).clickable {
+                            try { mediaActionSound.play(MediaActionSound.SHUTTER_CLICK) } catch (_: Exception) {}
+                            takePhoto(context, imageCapture, executor, { capturedImageUri = it; isCapturedImage = true; isTextOnlyMode = false }, {})
+                        })
+                        IconButton(onClick = { isTextOnlyMode = true }, modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape).size(56.dp)) { Icon(Icons.Default.EditNote, null, tint = MaterialTheme.colorScheme.secondary) }
                     }
                 }
-            }
-            if (!isKeyboardVisible) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.navigationBarsPadding())
             }
         }
 
-        if (isUploading) {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).clickable(enabled = false) {}, contentAlignment = Alignment.Center) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
-                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(32.dp)).border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(32.dp)).padding(horizontal = 32.dp, vertical = 40.dp)
+        // LAYER 3: Vùng Nhập liệu & Nút Gửi (TỰ ĐẨY LÊN TRÊN BÀN PHÍM - CHỈ HIỆN KHI ĐÃ CÓ ẢNH HOẶC Ở CHẾ ĐỘ CHỈ NHẬP VĂN BẢN)
+        if (capturedImageUri != null || isTextOnlyMode) {
+            Column(
+                modifier = Modifier.align(Alignment.BottomCenter).imePadding().padding(bottom = bottomPadding),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Emoji Selector
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 4.dp,
+                    shadowElevation = 3.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                 ) {
-                    Box(modifier = Modifier.size(100.dp).graphicsLayer { scaleX = uploadPulseScale; scaleY = uploadPulseScale }, contentAlignment = Alignment.Center) {
-                        Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), Color.Transparent)), CircleShape))
-                        CircularProgressIndicator(progress = { 0.35f }, color = MaterialTheme.colorScheme.primary, strokeWidth = 3.5.dp, modifier = Modifier.fillMaxSize().graphicsLayer { rotationZ = uploadRotation })
-                        Image(painter = painterResource(id = moodIcons[selectedEmoji] ?: R.drawable.ic_mood_neutral), contentDescription = null, modifier = Modifier.size(52.dp))
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Đang ghi lại hành trình...", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text("Vui lòng đợi trong giây lát", color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
-                    }
-                    OutlinedButton(
-                        onClick = onCancelUpload,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp),
-                        modifier = Modifier.background(Color.Red.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Icon(Icons.Default.Close, "Cancel", modifier = Modifier.size(16.dp), tint = Color.White)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Hủy gửi", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        journalEmojis.forEach { emoji ->
+                            val isSelected = selectedEmoji == emoji
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        selectedEmoji = emoji
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(moodIcons[emoji] ?: R.drawable.ic_mood_neutral),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(if (isSelected) 28.dp else 22.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (tagSuggestions.isNotEmpty()) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        item {
+                            Text(
+                                text = "Gợi ý nhãn:",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        items(tagSuggestions) { tag ->
+                            Surface(
+                                onClick = {
+                                    val words = text.split(" ").toMutableList()
+                                    if (words.isNotEmpty()) {
+                                        words[words.lastIndex] = tag
+                                        text = words.joinToString(" ") + " "
+                                    }
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                tonalElevation = 2.dp,
+                                shadowElevation = 2.dp,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                            ) {
+                                Text(
+                                    text = tag,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Lựa chọn Quyền riêng tư (Đăng riêng tư / Bạn bè)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (selectedPrivacy == com.example.newstart.domain.model.JournalPrivacy.PRIVATE) "🔒 Chỉ mình tôi" else "👥 Cộng đồng (Bạn bè)",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Switch(
+                        checked = selectedPrivacy == com.example.newstart.domain.model.JournalPrivacy.FRIENDS,
+                        onCheckedChange = { isChecked ->
+                            selectedPrivacy = if (isChecked) com.example.newstart.domain.model.JournalPrivacy.FRIENDS else com.example.newstart.domain.model.JournalPrivacy.PRIVATE
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.scale(0.8f)
+                    )
+                }
+
+                // Ô nhập văn bản + Nút Gửi (Chỉ hiện nút gửi khi có bàn phím hoặc đã có nội dung)
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 4.dp,
+                    shadowElevation = 3.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                ) {
+                    Row(modifier = Modifier.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = text, onValueChange = { if (it.length <= 150) { text = it; onTextChanged(it) } },
+                            placeholder = { Text(stringResource(R.string.journal_panel_placeholder), fontSize = 14.sp) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            )
+                        )
+                        
+                        if (isKeyboardVisible || text.isNotBlank() || capturedImageUri != null) {
+                            IconButton(
+                                onClick = { 
+                                    val isVietnamese = java.util.Locale.getDefault().language == "vi"
+                                    if (selectedType == JournalType.MOVIE && movieTitle.trim().isEmpty()) {
+                                        android.widget.Toast.makeText(context, if (isVietnamese) "Vui lòng nhập tên phim" else "Please enter movie title", android.widget.Toast.LENGTH_SHORT).show()
+                                        return@IconButton
+                                    }
+                                    if (selectedType == JournalType.BOOK && bookTitle.trim().isEmpty()) {
+                                        android.widget.Toast.makeText(context, if (isVietnamese) "Vui lòng nhập tên sách" else "Please enter book title", android.widget.Toast.LENGTH_SHORT).show()
+                                        return@IconButton
+                                    }
+                                    if (selectedType == JournalType.SUBJECT && subjectName.trim().isEmpty()) {
+                                        android.widget.Toast.makeText(context, if (isVietnamese) "Vui lòng nhập tên môn học" else "Please enter subject name", android.widget.Toast.LENGTH_SHORT).show()
+                                        return@IconButton
+                                    }
+
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onPost(selectedEmoji, text, capturedImageUri, if (capturedImageUri != null) (if (isCapturedImage) "CAMERA" else "GALLERY") else null, selectedType, if (selectedType == JournalType.MOVIE) MovieDetails(title = movieTitle.trim(), rating = movieRating) else null, if (selectedType == JournalType.BOOK) BookDetails(title = bookTitle.trim(), rating = bookRating) else null, if (selectedType == JournalType.SUBJECT) SubjectDetails(name = subjectName.trim(), understandingLevel = understandingLevel) else null, selectedPrivacy)
+                                },
+                                modifier = Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary)
+                            ) {
+                                if (isUploading) CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                else Icon(Icons.AutoMirrored.Filled.Send, null, tint = MaterialTheme.colorScheme.onPrimary)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Category Chips
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val types = listOf(
+                        JournalType.NORMAL to ("Nhật ký" to Icons.Default.EditNote),
+                        JournalType.MOVIE to ("Phim" to Icons.Default.Movie),
+                        JournalType.BOOK to ("Sách" to Icons.AutoMirrored.Filled.MenuBook),
+                        JournalType.SUBJECT to ("Môn học" to Icons.Default.School)
+                    )
+                    items(types) { (type, pair) ->
+                        val isSelected = selectedType == type
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedType = type },
+                            label = {
+                                Text(
+                                    text = pair.first,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = pair.second,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp),
+                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                iconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                selectedBorderColor = MaterialTheme.colorScheme.primary,
+                                borderWidth = 1.dp,
+                                selectedBorderWidth = 1.5.dp
+                            )
+                        )
                     }
                 }
             }
         }
     }
 
-    if (showDiscardDialog) {
-        AlertDialog(
-            onDismissRequest = { showDiscardDialog = false },
-            title = { Text("Hủy bỏ bài viết?") },
-            text = { Text("Mọi nội dung bạn vừa nhập hoặc ảnh vừa chụp sẽ bị mất. Bạn có chắc chắn muốn thoát?") },
-            confirmButton = {
-                TextButton(
-                    onClick = { 
-                        showDiscardDialog = false
-                        onDismiss() 
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Hủy bỏ")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDiscardDialog = false }) {
-                    Text("Tiếp tục viết")
+    if (showDiscardDialog) { AlertDialog(onDismissRequest = { showDiscardDialog = false }, title = { Text("Hủy bỏ bài viết?") }, text = { Text("Nội dung sẽ bị mất.") }, confirmButton = { TextButton(onClick = { showDiscardDialog = false; onDismiss() }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Hủy bỏ") } }, dismissButton = { TextButton(onClick = { showDiscardDialog = false }) { Text("Tiếp tục") } }) }
+}
+
+@Composable
+fun InteractiveRatingBar(
+    rating: Float,
+    onRatingChanged: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    maxStars: Int = 5,
+    starSize: androidx.compose.ui.unit.Dp = 20.dp
+) {
+    var rowWidth by remember { mutableIntStateOf(0) }
+    val haptic = LocalHapticFeedback.current
+
+    val halfShape = remember {
+        object : androidx.compose.ui.graphics.Shape {
+            override fun createOutline(
+                size: androidx.compose.ui.geometry.Size,
+                layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+                density: androidx.compose.ui.unit.Density
+            ): androidx.compose.ui.graphics.Outline {
+                return androidx.compose.ui.graphics.Outline.Rectangle(
+                    androidx.compose.ui.geometry.Rect(0f, 0f, size.width * 0.5f, size.height)
+                )
+            }
+        }
+    }
+
+    Row(
+        modifier = modifier
+            .onGloballyPositioned { coordinates ->
+                rowWidth = coordinates.size.width
+            }
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    if (rowWidth > 0) {
+                        val rawRating = (offset.x / rowWidth) * maxStars
+                        val roundedRating = ((rawRating * 2).roundToInt() / 2f).coerceIn(0.5f, maxStars.toFloat())
+                        if (roundedRating != rating) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onRatingChanged(roundedRating)
+                        }
+                    }
                 }
             }
-        )
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        if (rowWidth > 0) {
+                            val rawRating = (offset.x / rowWidth) * maxStars
+                            val roundedRating = ((rawRating * 2).roundToInt() / 2f).coerceIn(0.5f, maxStars.toFloat())
+                            if (roundedRating != rating) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onRatingChanged(roundedRating)
+                            }
+                        }
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        if (rowWidth > 0) {
+                            val rawRating = (change.position.x / rowWidth) * maxStars
+                            val roundedRating = ((rawRating * 2).roundToInt() / 2f).coerceIn(0.5f, maxStars.toFloat())
+                            if (roundedRating != rating) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onRatingChanged(roundedRating)
+                            }
+                        }
+                    }
+                )
+            },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        (1..maxStars).forEach { i ->
+            Box(modifier = Modifier.size(starSize)) {
+                if (rating >= i) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFCC00),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else if (rating <= i - 1f) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color.Gray.copy(alpha = 0.3f),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color.Gray.copy(alpha = 0.3f),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFCC00),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(halfShape)
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
 fun ZoomOption(label: String, isSelected: Boolean, onClick: () -> Unit) {
-    Box(modifier = Modifier.clip(CircleShape).background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp)) {
-        Text(text = label, color = if (isSelected) Color(0xFFFFCC00) else Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = label,
+            color = if (isSelected) Color(0xFFFFCC00) else Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
 @Composable
-fun CameraPreview(modifier: Modifier = Modifier, imageCapture: ImageCapture, lensFacing: Int = CameraSelector.LENS_FACING_BACK, flashMode: Int = ImageCapture.FLASH_MODE_OFF, onCameraReady: (CameraInfo, CameraControl) -> Unit = { _, _ -> }, onZoomRatioChanged: (Float) -> Unit = {}) {
+fun FocusCircle(offset: Offset) {
+    val infiniteTransition = rememberInfiniteTransition(label = "focus")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1.2f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(400, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
+
+    Box(
+        modifier = Modifier
+            .offset {
+                IntOffset(
+                    (offset.x - 35.dp.toPx()).roundToInt(),
+                    (offset.y - 35.dp.toPx()).roundToInt()
+                )
+            }
+            .size(70.dp)
+            .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+            .padding(10.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+    )
+}
+
+@Composable
+fun CameraPreview(
+    modifier: Modifier = Modifier,
+    imageCapture: ImageCapture,
+    lensFacing: Int = CameraSelector.LENS_FACING_BACK,
+    flashMode: Int = ImageCapture.FLASH_MODE_OFF,
+    onCameraReady: (CameraInfo, CameraControl) -> Unit = { _, _ -> },
+    onZoomRatioChanged: (Float) -> Unit = {}
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val isPreview = LocalInspectionMode.current
@@ -630,7 +991,10 @@ fun CameraPreview(modifier: Modifier = Modifier, imageCapture: ImageCapture, len
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     val previewUseCase = remember { Preview.Builder().build() }
-    LaunchedEffect(cameraProviderFuture) { cameraProvider = cameraProviderFuture.await() }
+
+    LaunchedEffect(cameraProviderFuture) {
+        cameraProvider = cameraProviderFuture.await()
+    }
     LaunchedEffect(cameraProvider, lensFacing) {
         val safeProvider = cameraProvider ?: return@LaunchedEffect
         val cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
@@ -643,13 +1007,28 @@ fun CameraPreview(modifier: Modifier = Modifier, imageCapture: ImageCapture, len
         } catch (e: Exception) { Log.e("CameraPreview", "Binding failed", e) }
     }
     DisposableEffect(cameraInfo) {
-        val observer = androidx.lifecycle.Observer<ZoomState> { state -> currentZoomState = state; onZoomRatioChanged(state.zoomRatio) }
+        val observer = androidx.lifecycle.Observer<ZoomState> { state ->
+            currentZoomState = state
+            onZoomRatioChanged(state.zoomRatio)
+        }
         cameraInfo?.zoomState?.observe(lifecycleOwner, observer)
         onDispose { cameraInfo?.zoomState?.removeObserver(observer) }
     }
-    LaunchedEffect(flashMode) { imageCapture.flashMode = flashMode }
-    LaunchedEffect(focusTapOffset) { if (focusTapOffset != null) { kotlinx.coroutines.delay(1000); focusTapOffset = null } }
-    if (isPreview) { Box(modifier = modifier.background(Color.DarkGray), contentAlignment = Alignment.Center) { Text("Camera Preview", color = Color.White) }; return }
+    LaunchedEffect(flashMode) {
+        imageCapture.flashMode = flashMode
+    }
+    LaunchedEffect(focusTapOffset) {
+        if (focusTapOffset != null) {
+            kotlinx.coroutines.delay(1000)
+            focusTapOffset = null
+        }
+    }
+    if (isPreview) {
+        Box(modifier = modifier.background(Color.DarkGray), contentAlignment = Alignment.Center) {
+            Text("Camera Preview", color = Color.White)
+        }
+        return
+    }
     Box(modifier = modifier) {
         val scaleGestureDetector = remember(context, cameraInfo) {
             ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -662,65 +1041,64 @@ fun CameraPreview(modifier: Modifier = Modifier, imageCapture: ImageCapture, len
                 }
             })
         }
-        AndroidView(factory = { ctx -> PreviewView(ctx).apply { scaleType = PreviewView.ScaleType.FILL_CENTER; implementationMode = PreviewView.ImplementationMode.COMPATIBLE; previewUseCase.setSurfaceProvider(this.surfaceProvider) } }, update = { previewView -> previewView.setOnTouchListener { v, event -> scaleGestureDetector.onTouchEvent(event); if (event.action == android.view.MotionEvent.ACTION_UP && event.pointerCount == 1) { val factory = previewView.meteringPointFactory; val point = factory.createPoint(event.x, event.y); val action = FocusMeteringAction.Builder(point).build(); cameraControl?.startFocusAndMetering(action); focusTapOffset = Offset(event.x, event.y); try { mediaActionSound.play(MediaActionSound.FOCUS_COMPLETE) } catch (e: Exception) {}; v.performClick() }; true } }, modifier = Modifier.fillMaxSize())
+        AndroidView(
+            factory = { ctx ->
+                PreviewView(ctx).apply {
+                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                    previewUseCase.setSurfaceProvider(this.surfaceProvider)
+                }
+            },
+            update = { previewView ->
+                previewView.setOnTouchListener { v, event ->
+                    scaleGestureDetector.onTouchEvent(event)
+                    if (event.action == android.view.MotionEvent.ACTION_UP && event.pointerCount == 1) {
+                        val factory = previewView.meteringPointFactory
+                        val point = factory.createPoint(event.x, event.y)
+                        val action = FocusMeteringAction.Builder(point).build()
+                        cameraControl?.startFocusAndMetering(action)
+                        focusTapOffset = Offset(event.x, event.y)
+                        try {
+                            mediaActionSound.play(MediaActionSound.FOCUS_COMPLETE)
+                        } catch (e: Exception) {}
+                        v.performClick()
+                    }
+                    true
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
         focusTapOffset?.let { offset -> FocusCircle(offset) }
         val zoomRatio = currentZoomState?.zoomRatio ?: 1.0f
-        if (zoomRatio > 1.01f) { Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp).background(Color.Black.copy(alpha = 0.4f), CircleShape).padding(horizontal = 10.dp, vertical = 4.dp)) { Text(text = String.format("%.1fx", zoomRatio), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold) } }
+        if (zoomRatio > 1.01f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 80.dp)
+                    .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = String.format("%.1fx", zoomRatio),
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }
 
-@Composable
-fun FocusCircle(offset: Offset) {
-    val infiniteTransition = rememberInfiniteTransition(label = "focus")
-    val scale by infiniteTransition.animateFloat(initialValue = 1.2f, targetValue = 0.8f, animationSpec = infiniteRepeatable(animation = tween(400, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "scale")
-    Box(modifier = Modifier.offset { IntOffset((offset.x - 35.dp.toPx()).roundToInt(), (offset.y - 35.dp.toPx()).roundToInt()) }.size(70.dp).border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape).padding(10.dp).graphicsLayer { scaleX = scale; scaleY = scale }.border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape))
-}
-
-private fun takePhoto(context: android.content.Context, imageCapture: ImageCapture, executor: ExecutorService, onImageCaptured: (Uri) -> Unit, onError: (ImageCaptureException) -> Unit) {
-    val outputDirectory = getOutputDirectory(context)
-    val photoFile = File(outputDirectory, SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS", Locale.US).format(System.currentTimeMillis()) + ".jpg")
-    val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-    imageCapture.takePicture(outputOptions, executor, object : ImageCapture.OnImageSavedCallback {
-        override fun onError(exception: ImageCaptureException) { onError(exception) }
-        override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) { processImageToSquare(photoFile); val savedUri = Uri.fromFile(photoFile); onImageCaptured(savedUri) }
+private fun takePhoto(context: android.content.Context, imageCapture: ImageCapture, executor: ExecutorService, onImageCaptured: (Uri) -> Unit, onError: (ImageCaptureException) -> Unit) { 
+    val outputDirectory = context.filesDir; val photoFile = File(outputDirectory, SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis()) + ".jpg")
+    imageCapture.takePicture(ImageCapture.OutputFileOptions.Builder(photoFile).build(), executor, object : ImageCapture.OnImageSavedCallback {
+        override fun onError(e: ImageCaptureException) { onError(e) }
+        override fun onImageSaved(r: ImageCapture.OutputFileResults) { processImageToSquare(photoFile); onImageCaptured(Uri.fromFile(photoFile)) }
     })
 }
 
-private fun processImageToSquare(file: File) {
-    try {
-        val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return
-        val exif = ExifInterface(file.absolutePath)
-        val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
-        val matrix = Matrix()
-        when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
-            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
-            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
-        }
-        val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-        val width = rotatedBitmap.width
-        val height = rotatedBitmap.height
-        val newDimension = if (width < height) width else height
-        val xOffset = (width - newDimension) / 2
-        val yOffset = (height - newDimension) / 2
-        val squareBitmap = Bitmap.createBitmap(rotatedBitmap, xOffset, yOffset, newDimension, newDimension)
-        java.io.FileOutputStream(file).use { out -> squareBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out) }
-        if (bitmap != rotatedBitmap) bitmap.recycle()
-        rotatedBitmap.recycle(); squareBitmap.recycle()
-    } catch (e: Exception) { Log.e("ImageProcess", "Failed to crop square", e) }
-}
-
-private fun getOutputDirectory(context: android.content.Context): File {
-    val mediaDir = context.externalMediaDirs.firstOrNull()?.let { File(it, context.resources.getString(R.string.app_name)).apply { mkdirs() } }
-    return if (mediaDir != null && mediaDir.exists()) mediaDir else context.filesDir
-}
+private fun processImageToSquare(file: File) { try { val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return; val exif = ExifInterface(file.absolutePath); val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL); val matrix = Matrix(); when (orientation) { ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f); ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f); ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f) }; val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true); val width = rotatedBitmap.width; val height = rotatedBitmap.height; val newDimension = if (width < height) width else height; val squareBitmap = Bitmap.createBitmap(rotatedBitmap, (width - newDimension) / 2, (height - newDimension) / 2, newDimension, newDimension); java.io.FileOutputStream(file).use { out -> squareBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out) } } catch (e: Exception) {} }
 
 @AppCombinedPreviews
 @Composable
-fun JournalEntryPanelPreview() {
-    NewStartTheme {
-        Surface(color = MaterialTheme.colorScheme.background) {
-            JournalEntryPanel(onDismiss = {}, onPost = { _, _, _, _ -> })
-        }
-    }
-}
+fun JournalEntryPanelPreview() { NewStartTheme { Surface(color = MaterialTheme.colorScheme.background) { JournalEntryPanel(onDismiss = {}, onPost = { _, _, _, _, _, _, _, _, _ -> }) } } }

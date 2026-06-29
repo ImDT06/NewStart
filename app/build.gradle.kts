@@ -94,6 +94,8 @@ dependencies {
 
     // OkHttp
     implementation(libs.okhttp)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.serialization)
 
     // Gemini AI
     implementation(libs.generativeai)
@@ -119,6 +121,7 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
     implementation(libs.firebase.functions)
+    implementation(libs.firebase.messaging)
     implementation(libs.googleid)
 
     // Hilt

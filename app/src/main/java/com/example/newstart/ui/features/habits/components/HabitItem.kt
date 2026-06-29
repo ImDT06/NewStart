@@ -27,14 +27,12 @@ import androidx.compose.ui.unit.sp
 import com.example.newstart.R
 import com.example.newstart.domain.model.Habit
 
-
 @Composable
 fun HabitItem(
     habit: Habit,
     onToggle: () -> Unit,
     onEdit: () -> Unit
 ) {
-
     val color = remember(habit.colorHex) {
         try {
             Color(android.graphics.Color.parseColor(habit.colorHex))
@@ -43,336 +41,123 @@ fun HabitItem(
         }
     }
 
-
-    val interactionSource = remember {
-        MutableInteractionSource()
-    }
-
-
+    val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-
-
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1f,
-        label = "scale"
-    )
-
+    val scale by animateFloatAsState(targetValue = if (isPressed) 0.96f else 1f, label = "scale")
 
     Surface(
-
         modifier = Modifier
             .fillMaxWidth()
-
             .graphicsLayer {
-
                 scaleX = scale
                 scaleY = scale
-
-                alpha =
-                    if(habit.isCompleted)
-                        0.75f
-                    else
-                        1f
             }
-
+            .border(
+                0.5.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                RoundedCornerShape(12.dp)
+            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onEdit
             ),
-
-
-        shape = RoundedCornerShape(16.dp),
-
-        shadowElevation = 4.dp,
-
-        color = color.copy(
-            alpha =
-                if(habit.isCompleted)
-                    0.8f
-                else
-                    0.12f
-        )
-
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface
     ) {
-
-
         Row(
-
             modifier = Modifier
-                .padding(
-                    horizontal = 14.dp,
-                    vertical = 10.dp
-                )
-                .fillMaxWidth(),
-
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
             verticalAlignment = Alignment.CenterVertically
-
         ) {
-
-
-
-            // ICON
-
-            Surface(
-
-                modifier = Modifier.size(32.dp),
-
-                shape = RoundedCornerShape(8.dp),
-
-                color =
-                    MaterialTheme.colorScheme.onSurface
-                        .copy(alpha = 0.1f)
-
-            ) {
-
-
-                Box(
-                    contentAlignment = Alignment.Center
-                ) {
-
-                    Text(
-                        habit.icon,
-                        fontSize = 16.sp
-                    )
-
-                }
-
-            }
-
-
-
-
-            Spacer(
-                modifier = Modifier.width(10.dp)
+            // Mép bên trái dải màu thói quen (Giống Todo)
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(color)
             )
 
-
-
-
-
-            Column(
-                modifier = Modifier.weight(1f)
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                // ICON
+                Surface(
+                    modifier = Modifier.size(40.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    color = color.copy(alpha = 0.1f)
                 ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(habit.icon, fontSize = 20.sp)
+                    }
+                }
 
+                Spacer(modifier = Modifier.width(16.dp))
 
-                    Text(
-
-                        text = habit.name,
-
-
-                        color =
-                            if(habit.isCompleted)
-
-                                Color.White.copy(alpha = 0.85f)
-
-                            else
-
-                                MaterialTheme.colorScheme.onSurface,
-
-
-                        fontSize = 14.sp,
-
-
-                        fontWeight = FontWeight.Bold,
-
-
-                        textDecoration =
-
-                            if(habit.isCompleted)
-
-                                TextDecoration.LineThrough
-
-                            else
-
-                                TextDecoration.None
-
-                    )
-
-
-
-
-                    if (habit.streak > 0) {
-
-
-                        Spacer(
-                            modifier = Modifier.width(4.dp)
-                        )
-
-
-
-                        Icon(
-
-                            Icons.Default.LocalFireDepartment,
-
-                            contentDescription = null,
-
-                            tint = Color(0xFFFFA500),
-
-                            modifier =
-                                Modifier.size(12.dp)
-
-                        )
-
-
-
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-
-                            "${habit.streak} " +
-                                    stringResource(
-                                        R.string.habits_streak_day
-                                    ),
-
-                            color =
-                                if(habit.isCompleted)
-
-                                    Color.White.copy(alpha = 0.7f)
-
-                                else
-
-                                    MaterialTheme.colorScheme
-                                        .onSurfaceVariant,
-
-
-                            fontSize = 9.sp,
-
-                            fontWeight = FontWeight.Bold
-
+                            text = habit.name,
+                            color = if (habit.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            textDecoration = if (habit.isCompleted) TextDecoration.LineThrough else TextDecoration.None
                         )
 
+                        if (habit.streak > 0) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                Icons.Default.LocalFireDepartment,
+                                null,
+                                tint = Color(0xFFFFA500),
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                "${habit.streak} " + stringResource(R.string.habits_streak_day),
+                                color = if (habit.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
+                    if (habit.reminderTime != null) {
+                        Text(
+                            text = "🔔 ${habit.reminderTime}",
+                            color = if (habit.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            fontSize = 11.sp
+                        )
+                    }
                 }
 
-
-
-
-
-                Text(
-
-                    text =
-
-                        if(habit.reminderTime != null)
-
-                            "${habit.progress}/${habit.goal} • 🔔 ${habit.reminderTime}"
-
-                        else
-
-                            "${habit.progress}/${habit.goal}",
-
-
-
-                    color =
-
-                        if(habit.isCompleted)
-
-                            Color.White.copy(alpha = 0.7f)
-
-                        else
-
-                            Color.Gray.copy(alpha = 0.7f),
-
-
-
-                    fontSize = 11.sp
-
-                )
-
-
-            }
-
-
-
-
-
-            // CHECK BUTTON
-
-
-            Box(
-
-                modifier = Modifier
-
-                    .size(24.dp)
-
-                    .clip(CircleShape)
-
-                    .border(
-
-                        width = 1.2.dp,
-
-                        color =
-
-                            if(habit.isCompleted)
-
-                                Color.Transparent
-
-                            else
-
-                                MaterialTheme.colorScheme
-                                    .onSurface
-                                    .copy(alpha = 0.4f),
-
-
-                        shape = CircleShape
-
-                    )
-
-
-                    .background(
-
-                        if(habit.isCompleted)
-
-                            Color.White.copy(alpha = 0.2f)
-
-                        else
-
-                            Color.Transparent
-
-                    )
-
-
-                    .clickable {
-
-                        onToggle()
-
-                    },
-
-
-                contentAlignment = Alignment.Center
-
-            ) {
-
-
-
-                if(habit.isCompleted) {
-
-
-                    Icon(
-
-                        imageVector = Icons.Default.Check,
-
-                        contentDescription = null,
-
-                        tint = Color.White,
-
-
-                        modifier =
-                            Modifier.size(15.dp)
-
-                    )
-
-
+                // CHECK BUTTON
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .border(
+                            width = 1.5.dp,
+                            color = if (habit.isCompleted) Color.Transparent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                            shape = CircleShape
+                        )
+                        .background(if (habit.isCompleted) color else Color.Transparent)
+                        .clickable { onToggle() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (habit.isCompleted) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
-
             }
-
         }
-
     }
-
 }

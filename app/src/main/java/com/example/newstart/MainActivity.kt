@@ -135,11 +135,11 @@ class MainActivity : AppCompatActivity() {
                 val showFab = showShell && isMainRoute
 
                 // Tối ưu hóa Navbar nổi: Hide on Scroll
-                var isBottomBarVisible by remember { mutableStateOf(true) }
+                val isBottomBarVisible by mainViewModel.isBottomBarVisible.collectAsState()
                 
                 // Tự động hiện lại thanh điều hướng khi chuyển trang
                 LaunchedEffect(currentRoute) {
-                    isBottomBarVisible = true
+                    mainViewModel.setBottomBarVisible(true)
                 }
 
                 val nestedScrollConnection = remember(currentRoute) {
@@ -151,9 +151,9 @@ class MainActivity : AppCompatActivity() {
                         ): Offset {
                             // Chỉ xử lý ẩn/hiện nếu trang thực sự có thể cuộn (consumed.y != 0)
                             if (consumed.y < -5f) {
-                                isBottomBarVisible = false
+                                mainViewModel.setBottomBarVisible(false)
                             } else if (consumed.y > 5f) {
-                                isBottomBarVisible = true
+                                mainViewModel.setBottomBarVisible(true)
                             }
                             return super.onPostScroll(consumed, available, source)
                         }
@@ -190,6 +190,35 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
+                LaunchedEffect(authState) {
+                    if (authState == AuthState.Authenticated) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            if (ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.POST_NOTIFICATIONS
+                                ) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        }
+                        try {
+                            com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                                .addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        task.result?.let { token ->
+                                            android.util.Log.d("MainActivity", "FCM Token: $token")
+                                            mainViewModel.updateFcmToken(token)
+                                        }
+                                    } else {
+                                        android.util.Log.e("MainActivity", "Failed to fetch FCM token", task.exception)
+                                    }
+                                }
+                        } catch (e: Exception) {
+                            android.util.Log.e("MainActivity", "FirebaseMessaging failed: ${e.message}")
+                        }
+                    }
+                }
+
                 var isJournalDirty by remember { mutableStateOf(false) }
                 
                 LaunchedEffect(showBottomSheet) {
@@ -208,7 +237,7 @@ class MainActivity : AppCompatActivity() {
                             .nestedScroll(nestedScrollConnection),
                         containerColor = MaterialTheme.colorScheme.background,
                         contentColor = MaterialTheme.colorScheme.onBackground
-                    ) { innerPadding ->
+                    ) { _ ->
                         Box(
                             modifier = Modifier.fillMaxSize()
                         ) {
@@ -400,19 +429,26 @@ class MainActivity : AppCompatActivity() {
                                     sheetState = sheetState,
                                     dragHandle = { BottomSheetDefaults.DragHandle() },
                                     containerColor = MaterialTheme.colorScheme.surface,
-                                    shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+                                    shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+                                    contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
                                 ) {
                                     when (sheetContentType) {
                                         SheetContent.JournalEntry -> {
                                             val suggestedEmojis by mainViewModel.aiSuggestedEmojis.collectAsStateWithLifecycle()
                                             val isSuggesting by mainViewModel.isSuggestingEmojis.collectAsStateWithLifecycle()
+                                            val suggestedMovies by mainViewModel.uniqueMovieTitles.collectAsStateWithLifecycle()
+                                            val suggestedBooks by mainViewModel.uniqueBookTitles.collectAsStateWithLifecycle()
+                                            val suggestedSubjects by mainViewModel.uniqueSubjectNames.collectAsStateWithLifecycle()
+                                            val suggestedTags by mainViewModel.uniqueTags.collectAsStateWithLifecycle()
                                             JournalEntryPanel(
                                                 onDismiss = { 
                                                     showBottomSheet = false
                                                     mainViewModel.setShowJournalSheet(false)
                                                 },
-                                                onPost = { emoji, text, uri, source ->
-                                                    mainViewModel.saveJournalEntry(emoji, text, uri, source) {
+                                                onPost = { emoji, text, uri, source, type, movie, book, subject, privacy ->
+                                                    mainViewModel.saveJournalEntry(
+                                                        emoji, text, uri, source, type, movie, book, subject, privacy
+                                                    ) {
                                                         showBottomSheet = false
                                                         mainViewModel.setShowJournalSheet(false)
                                                     }
@@ -420,6 +456,10 @@ class MainActivity : AppCompatActivity() {
                                                 isUploading = isUploading,
                                                 suggestedEmojis = suggestedEmojis,
                                                 isSuggesting = isSuggesting,
+                                                suggestedMovieTitles = suggestedMovies,
+                                                suggestedBookTitles = suggestedBooks,
+                                                suggestedSubjectNames = suggestedSubjects,
+                                                suggestedTags = suggestedTags,
                                                 onTextChanged = { mainViewModel.getEmojiSuggestions(it) },
                                                 onCancelUpload = { mainViewModel.cancelUpload() },
                                                 onDirtyStateChanged = { isJournalDirty = it }

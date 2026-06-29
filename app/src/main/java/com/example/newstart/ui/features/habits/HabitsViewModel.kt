@@ -11,7 +11,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -27,6 +29,10 @@ sealed class AiState {
     data class Drafting(val habits: List<Habit>) : AiState()
 }
 
+enum class HabitFilter {
+    ALL, COMPLETED, UNCOMPLETED
+}
+
 @HiltViewModel
 class HabitsViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
@@ -36,6 +42,9 @@ class HabitsViewModel @Inject constructor(
     private val _selectedDate = MutableStateFlow(LocalDate.now())
     val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
 
+    private val _filter = MutableStateFlow(HabitFilter.ALL)
+    val filter: StateFlow<HabitFilter> = _filter.asStateFlow()
+
     private val _aiState = MutableStateFlow<AiState>(AiState.Idle)
     val aiState: StateFlow<AiState> = _aiState.asStateFlow()
 
@@ -43,11 +52,18 @@ class HabitsViewModel @Inject constructor(
     val completedHabitForJournal: StateFlow<Habit?> = _completedHabitForJournal.asStateFlow()
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val habits: StateFlow<List<Habit>> = _selectedDate
-        .flatMapLatest { date ->
-            val dateStr = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
-            habitRepository.getHabits(dateStr)
+    val habits: StateFlow<List<Habit>> = combine(_selectedDate, _filter) { date, filter ->
+        date to filter
+    }.flatMapLatest { (date, filter) ->
+        val dateStr = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
+        habitRepository.getHabits(dateStr).map { list ->
+            when (filter) {
+                HabitFilter.ALL -> list
+                HabitFilter.COMPLETED -> list.filter { it.isCompleted }
+                HabitFilter.UNCOMPLETED -> list.filter { !it.isCompleted }
+            }
         }
+    }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -56,6 +72,10 @@ class HabitsViewModel @Inject constructor(
 
     fun onDateSelected(date: LocalDate) {
         _selectedDate.value = date
+    }
+
+    fun setFilter(filter: HabitFilter) {
+        _filter.value = filter
     }
 
     fun toggleHabit(habit: Habit, completed: Boolean) {

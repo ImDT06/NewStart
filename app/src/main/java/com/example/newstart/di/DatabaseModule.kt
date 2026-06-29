@@ -5,6 +5,9 @@ import androidx.room.Room
 import com.example.newstart.data.local.NewStartDatabase
 import com.example.newstart.data.local.dao.HabitDao
 import com.example.newstart.data.local.dao.TodoDao
+import com.example.newstart.data.local.dao.JournalDao
+import com.example.newstart.data.local.dao.SocialDao
+import com.example.newstart.data.local.dao.UserDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -23,7 +26,9 @@ object DatabaseModule {
             context,
             NewStartDatabase::class.java,
             NewStartDatabase.DATABASE_NAME
-        ).fallbackToDestructiveMigration().build()
+        ).fallbackToDestructiveMigration()
+         .enableMultiInstanceInvalidation()
+         .build()
     }
 
     @Provides
@@ -35,4 +40,21 @@ object DatabaseModule {
     fun provideTodoDao(database: NewStartDatabase): TodoDao {
         return database.todoDao()
     }
+
+    @Provides
+    fun provideJournalDao(database: NewStartDatabase): JournalDao {
+        return database.journalDao()
+    }
+
+    @Provides
+    fun provideSocialDao(database: NewStartDatabase): SocialDao {
+        return database.socialDao()
+    }
+
+    @Provides
+    fun provideUserDao(database: NewStartDatabase): UserDao {
+        return database.userDao()
+    }
 }
+
+

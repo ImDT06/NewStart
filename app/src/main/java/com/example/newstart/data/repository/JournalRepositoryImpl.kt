@@ -7,7 +7,13 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
+import com.example.newstart.data.remote.dto.*
 import com.example.newstart.domain.model.JournalEntry
+import com.example.newstart.domain.model.JournalType
+import com.example.newstart.domain.model.JournalPrivacy
+import com.example.newstart.domain.model.MovieDetails
+import com.example.newstart.domain.model.BookDetails
+import com.example.newstart.domain.model.SubjectDetails
 import com.example.newstart.domain.repository.JournalRepository
 import com.example.newstart.util.AppConstants
 import com.google.firebase.auth.FirebaseAuth
@@ -32,42 +38,137 @@ import java.io.ByteArrayOutputStream
 import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.newstart.data.local.dao.JournalDao
+import com.example.newstart.data.local.toDomain
+import com.example.newstart.data.local.toEntity
+import androidx.work.*
+import com.example.newstart.data.worker.JournalSyncWorker
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+
 
 @Singleton
 class JournalRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
+    private val journalDao: JournalDao,
+    private val apiService: com.example.newstart.data.remote.NewStartApiService,
     @ApplicationContext private val context: Context,
 ) : JournalRepository {
 
     private val client = OkHttpClient()
+    private val repositoryScope = CoroutineScope(Dispatchers.IO)
+    private val workManager = WorkManager.getInstance(context)
 
-    override suspend fun saveJournalEntry(emoji: String, text: String, imageUri: Uri?, imageSource: String?): Result<Unit> {
+    private fun scheduleSync() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val syncRequest = OneTimeWorkRequestBuilder<JournalSyncWorker>()
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
+            .build()
+
+        workManager.enqueueUniqueWork(
+            "journal_sync_work",
+            ExistingWorkPolicy.REPLACE,
+            syncRequest
+        )
+    }
+
+    override suspend fun saveJournalEntry(
+        emoji: String,
+        text: String,
+        imageUri: Uri?,
+        imageSource: String?,
+        type: JournalType,
+        movieDetails: MovieDetails?,
+        bookDetails: BookDetails?,
+        subjectDetails: SubjectDetails?,
+        privacy: JournalPrivacy
+    ): Result<Unit> {
         return try {
             val userId = auth.currentUser?.uid ?: throw Exception("User not logged in")
-            var imageUrl: String? = null
-
-            // Upload ảnh lên Cloudinary nếu có
-            if (imageUri != null) {
-                imageUrl = uploadToCloudinary(imageUri)
-                if (imageUrl == null) throw Exception("Failed to upload image to Cloudinary")
-            }
-
-            val entry = JournalEntry(
+            val entryId = UUID.randomUUID().toString()
+            
+            // 1. Lưu local trước (isSynced = false)
+            val localEntry = JournalEntry(
+                id = entryId,
                 userId = userId,
                 emoji = emoji,
                 text = text,
-                imageUrl = imageUrl,
+                imageUrl = null,
                 imageSource = imageSource,
+                linkedHabitId = null,
+                linkedTodoId = null,
+                privacy = privacy,
+                type = type,
+                movieDetails = movieDetails,
+                bookDetails = bookDetails,
+                subjectDetails = subjectDetails,
                 timestamp = Date()
             )
-
-            // Sử dụng document() để lấy reference trước, lấy ID sau đó mới set data
-            val docRef = firestore.collection("journals").document()
-            val entryWithId = entry.copy(id = docRef.id)
+            journalDao.insertJournal(localEntry.toEntity(isSynced = false, localImageUri = imageUri?.toString()))
             
-            docRef.set(entryWithId).await()
-            android.util.Log.d("JournalRepository", "Entry saved successfully with ID: ${docRef.id}")
+            // 2. Thử đồng bộ ngay lập tức
+            try {
+                var imageUrl: String? = null
+                if (imageUri != null) {
+                    imageUrl = uploadToCloudinary(imageUri)
+                    if (imageUrl == null) throw Exception("Failed to upload image to Cloudinary")
+                }
+
+                val entryDto = JournalEntryDto(
+                    id = entryId,
+                    userId = userId,
+                    emoji = emoji,
+                    text = text,
+                    imageUrl = imageUrl,
+                    imageSource = imageSource ?: "",
+                    type = type.name,
+                    privacy = privacy.name,
+                    movieDetails = movieDetails?.let {
+                        MovieDetailsDto(
+                            title = it.title,
+                            director = it.director,
+                            actors = it.actors,
+                            rating = it.rating
+                        )
+                    },
+                    bookDetails = bookDetails?.let {
+                        BookDetailsDto(
+                            title = it.title,
+                            author = it.author,
+                            pagesRead = it.pagesRead,
+                            rating = it.rating
+                        )
+                    },
+                    subjectDetails = subjectDetails?.let {
+                        SubjectDetailsDto(
+                            name = it.name,
+                            topic = it.topic,
+                            score = it.score,
+                            understandingLevel = it.understandingLevel
+                        )
+                    }
+                )
+
+                println(">>> Đang gửi Nhật ký lên Server...")
+                apiService.createJournalEntry(entryDto)
+                
+                // Đồng bộ thành công -> update trạng thái isSynced = true
+                journalDao.insertJournal(
+                    localEntry.copy(imageUrl = imageUrl).toEntity(isSynced = true, localImageUri = imageUri?.toString())
+                )
+                android.util.Log.d("JournalRepository", "Entry saved via API successfully")
+            } catch (e: Exception) {
+                // Lỗi mạng -> Lên lịch sync ngầm
+                scheduleSync()
+            }
+            
             Result.success(Unit)
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
@@ -78,10 +179,16 @@ class JournalRepositoryImpl @Inject constructor(
 
     override suspend fun deleteJournalEntry(entryId: String): Result<Unit> {
         return try {
-            firestore.collection("journals").document(entryId).delete().await()
+            // Xóa local trước để UI mượt mà
+            journalDao.deleteJournal(entryId)
+            
+            try {
+                apiService.deleteJournalEntry(entryId)
+            } catch (e: Exception) {
+                // Bỏ qua lỗi xóa trên remote
+            }
             Result.success(Unit)
         } catch (e: Exception) {
-            android.util.Log.e("JournalRepository", "Error deleting entry: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -188,6 +295,14 @@ class JournalRepositoryImpl @Inject constructor(
             return@callbackFlow
         }
 
+        // 1. Phát ra dữ liệu từ Room cục bộ
+        val localJob = launch {
+            journalDao.getJournalEntries(userId).collect { entities ->
+                trySend(entities.map { it.toDomain() })
+            }
+        }
+
+        // 2. Lắng nghe Firestore để đồng bộ các thay đổi từ xa vào Room
         val subscription = firestore.collection("journals")
             .whereEqualTo("userId", userId)
             .orderBy("timestamp", Query.Direction.DESCENDING)
@@ -197,19 +312,99 @@ class JournalRepositoryImpl @Inject constructor(
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    android.util.Log.d("JournalRepository", "Raw documents count: ${snapshot.size()}")
-                    val entries = snapshot.documents.mapNotNull { doc ->
+                    val remoteEntries = snapshot.documents.mapNotNull { doc ->
                         try {
                             doc.toObject(JournalEntry::class.java)?.copy(id = doc.id)
                         } catch (e: Exception) {
-                            android.util.Log.e("JournalRepository", "Error parsing doc ${doc.id}: ${e.message}")
                             null
                         }
                     }
-                    android.util.Log.d("JournalRepository", "Successfully parsed entries: ${entries.size}")
-                    trySend(entries)
+                    
+                    launch(Dispatchers.IO) {
+                        // A. Dọn dẹp các journal đã bị xóa trên Firestore khỏi database cục bộ
+                        val localSyncedIds = journalDao.getSyncedJournalIds(userId)
+                        val remoteIds = remoteEntries.map { it.id }.toSet()
+                        val deletedIds = localSyncedIds.filter { !remoteIds.contains(it) }
+                        
+                        for (deletedId in deletedIds) {
+                            journalDao.deleteJournal(deletedId)
+                        }
+
+                        // B. Thêm/Cập nhật các journal mới từ Firestore vào Room
+                        if (remoteEntries.isNotEmpty()) {
+                            val entities = remoteEntries.map { it.toEntity(isSynced = true) }
+                            journalDao.insertJournals(entities)
+                        }
+                    }
                 }
             }
-        awaitClose { subscription.remove() }
+        awaitClose {
+            localJob.cancel()
+            subscription.remove()
+        }
+    }
+
+    override suspend fun syncUnsyncedJournals(): Result<Unit> {
+        return try {
+            val unsynced = journalDao.getUnsyncedJournals()
+            android.util.Log.d("JournalRepository", "Syncing ${unsynced.size} unsynced journals")
+            
+            for (entity in unsynced) {
+                var currentImageUrl = entity.imageUrl
+                
+                // 1. Tải ảnh lên Cloudinary nếu chưa tải lên và có ảnh cục bộ
+                if (currentImageUrl == null && !entity.localImageUri.isNullOrEmpty()) {
+                    val localUri = Uri.parse(entity.localImageUri)
+                    currentImageUrl = uploadToCloudinary(localUri)
+                    if (currentImageUrl == null) {
+                        throw Exception("Failed to upload image during sync")
+                    }
+                }
+                
+                // 2. Gửi API lên Spring Boot
+                val entryDto = JournalEntryDto(
+                    id = entity.id,
+                    userId = entity.userId,
+                    emoji = entity.emoji,
+                    text = entity.text,
+                    imageUrl = currentImageUrl,
+                    imageSource = entity.imageSource ?: "",
+                    type = entity.type,
+                    privacy = entity.privacy,
+                    movieDetails = if (entity.movieTitle != null) MovieDetailsDto(
+                        title = entity.movieTitle,
+                        director = entity.movieDirector ?: "",
+                        actors = entity.movieActors ?: "",
+                        rating = entity.movieRating ?: 0f
+                    ) else null,
+                    bookDetails = if (entity.bookTitle != null) BookDetailsDto(
+                        title = entity.bookTitle,
+                        author = entity.bookAuthor ?: "",
+                        pagesRead = entity.bookPagesRead ?: 0,
+                        rating = entity.bookRating ?: 0f
+                    ) else null,
+                    subjectDetails = if (entity.subjectName != null) SubjectDetailsDto(
+                        name = entity.subjectName,
+                        topic = entity.subjectTopic ?: "",
+                        score = entity.subjectScore,
+                        understandingLevel = entity.subjectUnderstandingLevel ?: 3
+                    ) else null
+                )
+                
+                apiService.createJournalEntry(entryDto)
+                
+                // 3. Đánh dấu đã synced trong Room
+                journalDao.insertJournal(
+                    entity.copy(
+                        imageUrl = currentImageUrl,
+                        isSynced = true
+                    )
+                )
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("JournalRepository", "Error in syncUnsyncedJournals: ${e.message}", e)
+            Result.failure(e)
+        }
     }
 }

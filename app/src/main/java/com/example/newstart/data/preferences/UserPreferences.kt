@@ -9,5 +9,6 @@ data class UserPreferences(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val themeColor: AppThemeColor = AppThemeColor.BLACK,
     val commonPomoTimes: List<Int> = listOf(25, 40, 60, 180),
-    val isJournalPromptEnabled: Boolean = true
+    val isJournalPromptEnabled: Boolean = true,
+    val isSearchable: Boolean = true
 )

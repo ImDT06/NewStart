@@ -10,3 +10,5 @@ build/
 .cxx
 local.properties
 *.main.kts
+node_modules/
+**/node_modules/

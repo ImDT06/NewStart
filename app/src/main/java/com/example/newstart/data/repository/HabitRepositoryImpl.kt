@@ -6,6 +6,7 @@ import androidx.work.*
 import com.example.newstart.data.local.dao.HabitDao
 import com.example.newstart.data.local.toDomain
 import com.example.newstart.data.local.toEntity
+import com.example.newstart.data.remote.NewStartApiService
 import com.example.newstart.data.worker.SyncWorker
 import com.example.newstart.domain.model.Habit
 import com.example.newstart.domain.repository.HabitRepository
@@ -29,6 +30,7 @@ class HabitRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
     private val habitDao: HabitDao,
+    private val apiService: NewStartApiService,
     @ApplicationContext private val context: Context
 ) : HabitRepository {
 
@@ -55,32 +57,51 @@ class HabitRepositoryImpl @Inject constructor(
     override suspend fun saveHabit(habit: Habit): Result<Unit> {
         return try {
             val userId = auth.currentUser?.uid ?: throw Exception("User not logged in")
-            val docRef = if (habit.id.isEmpty()) {
-                firestore.collection("habits").document()
+            
+            if (habit.squadId != null && habit.id.isEmpty()) {
+                val squadDoc = firestore.collection("squads").document(habit.squadId).get().await()
+                val members = squadDoc.get("members") as? List<String> ?: emptyList()
+                
+                for (memberId in members) {
+                    val docRef = firestore.collection("habits").document()
+                    val memberHabit = habit.copy(id = docRef.id, userId = memberId)
+                    
+                    if (memberId == userId) {
+                        habitDao.insertHabit(memberHabit.toEntity(isSynced = false))
+                    }
+                    
+                    try {
+                        docRef.set(memberHabit).await()
+                        if (memberId == userId) {
+                            habitDao.insertHabit(memberHabit.toEntity(isSynced = true))
+                            HabitReminderManager.scheduleReminder(context, memberHabit)
+                        }
+                    } catch (e: Exception) {
+                        if (memberId == userId) {
+                            scheduleSync()
+                        }
+                    }
+                }
             } else {
-                firestore.collection("habits").document(habit.id)
+                val docRef = if (habit.id.isEmpty()) {
+                    firestore.collection("habits").document()
+                } else {
+                    firestore.collection("habits").document(habit.id)
+                }
+                
+                val habitWithUserId = habit.copy(id = docRef.id, userId = userId)
+                
+                habitDao.insertHabit(habitWithUserId.toEntity(isSynced = false))
+                try {
+                    docRef.set(habitWithUserId).await()
+                    habitDao.insertHabit(habitWithUserId.toEntity(isSynced = true))
+                } catch (e: Exception) {
+                    scheduleSync()
+                }
+                HabitReminderManager.scheduleReminder(context, habitWithUserId)
             }
             
-            val habitWithUserId = habit.copy(id = docRef.id, userId = userId)
-            
-            // 1. Lưu vào Room trước (Offline-first)
-            habitDao.insertHabit(habitWithUserId.toEntity(isSynced = false))
-
-            // 2. Thử lưu vào Firestore
-            try {
-                docRef.set(habitWithUserId).await()
-                habitDao.insertHabit(habitWithUserId.toEntity(isSynced = true))
-            } catch (e: Exception) {
-                // Thất bại thì để SyncWorker lo
-                scheduleSync()
-            }
-            
-            // Đặt báo thức nhắc nhở
-            HabitReminderManager.scheduleReminder(context, habitWithUserId)
-            
-            // Cập nhật Widget
             HabitWidget().updateAll(context)
-            
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -139,9 +160,16 @@ class HabitRepositoryImpl @Inject constructor(
     override fun getHabits(date: String): Flow<List<Habit>> {
         val userId = auth.currentUser?.uid ?: ""
         
-        // Kích hoạt việc fetch từ network ngầm
+        // Kích hoạt việc fetch từ SERVER SPRING BOOT ngầm
         if (userId.isNotEmpty()) {
             repositoryScope.launch {
+                try {
+                    println(">>> Đang gọi API lấy dữ liệu từ Spring Boot...")
+                    val remoteHabits = apiService.getHabits(date)
+                    println(">>> Đã nhận được ${remoteHabits.size} thói quen từ Server!")
+                } catch (e: Exception) {
+                    println(">>> Lỗi gọi API: ${e.message}")
+                }
                 syncHabitsFromNetwork(userId, date)
             }
         }
