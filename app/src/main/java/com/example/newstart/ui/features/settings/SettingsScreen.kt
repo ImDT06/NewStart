@@ -230,7 +230,6 @@ fun SettingsScreen(
 
     var userEmailText by remember { mutableStateOf(currentUser?.email ?: "tranvanchinh555@gmail.com") }
     
-    val context = LocalContext.current
     val locale = remember(context) { context.resources.configuration.locales[0] }
     val isVi = remember(locale) { locale.language == "vi" }
     
