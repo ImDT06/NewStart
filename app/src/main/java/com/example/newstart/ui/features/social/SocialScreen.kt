@@ -56,7 +56,7 @@ fun SocialScreen(
     onNavigateBack: () -> Unit,
     viewModel: SocialViewModel = hiltViewModel()
 ) {
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
     val incomingRequests by viewModel.incomingRequests.collectAsStateWithLifecycle()
     val squads by viewModel.squads.collectAsStateWithLifecycle()
@@ -264,11 +264,10 @@ fun FriendsTabWrapper(
             textStyle = MaterialTheme.typography.bodyMedium
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (isSearching) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(2.dp))
-            Spacer(modifier = Modifier.height(12.dp))
+        Box(modifier = Modifier.fillMaxWidth().height(14.dp), contentAlignment = Alignment.Center) {
+            if (isSearching) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(2.dp))
+            }
         }
 
         LazyColumn(
