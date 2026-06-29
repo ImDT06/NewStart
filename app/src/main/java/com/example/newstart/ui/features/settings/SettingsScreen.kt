@@ -3,12 +3,14 @@ package com.example.newstart.ui.features.settings
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -927,92 +929,229 @@ fun SettingsScreen(
         var tempMonth by remember { mutableStateOf(parts.getOrNull(1) ?: "Tháng 6") }
         val isDark = isSystemInDarkTheme()
         
+        // 0: Main form, 1: Month Selector, 2: Day Selector
+        var activePickerState by remember { mutableStateOf(0) }
+        
+        val monthsList = listOf(
+            "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", 
+            "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", 
+            "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
+        )
+        
+        val maxDays = when (tempMonth) {
+            "Tháng 2" -> 29
+            "Tháng 4", "Tháng 6", "Tháng 9", "Tháng 11" -> 30
+            else -> 31
+        }
+        val daysList = (1..maxDays).map { it.toString() }
+        
         ModalBottomSheet(
-            onDismissRequest = { showBirthdayDialog = false },
+            onDismissRequest = { 
+                showBirthdayDialog = false 
+                activePickerState = 0
+            },
             containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 36.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "When is your birthday?",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Let us know so we can celebrate! 🥳",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    TextField(
-                        value = tempMonth,
-                        onValueChange = { tempMonth = it },
-                        placeholder = { Text("Tháng", color = Color.Gray) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        singleLine = true
-                    )
-                    
-                    TextField(
-                        value = tempDay,
-                        onValueChange = { tempDay = it },
-                        placeholder = { Text("Ngày", color = Color.Gray) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        singleLine = true
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Button(
-                    onClick = {
-                        birthdayText = "$tempDay $tempMonth"
-                        showBirthdayDialog = false
-                    },
-                    enabled = tempDay.isNotBlank() && tempMonth.isNotBlank(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(25.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                        disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Text("Lưu", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            AnimatedContent(
+                targetState = activePickerState,
+                label = "birthday_picker_transition"
+            ) { state ->
+                when (state) {
+                    0 -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .padding(horizontal = 24.dp)
+                                .padding(bottom = 36.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "When is your birthday?",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Let us know so we can celebrate! 🥳",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                // Chọn Tháng
+                                Surface(
+                                    onClick = { activePickerState = 1 },
+                                    modifier = Modifier.weight(1f).height(56.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                                ) {
+                                    Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.padding(horizontal = 16.dp)) {
+                                        Column {
+                                            Text("Tháng", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(tempMonth, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                                
+                                // Chọn Ngày
+                                Surface(
+                                    onClick = { activePickerState = 2 },
+                                    modifier = Modifier.weight(1f).height(56.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                                ) {
+                                    Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.padding(horizontal = 16.dp)) {
+                                        Column {
+                                            Text("Ngày", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(tempDay, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            Button(
+                                onClick = {
+                                    birthdayText = "$tempDay $tempMonth"
+                                    showBirthdayDialog = false
+                                },
+                                enabled = tempDay.isNotBlank() && tempMonth.isNotBlank(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp),
+                                shape = RoundedCornerShape(25.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                    disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                                    disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
+                                )
+                            ) {
+                                Text("Lưu", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            }
+                        }
+                    }
+                    1 -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .padding(horizontal = 24.dp)
+                                .padding(bottom = 36.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Month",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                            
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 280.dp)
+                            ) {
+                                items(monthsList) { month ->
+                                    val isSelected = month == tempMonth
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                tempMonth = month
+                                                val dayInt = tempDay.toIntOrNull() ?: 1
+                                                val newMaxDays = when (month) {
+                                                    "Tháng 2" -> 29
+                                                    "Tháng 4", "Tháng 6", "Tháng 9", "Tháng 11" -> 30
+                                                    else -> 31
+                                                }
+                                                if (dayInt > newMaxDays) {
+                                                    tempDay = newMaxDays.toString()
+                                                }
+                                                activePickerState = 0
+                                            }
+                                            .padding(vertical = 12.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = month,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            TextButton(onClick = { activePickerState = 0 }) {
+                                Text("Quay lại", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                    2 -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .padding(horizontal = 24.dp)
+                                .padding(bottom = 36.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Day",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                            
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 280.dp)
+                            ) {
+                                items(daysList) { day ->
+                                    val isSelected = day == tempDay
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                tempDay = day
+                                                activePickerState = 0
+                                            }
+                                            .padding(vertical = 12.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = day,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            TextButton(onClick = { activePickerState = 0 }) {
+                                Text("Quay lại", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                 }
             }
         }
