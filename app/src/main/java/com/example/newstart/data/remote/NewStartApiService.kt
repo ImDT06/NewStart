@@ -34,4 +34,14 @@ interface NewStartApiService {
 
     @DELETE("api/journal/{id}")
     suspend fun deleteJournalEntry(@Path("id") id: String)
+
+    // Social
+    @GET("api/social/feed")
+    suspend fun getSocialFeed(): List<Map<String, @kotlinx.serialization.Contextual Any>>
+
+    @POST("api/social/react/{postId}")
+    suspend fun reactToPost(
+        @Path("postId") postId: String,
+        @Query("emoji") emoji: String
+    )
 }

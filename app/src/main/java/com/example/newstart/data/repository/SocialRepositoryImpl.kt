@@ -14,7 +14,8 @@ import javax.inject.Singleton
 @Singleton
 class SocialRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val apiService: com.example.newstart.data.remote.NewStartApiService
 ) : SocialRepository {
 
     override fun getFriends(): Flow<List<Friendship>> = callbackFlow {
@@ -151,82 +152,32 @@ class SocialRepositoryImpl @Inject constructor(
             ).await()
     }
 
-    override fun getSocialFeed(): Flow<List<JournalEntry>> = callbackFlow {
-        val currentUserId = auth.currentUser?.uid
-        if (currentUserId == null) {
-            trySend(emptyList())
-            close()
-            return@callbackFlow
-        }
-
-        var journalsRegistration: com.google.firebase.firestore.ListenerRegistration? = null
-
-        val friendshipsRegistration = firestore.collection("friendships")
-            .whereArrayContains("userIds", currentUserId)
-            .addSnapshotListener { friendshipsSnapshot, error ->
-                if (error != null) {
-                    android.util.Log.e("SocialRepository", "Error fetching friendships: ${error.message}", error)
-                    return@addSnapshotListener
-                }
-
-                val friendIds = friendshipsSnapshot?.documents?.flatMap { doc ->
-                    val userIds = doc.get("userIds") as? List<String> ?: emptyList()
-                    userIds.filter { it != currentUserId }
-                }?.distinct() ?: emptyList()
-
-                val queryUsers = (friendIds + currentUserId).take(30)
-
-                // Hủy listener cũ của journals
-                journalsRegistration?.remove()
-
-                if (queryUsers.isEmpty()) {
-                    trySend(emptyList())
-                    return@addSnapshotListener
-                }
-
-                journalsRegistration = firestore.collection("journals")
-                    .whereIn("userId", queryUsers)
-                    .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                    .addSnapshotListener { journalsSnapshot, journalError ->
-                        if (journalError != null) {
-                            android.util.Log.e("SocialRepository", "Error fetching journals: ${journalError.message}", journalError)
-                            return@addSnapshotListener
-                        }
-
-                        if (journalsSnapshot != null) {
-                            val entries = journalsSnapshot.documents.mapNotNull { doc ->
-                                try {
-                                    doc.toObject(JournalEntry::class.java)?.copy(id = doc.id)
-                                } catch (e: Exception) {
-                                    android.util.Log.e("SocialRepository", "Error parsing journal: ${e.message}")
-                                    null
-                                }
-                            }
-                            trySend(entries)
-                        }
-                    }
+    override fun getSocialFeed(): Flow<List<JournalEntry>> = kotlinx.coroutines.flow.flow {
+        try {
+            val response = apiService.getSocialFeed()
+            // Convert Map to JournalEntry (Simplified for now)
+            val entries = response.map { map ->
+                JournalEntry(
+                    id = map["id"] as? String ?: "",
+                    userId = map["userId"] as? String ?: "",
+                    emoji = map["emoji"] as? String ?: "",
+                    text = map["text"] as? String ?: "",
+                    imageUrl = map["imageUrl"] as? String,
+                    reactions = map["reactions"] as? Map<String, String> ?: emptyMap()
+                )
             }
-
-        awaitClose {
-            friendshipsRegistration.remove()
-            journalsRegistration?.remove()
+            emit(entries)
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "API Feed error: ${e.message}")
+            emit(emptyList())
         }
     }
 
     override suspend fun reactToPost(postId: String, emoji: String) {
-        val userId = auth.currentUser?.uid ?: return
         try {
-            val docRef = firestore.collection("journals").document(postId)
-            val doc = docRef.get().await()
-            val reactions = doc.get("reactions") as? Map<String, String> ?: emptyMap()
-            
-            if (reactions[userId] == emoji) {
-                docRef.update("reactions.$userId", com.google.firebase.firestore.FieldValue.delete()).await()
-            } else {
-                docRef.update("reactions.$userId", emoji).await()
-            }
+            apiService.reactToPost(postId, emoji)
         } catch (e: Exception) {
-            android.util.Log.e("SocialRepository", "Error reacting to post: ${e.message}", e)
+            android.util.Log.e("SocialRepository", "API React error: ${e.message}")
         }
     }
 
