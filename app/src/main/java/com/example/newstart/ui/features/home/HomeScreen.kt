@@ -97,6 +97,7 @@ fun HomeScreen(
     val aiState by habitsViewModel.aiState.collectAsStateWithLifecycle()
     val completedHabitForJournal by habitsViewModel.completedHabitForJournal.collectAsStateWithLifecycle()
     val isJournalPromptEnabled by mainViewModel.isJournalPromptEnabled.collectAsStateWithLifecycle()
+    val squads by mainViewModel.squads.collectAsStateWithLifecycle()
 
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -321,7 +322,8 @@ fun HomeScreen(
                             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
                     }
-                }
+                },
+                squads = squads
             )
         }
 
@@ -1530,7 +1532,8 @@ private fun AiInteractionSheet(
     onConfirmHabits: (List<Habit>) -> Unit,
     onClearState: () -> Unit,
     isListening: Boolean,
-    onToggleListening: () -> Unit
+    onToggleListening: () -> Unit,
+    squads: List<com.example.newstart.domain.model.Squad> = emptyList()
 ) {
     val aiGradient = Brush.linearGradient(
         colors = listOf(Color(0xFF007AFF), Color(0xFF007AFF), Color(0xFF00C851))
@@ -1545,7 +1548,7 @@ private fun AiInteractionSheet(
     ) {
         AnimatedContent(targetState = aiState, label = "ai_content_anim") { state ->
             when (state) {
-                is AiState.Drafting -> AiDraftingView(state.habits, onConfirmHabits, onClearState)
+                is AiState.Drafting -> AiDraftingView(state.habits, squads, onConfirmHabits, onClearState)
                 else -> AiInputView(state, aiCommand, onAiCommandChange, onProcessCommand, isListening, onToggleListening, aiGradient)
             }
         }
@@ -1553,7 +1556,72 @@ private fun AiInteractionSheet(
 }
 
 @Composable
-private fun AiDraftingView(habits: List<Habit>, onConfirm: (List<Habit>) -> Unit, onCancel: () -> Unit) {
+private fun AiDraftingView(
+    initialHabits: List<Habit>,
+    squads: List<com.example.newstart.domain.model.Squad> = emptyList(),
+    onConfirm: (List<Habit>) -> Unit,
+    onCancel: () -> Unit
+) {
+    var draftHabits by remember(initialHabits) { mutableStateOf(initialHabits) }
+    var editingHabit by remember { mutableStateOf<Habit?>(null) }
+    var editingIndex by remember { mutableStateOf(-1) }
+
+    if (editingHabit != null && editingIndex != -1) {
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {
+                    editingHabit = null
+                    editingIndex = -1
+                }) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                }
+                Text(
+                    text = "Chỉnh sửa thói quen",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.size(48.dp))
+            }
+            com.example.newstart.ui.features.habits.components.HabitConfigContent(
+                initialDate = LocalDate.parse(editingHabit!!.date),
+                habit = editingHabit!!,
+                squads = squads,
+                onConfirm = { name, icon, time, mins, color, date, squadId ->
+                    val colorInt = (color.red * 255).toInt() shl 16 or
+                                  (color.green * 255).toInt() shl 8 or
+                                  (color.blue * 255).toInt()
+                    val colorHex = String.format("#%06X", colorInt)
+                    val updatedHabit = editingHabit!!.copy(
+                        name = name,
+                        icon = icon,
+                        reminderTime = time,
+                        reminderMinutesBefore = mins,
+                        colorHex = colorHex,
+                        date = date.toString(),
+                        squadId = squadId
+                    )
+                    draftHabits = draftHabits.toMutableList().apply {
+                        set(editingIndex, updatedHabit)
+                    }
+                    editingHabit = null
+                    editingIndex = -1
+                },
+                onCancel = {
+                    editingHabit = null
+                    editingIndex = -1
+                }
+            )
+        }
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1562,13 +1630,31 @@ private fun AiDraftingView(habits: List<Habit>, onConfirm: (List<Habit>) -> Unit
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Xác nhận thói quen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text("AI đã đề xuất ${habits.size} mục mới cho bạn", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("AI đề xuất các thói quen sau (Bấm để chỉnh sửa)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
-        habits.forEach { habit ->
-            Card(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = RoundedCornerShape(20.dp)) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)) {
-                        Box(contentAlignment = Alignment.Center) { Text(habit.icon, fontSize = 24.sp) }
+        draftHabits.forEachIndexed { index, habit ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+                    .clickable {
+                        editingHabit = habit
+                        editingIndex = index
+                    },
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.size(48.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(habit.icon, fontSize = 24.sp)
+                        }
                     }
                     Spacer(Modifier.width(16.dp))
                     Column(Modifier.weight(1f)) {
@@ -1577,10 +1663,20 @@ private fun AiDraftingView(habits: List<Habit>, onConfirm: (List<Habit>) -> Unit
                             Text(time, color = MaterialTheme.colorScheme.primary)
                         }
                     }
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
-        Button(onClick = { onConfirm(habits) }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) {
+        Button(
+            onClick = { onConfirm(draftHabits) },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
             Text("Thêm tất cả vào lịch trình", fontWeight = FontWeight.Bold)
         }
         TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {

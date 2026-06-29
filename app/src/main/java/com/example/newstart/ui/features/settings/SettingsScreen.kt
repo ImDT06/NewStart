@@ -6,11 +6,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -22,6 +25,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -214,6 +219,7 @@ fun SettingsScreen(
     var isNotificationEnabled by remember { mutableStateOf(true) }
     var showChangeEmailDialog by remember { mutableStateOf(false) }
     var showBirthdayDialog by remember { mutableStateOf(false) }
+    var showChangePasswordBottomSheet by remember { mutableStateOf(false) }
 
 
     var emailChangeStep by remember { mutableStateOf(1) }
@@ -682,6 +688,13 @@ fun SettingsScreen(
                             subtitle = birthdayText,
                             onClick = { showBirthdayDialog = true }
                         )
+                        SettingsDivider()
+                        SettingsItem(
+                            icon = Icons.Default.VpnKey,
+                            title = if (isVi) "Đổi mật khẩu" else "Change Password",
+                            subtitle = if (isVi) "Cập nhật mật khẩu tài khoản" else "Update account password",
+                            onClick = { showChangePasswordBottomSheet = true }
+                        )
                     }
                 }
 
@@ -813,15 +826,24 @@ fun SettingsScreen(
         var tempEmail by remember { mutableStateOf(userEmailText) }
         val isDark = isSystemInDarkTheme()
         
+        val emailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
             onDismissRequest = { showChangeEmailDialog = false },
+            sheetState = emailSheetState,
             containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
+            val focusManager = LocalFocusManager.current
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
+                    .imePadding()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { focusManager.clearFocus() }
+                    )
                     .padding(horizontal = 24.dp)
                     .padding(bottom = 36.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -1179,6 +1201,219 @@ fun SettingsScreen(
             }
         }
     }
+
+    if (showChangePasswordBottomSheet) {
+        val isDark = isSystemInDarkTheme()
+        var currentPasswordText by remember { mutableStateOf("") }
+        var newPasswordText by remember { mutableStateOf("") }
+        var confirmPasswordText by remember { mutableStateOf("") }
+        
+        var currentPasswordError by remember { mutableStateOf<String?>(null) }
+        var newPasswordError by remember { mutableStateOf<String?>(null) }
+        var confirmPasswordError by remember { mutableStateOf<String?>(null) }
+        
+        var isLoading by remember { mutableStateOf(false) }
+        val scrollState = rememberScrollState()
+        
+        val changePasswordSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { 
+                showChangePasswordBottomSheet = false 
+                currentPasswordText = ""
+                newPasswordText = ""
+                confirmPasswordText = ""
+                currentPasswordError = null
+                newPasswordError = null
+                confirmPasswordError = null
+            },
+            sheetState = changePasswordSheetState,
+            containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            val focusManager = LocalFocusManager.current
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .verticalScroll(scrollState)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { focusManager.clearFocus() }
+                    )
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 36.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = if (isVi) "Đổi mật khẩu" else "Change Password",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                // Mật khẩu hiện tại
+                OutlinedTextField(
+                    value = currentPasswordText,
+                    onValueChange = { 
+                        currentPasswordText = it
+                        currentPasswordError = null
+                    },
+                    placeholder = { Text(if (isVi) "Mật khẩu hiện tại" else "Current Password", color = Color.Gray) },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = currentPasswordError != null,
+                    supportingText = currentPasswordError?.let { { Text(it, color = Color(0xFFE53935)) } },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        errorContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        errorBorderColor = Color(0xFFE53935),
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        errorTextColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    singleLine = true,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                )
+                
+                // Mật khẩu mới
+                OutlinedTextField(
+                    value = newPasswordText,
+                    onValueChange = { 
+                        newPasswordText = it
+                        newPasswordError = null
+                    },
+                    placeholder = { Text(if (isVi) "Mật khẩu mới (tối thiểu 6 ký tự)" else "New Password (min 6 chars)", color = Color.Gray) },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = newPasswordError != null,
+                    supportingText = newPasswordError?.let { { Text(it, color = Color(0xFFE53935)) } },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        errorContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        errorBorderColor = Color(0xFFE53935),
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        errorTextColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    singleLine = true,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                )
+                
+                // Xác nhận mật khẩu mới
+                OutlinedTextField(
+                    value = confirmPasswordText,
+                    onValueChange = { 
+                        confirmPasswordText = it
+                        confirmPasswordError = null
+                    },
+                    placeholder = { Text(if (isVi) "Xác nhận mật khẩu mới" else "Confirm New Password", color = Color.Gray) },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = confirmPasswordError != null,
+                    supportingText = confirmPasswordError?.let { { Text(it, color = Color(0xFFE53935)) } },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        unfocusedContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        errorContainerColor = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        errorBorderColor = Color(0xFFE53935),
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        errorTextColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    singleLine = true,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TextButton(
+                        onClick = { 
+                            showChangePasswordBottomSheet = false 
+                            currentPasswordText = ""
+                            newPasswordText = ""
+                            confirmPasswordText = ""
+                            currentPasswordError = null
+                            newPasswordError = null
+                            confirmPasswordError = null
+                        },
+                        enabled = !isLoading,
+                        modifier = Modifier.weight(1f).height(48.dp)
+                    ) {
+                        Text(if (isVi) "Hủy" else "Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Button(
+                        onClick = {
+                            if (newPasswordText.length < 6) {
+                                newPasswordError = if (isVi) "Mật khẩu mới phải từ 6 ký tự trở lên" else "New password must be at least 6 characters"
+                                return@Button
+                            }
+                            if (newPasswordText != confirmPasswordText) {
+                                confirmPasswordError = if (isVi) "Mật khẩu xác nhận không khớp" else "Confirm password does not match"
+                                return@Button
+                            }
+                            isLoading = true
+                            val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+                            if (user != null && user.email != null) {
+                                val credential = com.google.firebase.auth.EmailAuthProvider.getCredential(user.email!!, currentPasswordText)
+                                user.reauthenticate(credential).addOnCompleteListener { reauthTask ->
+                                    if (reauthTask.isSuccessful) {
+                                        user.updatePassword(newPasswordText).addOnCompleteListener { updateTask ->
+                                            isLoading = false
+                                            if (updateTask.isSuccessful) {
+                                                Toast.makeText(context, if (isVi) "Đổi mật khẩu thành công!" else "Password updated successfully!", Toast.LENGTH_SHORT).show()
+                                                showChangePasswordBottomSheet = false
+                                                currentPasswordText = ""
+                                                newPasswordText = ""
+                                                confirmPasswordText = ""
+                                            } else {
+                                                newPasswordError = updateTask.exception?.localizedMessage ?: (if (isVi) "Đổi mật khẩu thất bại" else "Failed to update password")
+                                            }
+                                        }
+                                    } else {
+                                        isLoading = false
+                                        currentPasswordError = if (isVi) "Mật khẩu hiện tại không chính xác" else "Incorrect current password"
+                                    }
+                                }
+                            } else {
+                                isLoading = false
+                                Toast.makeText(context, if (isVi) "Không tìm thấy thông tin người dùng" else "User info not found", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        enabled = !isLoading && currentPasswordText.isNotBlank() && newPasswordText.isNotBlank() && confirmPasswordText.isNotBlank(),
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(25.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                            disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
+                        } else {
+                            Text(if (isVi) "Lưu" else "Save", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1193,15 +1428,24 @@ fun EditProfileDialog(
     var lastName by remember { mutableStateOf(nameParts.getOrNull(1) ?: "") }
     val isDark = isSystemInDarkTheme()
     
+    val editProfileSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = editProfileSheetState,
         containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
+        val focusManager = LocalFocusManager.current
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
+                .imePadding()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { focusManager.clearFocus() }
+                )
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 36.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1333,8 +1577,10 @@ fun ThemeSelectionDialog(
     onModeSelected: (ThemeMode) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
@@ -1391,8 +1637,10 @@ fun ColorSelectionDialog(
         AppThemeColor.BLACK -> Color(0xFF1B1B1F)
     }
 
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
