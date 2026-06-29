@@ -62,6 +62,7 @@ import com.example.newstart.domain.model.User
 import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.components.MonthPickerDialog
 import com.example.newstart.ui.features.habits.AiState
+import com.example.newstart.ui.features.habits.HabitFilter
 import com.example.newstart.ui.features.habits.HabitsViewModel
 import com.example.newstart.ui.features.habits.components.HabitItem
 import com.example.newstart.ui.navigation.Screen
@@ -87,6 +88,7 @@ fun HomeScreen(
 ) {
     val userState by viewModel.userState.collectAsStateWithLifecycle()
     val habits by habitsViewModel.habits.collectAsStateWithLifecycle()
+    val habitsFilter by habitsViewModel.filter.collectAsStateWithLifecycle()
     val todos by viewModel.todos.collectAsStateWithLifecycle()
     val timerSeconds by viewModel.timerSeconds.collectAsStateWithLifecycle()
     val isTimerRunning by viewModel.isTimerRunning.collectAsStateWithLifecycle()
@@ -228,6 +230,8 @@ fun HomeScreen(
         HomeContent(
             user = userState,
             habits = habits,
+            habitsFilter = habitsFilter,
+            onFilterSelected = { habitsViewModel.setFilter(it) },
             todos = todos,
             timerSeconds = timerSeconds,
             isTimerRunning = isTimerRunning,
@@ -408,6 +412,8 @@ fun HomeScreen(
 fun HomeContent(
     user: User?,
     habits: List<Habit>,
+    habitsFilter: HabitFilter,
+    onFilterSelected: (HabitFilter) -> Unit,
     todos: List<Todo>,
     timerSeconds: Int,
     isTimerRunning: Boolean,
@@ -476,6 +482,8 @@ fun HomeContent(
                 item {
                     HabitsHeader(
                         selectedDate = selectedDate,
+                        currentFilter = habitsFilter,
+                        onFilterSelected = onFilterSelected,
                         today = today,
                         isVietnamese = isVietnamese,
                         locale = locale,
@@ -793,12 +801,16 @@ private fun HabitSwipeableItem(
 @Composable
 private fun HabitsHeader(
     selectedDate: LocalDate,
+    currentFilter: HabitFilter,
+    onFilterSelected: (HabitFilter) -> Unit,
     today: LocalDate,
     isVietnamese: Boolean,
     locale: Locale,
     onTodayClick: () -> Unit,
     onShowMonthPicker: () -> Unit,
 ) {
+    var showFilterMenu by remember { mutableStateOf(false) }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -810,22 +822,67 @@ private fun HabitsHeader(
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.align(Alignment.CenterStart)
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.habits_filter_all),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Icon(
-                    Icons.Default.KeyboardArrowDown,
-                    null,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(14.dp)
-                )
+            Box {
+                Row(
+                    modifier = Modifier
+                        .clickable { showFilterMenu = true }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = when (currentFilter) {
+                            HabitFilter.ALL -> stringResource(R.string.habits_filter_all)
+                            HabitFilter.COMPLETED -> stringResource(R.string.habits_filter_completed)
+                            HabitFilter.UNCOMPLETED -> stringResource(R.string.habits_filter_uncompleted)
+                        },
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        null,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showFilterMenu,
+                    onDismissRequest = { showFilterMenu = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.habits_filter_all)) },
+                        onClick = {
+                            onFilterSelected(HabitFilter.ALL)
+                            showFilterMenu = false
+                        },
+                        leadingIcon = {
+                            if (currentFilter == HabitFilter.ALL) Icon(Icons.Default.Check, null)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.habits_filter_completed)) },
+                        onClick = {
+                            onFilterSelected(HabitFilter.COMPLETED)
+                            showFilterMenu = false
+                        },
+                        leadingIcon = {
+                            if (currentFilter == HabitFilter.COMPLETED) Icon(Icons.Default.Check, null)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.habits_filter_uncompleted)) },
+                        onClick = {
+                            onFilterSelected(HabitFilter.UNCOMPLETED)
+                            showFilterMenu = false
+                        },
+                        leadingIcon = {
+                            if (currentFilter == HabitFilter.UNCOMPLETED) Icon(Icons.Default.Check, null)
+                        }
+                    )
+                }
             }
         }
 

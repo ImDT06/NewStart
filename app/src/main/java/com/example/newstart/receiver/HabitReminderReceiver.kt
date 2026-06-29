@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import android.media.RingtoneManager
 import androidx.core.app.NotificationCompat
 import com.example.newstart.MainActivity
 import com.example.newstart.R
@@ -53,6 +54,8 @@ class HabitReminderReceiver : BroadcastReceiver() {
         val channelId = "habit_reminder_channel"
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
+        val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
@@ -62,6 +65,7 @@ class HabitReminderReceiver : BroadcastReceiver() {
                 description = "Thông báo nhắc nhở thói quen"
                 enableLights(true)
                 enableVibration(true)
+                setSound(defaultSoundUri, null)
             }
             notificationManager.createNotificationChannel(channel)
         }
@@ -85,6 +89,8 @@ class HabitReminderReceiver : BroadcastReceiver() {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .setSound(defaultSoundUri)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
 
         val notificationId = if (isEarly) habitId.hashCode() + 1 else habitId.hashCode()

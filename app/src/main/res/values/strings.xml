@@ -109,6 +109,8 @@
 
     <!-- Habits Screen -->
     <string name="habits_filter_all">Tất cả</string>
+    <string name="habits_filter_completed">Hoàn thành</string>
+    <string name="habits_filter_uncompleted">Chưa hoàn thành</string>
     <string name="habits_today">Hôm nay</string>
     <string name="habits_streak_day">Ngày</string>
     <string name="habits_delete_title">Xóa thói quen</string>

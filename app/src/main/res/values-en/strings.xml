@@ -109,6 +109,8 @@
 
     <!-- Habits Screen -->
     <string name="habits_filter_all">All</string>
+    <string name="habits_filter_completed">Completed</string>
+    <string name="habits_filter_uncompleted">Uncompleted</string>
     <string name="habits_today">Today</string>
     <string name="habits_streak_day">Day</string>
     <string name="habits_delete_title">Delete habit</string>
