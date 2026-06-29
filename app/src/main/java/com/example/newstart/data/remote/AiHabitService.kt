@@ -13,41 +13,33 @@ import javax.inject.Singleton
 class AiHabitService @Inject constructor(
     private val client: OkHttpClient // Sử dụng OkHttpClient đã có trong project
 ) {
-    // ĐƯỜNG LINK VERCEL ĐÃ ĐƯỢC CẬP NHẬT TỪ PROJECT CỦA BẠN
-    private val VERCEL_URL = "https://vercel-new-start.vercel.app/api/process"
+    // ĐƯỜNG LINK RAILWAY MỚI
+    private val SERVER_URL = "https://newstart-backend-production.up.railway.app/api/ai/process"
 
     suspend fun processCommand(input: String, currentTime: String): JSONObject {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val jsonBody = JSONObject().apply {
-                    put("prompt", input)
-                    put("currentTime", currentTime)
+                    put("prompt", "Current time: $currentTime. User input: $input")
                 }
 
                 val request = Request.Builder()
-                    .url(VERCEL_URL)
+                    .url(SERVER_URL)
                     .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                     .build()
 
                 client.newCall(request).execute().use { response ->
-                    val responseStr = response.body?.string()?.trim() ?: "{}"
-                    android.util.Log.d("AiHabitService", "Response: $responseStr")
+                    val responseStr = response.body?.string()?.trim() ?: ""
+                    android.util.Log.d("AiHabitService", "Response from Railway: $responseStr")
                     
                     if (!response.isSuccessful) {
-                        android.util.Log.e("AiHabitService", "Server Error: ${response.code} - $responseStr")
-                        throw Exception("Lỗi Server (${response.code}): $responseStr")
+                        throw Exception("Lỗi Server Railway: $responseStr")
                     }
                     
-                    if (responseStr.startsWith("[")) {
-                        JSONObject().put("results", org.json.JSONArray(responseStr))
-                    } else {
-                        val parsedJson = JSONObject(responseStr)
-                        if (parsedJson.has("results")) {
-                            parsedJson
-                        } else {
-                            JSONObject().put("results", org.json.JSONArray().put(parsedJson))
-                        }
-                    }
+                    // Giữ nguyên logic trả về kết quả cho App
+                    val result = JSONObject()
+                    result.put("results", responseStr)
+                    result
                 }
             } catch (e: Exception) {
                 android.util.Log.e("AiHabitService", "Lỗi: ${e.message}", e)
