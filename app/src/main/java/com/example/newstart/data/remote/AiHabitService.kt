@@ -5,6 +5,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import org.json.JSONArray
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -36,9 +37,32 @@ class AiHabitService @Inject constructor(
                         throw Exception("Lỗi Server Railway: $responseStr")
                     }
                     
+                    // Clean markdown code blocks from response if present
+                    var cleanJson = responseStr
+                    if (cleanJson.startsWith("```")) {
+                        cleanJson = cleanJson.substringAfter("\n")
+                    }
+                    if (cleanJson.endsWith("```")) {
+                        cleanJson = cleanJson.substringBeforeLast("```")
+                    }
+                    cleanJson = cleanJson.trim()
+                    if (cleanJson.startsWith("json")) {
+                        cleanJson = cleanJson.substring(4).trim()
+                    }
+
+                    val resultsArray = try {
+                        JSONArray(cleanJson)
+                    } catch (e: Exception) {
+                        try {
+                            JSONArray().put(JSONObject(cleanJson))
+                        } catch (ex: Exception) {
+                            JSONArray()
+                        }
+                    }
+
                     // Giữ nguyên logic trả về kết quả cho App
                     val result = JSONObject()
-                    result.put("results", responseStr)
+                    result.put("results", resultsArray)
                     result
                 }
             } catch (e: Exception) {
