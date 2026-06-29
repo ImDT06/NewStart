@@ -1038,14 +1038,14 @@ fun SquadDetailView(
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
-            lazyListState.animateScrollToItem(messages.size - 1)
+            lazyListState.animateScrollToItem(0)
         }
     }
 
     val isKeyboardVisible = WindowInsets.isImeVisible
     LaunchedEffect(isKeyboardVisible) {
         if (isKeyboardVisible && messages.isNotEmpty()) {
-            lazyListState.animateScrollToItem(messages.size - 1)
+            lazyListState.animateScrollToItem(0)
         }
     }
 
@@ -1252,6 +1252,7 @@ fun SquadDetailView(
                     } else {
                         LazyColumn(
                             state = lazyListState,
+                            reverseLayout = true,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .pointerInput(Unit) {
@@ -1265,7 +1266,7 @@ fun SquadDetailView(
                                 bottom = 8.dp
                             )
                         ) {
-                            items(messages) { message ->
+                            items(messages.asReversed()) { message ->
                                 val isMe = message.senderId == currentUserId
                                 val timeString = remember(message.timestamp) { timeFormatter.format(message.timestamp) }
                                 Row(
