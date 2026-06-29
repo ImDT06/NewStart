@@ -7,19 +7,18 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
+import com.example.newstart.data.remote.dto.*
 import com.example.newstart.domain.model.User
 import com.example.newstart.domain.repository.UserRepository
 import com.example.newstart.util.AppConstants
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import okhttp3.*
@@ -34,46 +33,40 @@ import javax.inject.Singleton
 class UserRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
+    private val apiService: com.example.newstart.data.remote.NewStartApiService,
     @ApplicationContext private val context: Context
 ) : UserRepository {
     
     private val client = OkHttpClient()
 
-    override fun getUserById(id: String): Flow<User> = callbackFlow {
+    override fun getUserById(id: String): Flow<User> = kotlinx.coroutines.flow.flow {
         if (id.isBlank()) {
-            trySend(User())
-            close()
-            return@callbackFlow
+            emit(User())
+            return@flow
         }
-
-        val subscription = firestore.collection("users").document(id)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    android.util.Log.e("UserRepository", "Listen failed: ${error.message}")
-                    return@addSnapshotListener
-                }
-                
-                if (snapshot != null && snapshot.exists()) {
-                    try {
-                        val user = snapshot.toObject(User::class.java)?.copy(id = snapshot.id)
-                        if (user != null) trySend(user)
-                    } catch (e: Exception) {
-                        android.util.Log.e("UserRepository", "Error parsing user: ${e.message}")
-                    }
-                } else {
-                    // Fallback: Lấy từ Auth nếu Firestore chưa có (user mới)
-                    val firebaseUser = auth.currentUser
-                    if (firebaseUser != null && firebaseUser.uid == id) {
-                        trySend(User(
-                            id = firebaseUser.uid,
-                            name = firebaseUser.displayName ?: "",
-                            email = firebaseUser.email ?: "",
-                            avatarUrl = firebaseUser.photoUrl?.toString()
-                        ))
-                    }
-                }
+        try {
+            val dto = apiService.getUserById(id)
+            emit(User(
+                id = dto.id ?: "",
+                userId = dto.userId ?: "",
+                name = dto.name,
+                email = dto.email,
+                avatarUrl = dto.avatarUrl
+            ))
+        } catch (e: Exception) {
+            android.util.Log.e("UserRepository", "API getUserById error: ${e.message}")
+            val firebaseUser = auth.currentUser
+            if (firebaseUser != null && firebaseUser.uid == id) {
+                emit(User(
+                    id = firebaseUser.uid,
+                    name = firebaseUser.displayName ?: "",
+                    email = firebaseUser.email ?: "",
+                    avatarUrl = firebaseUser.photoUrl?.toString()
+                ))
+            } else {
+                emit(User(id = id))
             }
-        awaitClose { subscription.remove() }
+        }
     }
 
     override suspend fun updateAvatar(userId: String, uri: Uri?): Result<String?> {
@@ -90,23 +83,14 @@ class UserRepositoryImpl @Inject constructor(
                 if (imageUrl == null) throw Exception("Cloudinary upload failed")
             }
 
-            // 2. LẤY DỮ LIỆU TỪ AUTH ĐỂ LẮP VÀO FIRESTORE
-            val firebaseUser = auth.currentUser
-            val userDocument = firestore.collection("users").document(userId)
+            // 2. Gửi API update
+            val updates = mutableMapOf<String, String>()
+            imageUrl?.let { updates["avatarUrl"] = it }
             
-            // Đóng gói thông tin từ Auth để gửi qua Firestore
-            val updates = mutableMapOf<String, Any?>()
-            updates["id"] = userId
-            updates["avatarUrl"] = imageUrl
-            
-            // Lấy Tên và Email từ Auth, nếu có thì mới lắp vào để tránh đè dữ liệu trống
-            firebaseUser?.displayName?.let { if (it.isNotBlank()) updates["name"] = it }
-            firebaseUser?.email?.let { if (it.isNotBlank()) updates["email"] = it }
-            
-            // Thực hiện lệnh lắp dữ liệu (Merge giúp giữ lại các trường khác nếu có)
-            userDocument.set(updates, SetOptions.merge()).await()
+            apiService.updateProfile(updates)
 
-            // 3. Cập nhật ngược lại hồ sơ Auth để đồng bộ bộ nhớ tạm
+            // 3. Cập nhật hồ sơ Auth
+            val firebaseUser = auth.currentUser
             val profileUpdates = UserProfileChangeRequest.Builder()
                 .setPhotoUri(imageUrl?.let { Uri.parse(it) })
                 .build()
@@ -132,10 +116,10 @@ class UserRepositoryImpl @Inject constructor(
         
         return try {
             val firebaseUser = auth.currentUser
-            val userDocument = firestore.collection("users").document(userId)
             
+            // Gửi API update
             val updates = mapOf("name" to name)
-            userDocument.set(updates, SetOptions.merge()).await()
+            apiService.updateProfile(updates)
 
             val profileUpdates = UserProfileChangeRequest.Builder()
                 .setDisplayName(name)
@@ -154,52 +138,18 @@ class UserRepositoryImpl @Inject constructor(
         if (queryClean.isEmpty()) return emptyList()
 
         return try {
-            val capitalizedQuery = queryClean.replaceFirstChar { 
-                if (it.isLowerCase()) it.titlecase(java.util.Locale.ROOT) else it.toString() 
+            val response = apiService.searchUsers(queryClean)
+            response.map { dto ->
+                User(
+                    id = dto.id ?: "",
+                    userId = dto.userId ?: "",
+                    name = dto.name,
+                    email = dto.email,
+                    avatarUrl = dto.avatarUrl
+                )
             }
-            val lowercaseQuery = queryClean.lowercase()
-
-            val nameQuery1 = firestore.collection("users")
-                .whereGreaterThanOrEqualTo("name", queryClean)
-                .whereLessThanOrEqualTo("name", queryClean + "\uf8ff")
-                .limit(20)
-                .get()
-
-            val nameQuery2 = if (capitalizedQuery != queryClean) {
-                firestore.collection("users")
-                    .whereGreaterThanOrEqualTo("name", capitalizedQuery)
-                    .whereLessThanOrEqualTo("name", capitalizedQuery + "\uf8ff")
-                    .limit(20)
-                    .get()
-            } else null
-
-            val emailQuery1 = firestore.collection("users")
-                .whereGreaterThanOrEqualTo("email", queryClean)
-                .whereLessThanOrEqualTo("email", queryClean + "\uf8ff")
-                .limit(20)
-                .get()
-
-            val emailQuery2 = if (lowercaseQuery != queryClean) {
-                firestore.collection("users")
-                    .whereGreaterThanOrEqualTo("email", lowercaseQuery)
-                    .whereLessThanOrEqualTo("email", lowercaseQuery + "\uf8ff")
-                    .limit(20)
-                    .get()
-            } else null
-
-            val snapshot1 = nameQuery1.await()
-            val snapshot2 = nameQuery2?.await()
-            val snapshot3 = emailQuery1.await()
-            val snapshot4 = emailQuery2?.await()
-
-            val users = mutableListOf<User>()
-            users.addAll(snapshot1.documents.mapNotNull { it.toObject(User::class.java)?.copy(id = it.id) })
-            snapshot2?.let { s -> users.addAll(s.documents.mapNotNull { it.toObject(User::class.java)?.copy(id = it.id) }) }
-            users.addAll(snapshot3.documents.mapNotNull { it.toObject(User::class.java)?.copy(id = it.id) })
-            snapshot4?.let { s -> users.addAll(s.documents.mapNotNull { it.toObject(User::class.java)?.copy(id = it.id) }) }
-
-            users.distinctBy { it.id }
         } catch (e: Exception) {
+            android.util.Log.e("UserRepository", "API Search error: ${e.message}")
             emptyList()
         }
     }
@@ -214,12 +164,12 @@ class UserRepositoryImpl @Inject constructor(
                     bytes.toRequestBody("image/*".toMediaTypeOrNull()))
                 .addFormDataPart("upload_preset", AppConstants.CLOUDINARY_UPLOAD_PRESET)
                 .build()
-
+            
             val request = Request.Builder()
                 .url(AppConstants.CLOUDINARY_UPLOAD_URL)
                 .post(requestBody)
                 .build()
-
+            
             client.newCall(request).execute().use { response ->
                 val responseData = response.body?.string()
                 
@@ -233,7 +183,6 @@ class UserRepositoryImpl @Inject constructor(
                         "Mã lỗi ${response.code}"
                     }
                     
-                    // Hiện Toast để bạn biết tại sao lỗi (VD: sai Preset Cloudinary)
                     Handler(Looper.getMainLooper()).post {
                         Toast.makeText(context, "Cloudinary: $errorMsg", Toast.LENGTH_LONG).show()
                     }

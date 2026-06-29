@@ -72,4 +72,14 @@ interface NewStartApiService {
 
     @POST("api/squads/{id}/messages")
     suspend fun sendSquadMessage(@Path("id") id: String, @Body message: SquadMessageDto)
+
+    // Users
+    @GET("api/users/{id}")
+    suspend fun getUserById(@Path("id") id: String): UserDto
+
+    @GET("api/users/search")
+    suspend fun searchUsers(@Query("query") query: String): List<UserDto>
+
+    @PUT("api/users/profile")
+    suspend fun updateProfile(@Body updates: Map<String, String>): UserDto
 }
