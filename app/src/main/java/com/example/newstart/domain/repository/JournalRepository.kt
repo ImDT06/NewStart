@@ -22,4 +22,5 @@ interface JournalRepository {
     ): Result<Unit>
     suspend fun deleteJournalEntry(entryId: String): Result<Unit>
     fun getJournalEntries(): Flow<List<JournalEntry>>
+    suspend fun syncUnsyncedJournals(): Result<Unit>
 }
