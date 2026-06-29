@@ -229,7 +229,32 @@ fun SettingsScreen(
     val isSearchable by mainViewModel.isSearchable.collectAsStateWithLifecycle()
 
     var userEmailText by remember { mutableStateOf(currentUser?.email ?: "tranvanchinh555@gmail.com") }
-    var birthdayText by remember { mutableStateOf("27 Tháng 6") }
+    
+    val context = LocalContext.current
+    val locale = remember(context) { context.resources.configuration.locales[0] }
+    val isVi = remember(locale) { locale.language == "vi" }
+    
+    var birthdayDay by remember { mutableStateOf(27) }
+    var birthdayMonth by remember { mutableStateOf(6) } // 1-12
+    
+    val monthsList = listOf(
+        "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", 
+        "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", 
+        "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
+    )
+    val monthsListEn = listOf(
+        "January", "February", "March", "April", 
+        "May", "June", "July", "August", 
+        "September", "October", "November", "December"
+    )
+    
+    val birthdayText = remember(birthdayDay, birthdayMonth, isVi) {
+        if (isVi) {
+            "$birthdayDay ${monthsList[birthdayMonth - 1]}"
+        } else {
+            "${monthsListEn[birthdayMonth - 1]} $birthdayDay"
+        }
+    }
 
     val requestPinWidget = {
         val appWidgetManager = AppWidgetManager.getInstance(context)
@@ -924,26 +949,19 @@ fun SettingsScreen(
     }
 
     if (showBirthdayDialog) {
-        val parts = remember(birthdayText) { birthdayText.split(" ", limit = 2) }
-        var tempDay by remember { mutableStateOf(parts.getOrNull(0) ?: "27") }
-        var tempMonth by remember { mutableStateOf(parts.getOrNull(1) ?: "Tháng 6") }
+        var tempDay by remember { mutableStateOf(birthdayDay) }
+        var tempMonth by remember { mutableStateOf(birthdayMonth) }
         val isDark = isSystemInDarkTheme()
         
         // 0: Main form, 1: Month Selector, 2: Day Selector
         var activePickerState by remember { mutableStateOf(0) }
         
-        val monthsList = listOf(
-            "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", 
-            "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", 
-            "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
-        )
-        
         val maxDays = when (tempMonth) {
-            "Tháng 2" -> 29
-            "Tháng 4", "Tháng 6", "Tháng 9", "Tháng 11" -> 30
+            2 -> 29
+            4, 6, 9, 11 -> 30
             else -> 31
         }
-        val daysList = (1..maxDays).map { it.toString() }
+        val daysList = (1..maxDays).toList()
         
         ModalBottomSheet(
             onDismissRequest = { 
@@ -969,13 +987,13 @@ fun SettingsScreen(
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Text(
-                                text = "When is your birthday?",
+                                text = if (isVi) "Khi nào là sinh nhật của bạn?" else "When is your birthday?",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 20.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Let us know so we can celebrate! 🥳",
+                                text = if (isVi) "Hãy cho chúng tôi biết để cùng chúc mừng! 🥳" else "Let us know so we can celebrate! 🥳",
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -995,9 +1013,14 @@ fun SettingsScreen(
                                 ) {
                                     Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.padding(horizontal = 16.dp)) {
                                         Column {
-                                            Text("Tháng", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                            Text(if (isVi) "Tháng" else "Month", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                                             Spacer(modifier = Modifier.height(2.dp))
-                                            Text(tempMonth, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                text = if (isVi) monthsList[tempMonth - 1] else monthsListEn[tempMonth - 1], 
+                                                style = MaterialTheme.typography.bodyMedium, 
+                                                color = MaterialTheme.colorScheme.onSurface, 
+                                                fontWeight = FontWeight.Bold
+                                            )
                                         }
                                     }
                                 }
@@ -1012,9 +1035,9 @@ fun SettingsScreen(
                                 ) {
                                     Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.padding(horizontal = 16.dp)) {
                                         Column {
-                                            Text("Ngày", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                            Text(if (isVi) "Ngày" else "Day", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                                             Spacer(modifier = Modifier.height(2.dp))
-                                            Text(tempDay, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                            Text(tempDay.toString(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
@@ -1024,10 +1047,10 @@ fun SettingsScreen(
                             
                             Button(
                                 onClick = {
-                                    birthdayText = "$tempDay $tempMonth"
+                                    birthdayDay = tempDay
+                                    birthdayMonth = tempMonth
                                     showBirthdayDialog = false
                                 },
-                                enabled = tempDay.isNotBlank() && tempMonth.isNotBlank(),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(50.dp),
@@ -1039,7 +1062,7 @@ fun SettingsScreen(
                                     disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
                                 )
                             ) {
-                                Text("Lưu", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text(if (isVi) "Lưu" else "Save", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             }
                         }
                     }
@@ -1053,7 +1076,7 @@ fun SettingsScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Month",
+                                text = if (isVi) "Tháng" else "Month",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 20.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -1065,21 +1088,22 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .heightIn(max = 280.dp)
                             ) {
-                                items(monthsList) { month ->
-                                    val isSelected = month == tempMonth
+                                items(12) { index ->
+                                    val monthVal = index + 1
+                                    val isSelected = monthVal == tempMonth
+                                    val displayName = if (isVi) monthsList[index] else monthsListEn[index]
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clickable {
-                                                tempMonth = month
-                                                val dayInt = tempDay.toIntOrNull() ?: 1
-                                                val newMaxDays = when (month) {
-                                                    "Tháng 2" -> 29
-                                                    "Tháng 4", "Tháng 6", "Tháng 9", "Tháng 11" -> 30
+                                                tempMonth = monthVal
+                                                val newMaxDays = when (monthVal) {
+                                                    2 -> 29
+                                                    4, 6, 9, 11 -> 30
                                                     else -> 31
                                                 }
-                                                if (dayInt > newMaxDays) {
-                                                    tempDay = newMaxDays.toString()
+                                                if (tempDay > newMaxDays) {
+                                                    tempDay = newMaxDays
                                                 }
                                                 activePickerState = 0
                                             }
@@ -1087,7 +1111,7 @@ fun SettingsScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = month,
+                                            text = displayName,
                                             style = MaterialTheme.typography.bodyLarge,
                                             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
@@ -1098,7 +1122,7 @@ fun SettingsScreen(
                             
                             Spacer(modifier = Modifier.height(16.dp))
                             TextButton(onClick = { activePickerState = 0 }) {
-                                Text("Quay lại", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(if (isVi) "Quay lại" else "Back", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -1112,7 +1136,7 @@ fun SettingsScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Day",
+                                text = if (isVi) "Ngày" else "Day",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 20.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -1137,7 +1161,7 @@ fun SettingsScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = day,
+                                            text = day.toString(),
                                             style = MaterialTheme.typography.bodyLarge,
                                             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
@@ -1148,7 +1172,7 @@ fun SettingsScreen(
                             
                             Spacer(modifier = Modifier.height(16.dp))
                             TextButton(onClick = { activePickerState = 0 }) {
-                                Text("Quay lại", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(if (isVi) "Quay lại" else "Back", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
