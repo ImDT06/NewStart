@@ -206,6 +206,20 @@ class MainViewModel @Inject constructor(
             initialValue = true
         )
 
+    val isHabitNotificationsEnabled: StateFlow<Boolean> = userPreferencesRepository.isHabitNotificationsEnabledFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
+    val isCommunityNotificationsEnabled: StateFlow<Boolean> = userPreferencesRepository.isCommunityNotificationsEnabledFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
     val avatarUri: StateFlow<Uri?> = currentUser
         .map { user -> 
             user?.avatarUrl?.let { Uri.parse(it) } 
@@ -238,6 +252,18 @@ class MainViewModel @Inject constructor(
     fun setJournalPromptEnabled(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setJournalPromptEnabled(enabled)
+        }
+    }
+
+    fun setHabitNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setHabitNotificationsEnabled(enabled)
+        }
+    }
+
+    fun setCommunityNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setCommunityNotificationsEnabled(enabled)
         }
     }
 
@@ -300,6 +326,18 @@ class MainViewModel @Inject constructor(
         val userId = currentUser.value?.id ?: return
         viewModelScope.launch {
             userRepository.updateProfile(userId, newName)
+        }
+    }
+
+    fun updateBirthday(birthday: String) {
+        viewModelScope.launch {
+            userRepository.updateProfileFields(mapOf("birthday" to birthday))
+        }
+    }
+
+    fun updateEmail(newEmail: String) {
+        viewModelScope.launch {
+            userRepository.updateEmail(newEmail)
         }
     }
 

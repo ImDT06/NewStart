@@ -236,8 +236,8 @@
     <string name="settings_privacy_security">Privacy &amp; Security</string>
     <string name="settings_blocked_users">Blocked Accounts</string>
     <string name="settings_privacy_data">Privacy and Data</string>
-    <string name="settings_allow_search">Allow search by name</string>
-    <string name="settings_allow_search_desc">Allow others to find you using your name or email</string>
+    <string name="settings_allow_search">Search by name</string>
+    <string name="settings_allow_search_desc">Allow others to find you</string>
     <string name="settings_danger_zone">Danger Zone</string>
     <string name="settings_delete_account">Delete Account</string>
     <string name="settings_delete_account_desc">Permanently delete all data</string>

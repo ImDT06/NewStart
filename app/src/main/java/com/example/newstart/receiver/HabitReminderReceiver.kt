@@ -12,9 +12,35 @@ import android.media.RingtoneManager
 import androidx.core.app.NotificationCompat
 import com.example.newstart.MainActivity
 import com.example.newstart.R
+import com.example.newstart.data.preferences.UserPreferencesRepository
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 class HabitReminderReceiver : BroadcastReceiver() {
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface HabitReminderEntryPoint {
+        fun userPreferencesRepository(): UserPreferencesRepository
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
+        val entryPoint = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            HabitReminderEntryPoint::class.java
+        )
+        val repo = entryPoint.userPreferencesRepository()
+        
+        val isEnabled = runBlocking { repo.isHabitNotificationsEnabledFlow.first() }
+        if (!isEnabled) {
+            Log.d("HabitReminderReceiver", "Thông báo thói quen đã bị tắt trong cài đặt.")
+            return
+        }
+
         val habitName = intent.getStringExtra("habitName") ?: "Thói quen"
         val habitId = intent.getStringExtra("habitId") ?: ""
         val isEarlyReminder = intent.getBooleanExtra("isEarlyReminder", false)

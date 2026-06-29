@@ -8,7 +8,7 @@ import com.example.newstart.data.local.dao.JournalDao
 import com.example.newstart.data.local.dao.SocialDao
 import com.example.newstart.data.local.dao.UserDao
 
-@Database(entities = [HabitEntity::class, TodoEntity::class, JournalEntryEntity::class, FriendshipEntity::class, SquadEntity::class, UserEntity::class], version = 6, exportSchema = false)
+@Database(entities = [HabitEntity::class, TodoEntity::class, JournalEntryEntity::class, FriendshipEntity::class, SquadEntity::class, UserEntity::class], version = 7, exportSchema = false)
 abstract class NewStartDatabase : RoomDatabase() {
     abstract fun habitDao(): HabitDao
     abstract fun todoDao(): TodoDao

@@ -17,6 +17,8 @@ class UserPreferencesRepository @Inject constructor(
     val commonPomoTimesFlow: Flow<List<Int>> = dataStore.data.map { it.commonPomoTimes }
     val isJournalPromptEnabledFlow: Flow<Boolean> = dataStore.data.map { it.isJournalPromptEnabled }
     val isSearchableFlow: Flow<Boolean> = dataStore.data.map { it.isSearchable }
+    val isHabitNotificationsEnabledFlow: Flow<Boolean> = dataStore.data.map { it.isHabitNotificationsEnabled }
+    val isCommunityNotificationsEnabledFlow: Flow<Boolean> = dataStore.data.map { it.isCommunityNotificationsEnabled }
 
     suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.updateData { it.copy(themeMode = mode) }
@@ -29,12 +31,20 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun setCommonPomoTimes(times: List<Int>) {
         dataStore.updateData { it.copy(commonPomoTimes = times) }
     }
-
+    
     suspend fun setJournalPromptEnabled(enabled: Boolean) {
         dataStore.updateData { it.copy(isJournalPromptEnabled = enabled) }
     }
 
     suspend fun setSearchable(enabled: Boolean) {
         dataStore.updateData { it.copy(isSearchable = enabled) }
+    }
+
+    suspend fun setHabitNotificationsEnabled(enabled: Boolean) {
+        dataStore.updateData { it.copy(isHabitNotificationsEnabled = enabled) }
+    }
+
+    suspend fun setCommunityNotificationsEnabled(enabled: Boolean) {
+        dataStore.updateData { it.copy(isCommunityNotificationsEnabled = enabled) }
     }
 }

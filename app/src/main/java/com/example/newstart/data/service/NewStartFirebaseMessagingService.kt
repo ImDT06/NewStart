@@ -15,11 +15,37 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.example.newstart.data.preferences.UserPreferencesRepository
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 class NewStartFirebaseMessagingService : FirebaseMessagingService() {
 
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface FirebaseMessagingEntryPoint {
+        fun userPreferencesRepository(): UserPreferencesRepository
+    }
+
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
+        
+        val entryPoint = EntryPointAccessors.fromApplication(
+            this,
+            FirebaseMessagingEntryPoint::class.java
+        )
+        val repo = entryPoint.userPreferencesRepository()
+        val isEnabled = runBlocking { repo.isCommunityNotificationsEnabledFlow.first() }
+        
+        if (!isEnabled) {
+            Log.d(TAG, "Thông báo cộng đồng đã bị tắt.")
+            return
+        }
+
         Log.d(TAG, "From: ${remoteMessage.from}")
 
         // Check if message contains a notification payload.

@@ -71,7 +71,8 @@ class UserRepositoryImpl @Inject constructor(
                     userId = dto.userId ?: "",
                     name = dto.name,
                     email = dto.email,
-                    avatarUrl = dto.avatarUrl
+                    avatarUrl = dto.avatarUrl,
+                    birthday = dto.birthday
                 )
                 userDao.insertUser(user.toEntity())
             } catch (e: Exception) {
@@ -170,7 +171,8 @@ class UserRepositoryImpl @Inject constructor(
                     userId = dto.userId ?: "",
                     name = dto.name,
                     email = dto.email,
-                    avatarUrl = dto.avatarUrl
+                    avatarUrl = dto.avatarUrl,
+                    birthday = dto.birthday
                 )
             }
         } catch (e: Exception) {
@@ -235,6 +237,22 @@ class UserRepositoryImpl @Inject constructor(
             Result.success(Unit)
         } catch (e: Exception) {
             android.util.Log.e("UserRepository", "API updateProfileFields error: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun updateEmail(newEmail: String): Result<Unit> {
+        return try {
+            val firebaseUser = auth.currentUser
+            // Firebase yêu cầu xác thực lại nếu thao tác quan trọng, nhưng verifyBeforeUpdateEmail
+            // sẽ gửi email xác nhận trước khi thực sự đổi.
+            firebaseUser?.verifyBeforeUpdateEmail(newEmail)?.await()
+            
+            // Cập nhật email trong database thông qua API
+            apiService.updateProfile(mapOf("email" to newEmail))
+            
+            Result.success(Unit)
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }
