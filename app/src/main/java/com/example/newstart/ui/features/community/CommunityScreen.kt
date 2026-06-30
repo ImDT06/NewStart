@@ -92,7 +92,8 @@ fun CommunityScreen(
                             },
                             onImageClick = { /* full screen image nếu cần */ },
                             getUserFlow = { id -> viewModel.getUserById(id) },
-                            onReactToPost = { postId, emoji -> viewModel.reactToPost(postId, emoji) }
+                            onReactToPost = { postId, emoji -> viewModel.reactToPost(postId, emoji) },
+                            onReplyToPost = {}
                         )
                     }
                 }

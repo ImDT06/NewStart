@@ -66,7 +66,7 @@ class UserRepositoryImpl @Inject constructor(
         launch(Dispatchers.IO) {
             try {
                 val dto = apiService.getUserById(id)
-                val user = User(
+                var user = User(
                     id = dto.id ?: "",
                     userId = dto.userId ?: "",
                     name = dto.name,
@@ -74,6 +74,36 @@ class UserRepositoryImpl @Inject constructor(
                     avatarUrl = dto.avatarUrl,
                     birthday = dto.birthday
                 )
+                
+                // Đồng bộ tên và email từ Firebase Auth lên Spring Boot nếu server trả về trống
+                val firebaseUser = auth.currentUser
+                if (firebaseUser != null && firebaseUser.uid == id) {
+                    var needsUpdate = false
+                    val updates = mutableMapOf<String, String>()
+                    
+                    val fbName = firebaseUser.displayName ?: ""
+                    val fbEmail = firebaseUser.email ?: ""
+                    
+                    if (user.name.isBlank() && fbName.isNotBlank()) {
+                        user = user.copy(name = fbName)
+                        updates["name"] = fbName
+                        needsUpdate = true
+                    }
+                    if (user.email.isBlank() && fbEmail.isNotBlank()) {
+                        user = user.copy(email = fbEmail)
+                        updates["email"] = fbEmail
+                        needsUpdate = true
+                    }
+                    
+                    if (needsUpdate) {
+                        try {
+                            apiService.updateProfile(updates)
+                        } catch (updateEx: Exception) {
+                            android.util.Log.e("UserRepository", "Auto-sync profile to server failed: ${updateEx.message}")
+                        }
+                    }
+                }
+                
                 userDao.insertUser(user.toEntity())
             } catch (e: Exception) {
                 android.util.Log.e("UserRepository", "API getUserById error: ${e.message}")

@@ -354,4 +354,153 @@ class SocialRepositoryImpl @Inject constructor(
             android.util.Log.e("SocialRepository", "API Send Message error: ${e.message}")
         }
     }
+
+    override fun getDirectMessages(friendshipId: String): Flow<List<DirectMessage>> = callbackFlow {
+        val listener = firestore.collection("friendships")
+            .document(friendshipId)
+            .collection("messages")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("SocialRepository", "Error listening to direct messages: ${error.message}")
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                
+                if (snapshot != null) {
+                    val messages = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            val id = doc.id
+                            val senderId = doc.getString("senderId") ?: ""
+                            val senderName = doc.getString("senderName") ?: "Người dùng"
+                            val text = doc.getString("text") ?: ""
+                            val timestampDate = doc.getTimestamp("timestamp")?.toDate() ?: java.util.Date()
+                            
+                            val sharedJournalId = doc.getString("sharedJournalId")
+                            val sharedJournalText = doc.getString("sharedJournalText")
+                            val sharedJournalImageUrl = doc.getString("sharedJournalImageUrl")
+                            val sharedJournalEmoji = doc.getString("sharedJournalEmoji")
+                            val sharedJournalAuthorName = doc.getString("sharedJournalAuthorName")
+                            
+                            DirectMessage(
+                                id = id,
+                                senderId = senderId,
+                                senderName = senderName,
+                                text = text,
+                                timestamp = timestampDate,
+                                sharedJournalId = sharedJournalId,
+                                sharedJournalText = sharedJournalText,
+                                sharedJournalImageUrl = sharedJournalImageUrl,
+                                sharedJournalEmoji = sharedJournalEmoji,
+                                sharedJournalAuthorName = sharedJournalAuthorName
+                            )
+                        } catch (e: Exception) {
+                            android.util.Log.e("SocialRepository", "Error parsing direct message: ${e.message}")
+                            null
+                        }
+                    }
+                    trySend(messages)
+                }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    override suspend fun sendDirectMessage(
+        friendshipId: String,
+        text: String,
+        sharedJournal: JournalEntry?
+    ): Result<Unit> {
+        return try {
+            val user = auth.currentUser ?: throw Exception("User not logged in")
+            val senderName = user.displayName ?: "Người dùng"
+            
+            val messageData = mutableMapOf<String, Any>(
+                "senderId" to user.uid,
+                "senderName" to senderName,
+                "text" to text,
+                "timestamp" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+            )
+            
+            if (sharedJournal != null) {
+                messageData["sharedJournalId"] = sharedJournal.id
+                messageData["sharedJournalText"] = sharedJournal.text
+                sharedJournal.imageUrl?.let { messageData["sharedJournalImageUrl"] = it }
+                messageData["sharedJournalEmoji"] = sharedJournal.emoji
+                
+                var authorName = "Bạn"
+                if (sharedJournal.userId != user.uid) {
+                    try {
+                        val authorDoc = firestore.collection("users").document(sharedJournal.userId).get().await()
+                        authorName = authorDoc.getString("name") ?: "Người dùng"
+                    } catch (e: Exception) {
+                        authorName = "Người dùng"
+                    }
+                }
+                messageData["sharedJournalAuthorName"] = authorName
+            }
+            
+            firestore.collection("friendships")
+                .document(friendshipId)
+                .collection("messages")
+                .document()
+                .set(messageData)
+                .await()
+                
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override fun getLastMessage(friendshipId: String): Flow<DirectMessage?> = callbackFlow {
+        val listener = firestore.collection("friendships")
+            .document(friendshipId)
+            .collection("messages")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(1)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("SocialRepository", "Error listening to last message: ${error.message}")
+                    trySend(null)
+                    return@addSnapshotListener
+                }
+                val doc = snapshot?.documents?.firstOrNull()
+                if (doc != null) {
+                    try {
+                        val id = doc.id
+                        val senderId = doc.getString("senderId") ?: ""
+                        val senderName = doc.getString("senderName") ?: "Người dùng"
+                        val text = doc.getString("text") ?: ""
+                        val timestampDate = doc.getTimestamp("timestamp")?.toDate() ?: java.util.Date()
+                        
+                        val sharedJournalId = doc.getString("sharedJournalId")
+                        val sharedJournalText = doc.getString("sharedJournalText")
+                        val sharedJournalImageUrl = doc.getString("sharedJournalImageUrl")
+                        val sharedJournalEmoji = doc.getString("sharedJournalEmoji")
+                        val sharedJournalAuthorName = doc.getString("sharedJournalAuthorName")
+                        
+                        trySend(
+                            DirectMessage(
+                                id = id,
+                                senderId = senderId,
+                                senderName = senderName,
+                                text = text,
+                                timestamp = timestampDate,
+                                sharedJournalId = sharedJournalId,
+                                sharedJournalText = sharedJournalText,
+                                sharedJournalImageUrl = sharedJournalImageUrl,
+                                sharedJournalEmoji = sharedJournalEmoji,
+                                sharedJournalAuthorName = sharedJournalAuthorName
+                            )
+                        )
+                    } catch (e: Exception) {
+                        android.util.Log.e("SocialRepository", "Error parsing last message: ${e.message}")
+                        trySend(null)
+                    }
+                } else {
+                    trySend(null)
+                }
+            }
+        awaitClose { listener.remove() }
+    }
 }

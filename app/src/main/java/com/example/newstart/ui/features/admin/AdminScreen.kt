@@ -190,7 +190,8 @@ fun AdminScreen(
                                             },
                                             onImageClick = { _ -> },
                                             getUserFlow = { mainViewModel.getUserById(it) },
-                                            onReactToPost = { _, _ -> }
+                                            onReactToPost = { _, _ -> },
+                                            onReplyToPost = {}
                                         )
                                     }
                                 }

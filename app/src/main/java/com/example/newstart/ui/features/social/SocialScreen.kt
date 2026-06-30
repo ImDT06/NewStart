@@ -37,6 +37,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.newstart.domain.model.Squad
 import com.example.newstart.domain.model.User
+import com.example.newstart.domain.model.Friendship
+import com.example.newstart.domain.model.DirectMessage
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -71,6 +73,28 @@ fun SocialScreen(
     val activeSquad = squads.find { it.id == activeSquadDetail?.id } ?: activeSquadDetail
     val isDark = LocalDarkTheme.current
     
+    var activeChatFriendship by remember { mutableStateOf<Friendship?>(null) }
+    
+    LaunchedEffect(mainViewModel.pendingChatUserId) {
+        val pendingUserId = mainViewModel.pendingChatUserId
+        if (pendingUserId != null) {
+            val friendship = friends.find { it.userIds.contains(pendingUserId) }
+            if (friendship != null) {
+                activeChatFriendship = friendship
+                val pendingJournal = mainViewModel.pendingSharedJournal
+                if (pendingJournal != null) {
+                    mainViewModel.sendDirectMessage(
+                        friendshipId = friendship.id,
+                        text = "",
+                        sharedJournal = pendingJournal
+                    )
+                }
+            }
+            mainViewModel.pendingChatUserId = null
+            mainViewModel.pendingSharedJournal = null
+        }
+    }
+    
     if (activeSquad != null) {
         SquadDetailView(
             squad = activeSquad,
@@ -79,6 +103,13 @@ fun SocialScreen(
             viewModel = viewModel,
             mainViewModel = mainViewModel,
             onBack = { activeSquadDetail = null }
+        )
+    } else if (activeChatFriendship != null) {
+        DirectChatView(
+            friendship = activeChatFriendship!!,
+            currentUserId = currentUserId ?: "",
+            mainViewModel = mainViewModel,
+            onBack = { activeChatFriendship = null }
         )
     } else {
         Scaffold(
@@ -98,8 +129,9 @@ fun SocialScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                // Modern Segmented Control Style Tabs for Friends vs Squads
+                // Modern Segmented Control Style Tabs for Message list, Friends vs Squads
                 val tabs = listOf(
+                    "Tin nhắn",
                     stringResource(R.string.social_tab_friends),
                     stringResource(R.string.social_tab_squads)
                 )
@@ -171,34 +203,46 @@ fun SocialScreen(
                 }
 
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    if (selectedTab == 0) {
-                        FriendsTabWrapper(
-                            searchQuery = searchQuery,
-                            onSearchQueryChange = { 
-                                viewModel.onSearchQueryChange(it)
-                            },
-                            isSearching = isSearching,
-                            searchResults = searchResults,
-                            incomingRequests = incomingRequests,
-                            sentRequests = sentRequests,
-                            friends = friends,
-                            currentUserId = currentUserId ?: "",
-                            onSendRequest = { viewModel.sendRequest(it) },
-                            onAcceptRequest = { viewModel.acceptRequest(it) },
-                            onDeclineRequest = { viewModel.declineRequest(it) },
-                            onRemoveFriend = { viewModel.removeFriend(it) },
-                            getUserFlow = { viewModel.getUserById(it) }
-                        )
-                    } else {
-                        SquadsTabWrapper(
-                            squads = squads,
-                            friends = friends,
-                            currentUserId = currentUserId ?: "",
-                            getUserFlow = { id -> viewModel.getUserById(id) },
-                            onCreateSquad = { n, d, m -> viewModel.createSquad(n, d, m) },
-                            onUpdateSquad = { id, n, d -> viewModel.updateSquad(id, n, d) },
-                            onSquadClick = { activeSquadDetail = it }
-                        )
+                    when (selectedTab) {
+                        0 -> {
+                            ChatsTabWrapper(
+                                friends = friends,
+                                currentUserId = currentUserId ?: "",
+                                mainViewModel = mainViewModel,
+                                onFriendChatClick = { activeChatFriendship = it }
+                            )
+                        }
+                        1 -> {
+                            FriendsTabWrapper(
+                                searchQuery = searchQuery,
+                                onSearchQueryChange = { 
+                                    viewModel.onSearchQueryChange(it)
+                                },
+                                isSearching = isSearching,
+                                searchResults = searchResults,
+                                incomingRequests = incomingRequests,
+                                sentRequests = sentRequests,
+                                friends = friends,
+                                currentUserId = currentUserId ?: "",
+                                onSendRequest = { viewModel.sendRequest(it) },
+                                onAcceptRequest = { viewModel.acceptRequest(it) },
+                                onDeclineRequest = { viewModel.declineRequest(it) },
+                                onRemoveFriend = { viewModel.removeFriend(it) },
+                                getUserFlow = { viewModel.getUserById(it) },
+                                onFriendChatClick = { activeChatFriendship = it }
+                            )
+                        }
+                        2 -> {
+                            SquadsTabWrapper(
+                                squads = squads,
+                                friends = friends,
+                                currentUserId = currentUserId ?: "",
+                                getUserFlow = { id -> viewModel.getUserById(id) },
+                                onCreateSquad = { n, d, m -> viewModel.createSquad(n, d, m) },
+                                onUpdateSquad = { id, n, d -> viewModel.updateSquad(id, n, d) },
+                                onSquadClick = { activeSquadDetail = it }
+                            )
+                        }
                     }
                 }
             }
@@ -220,7 +264,8 @@ fun FriendsTabWrapper(
     onAcceptRequest: (String) -> Unit,
     onDeclineRequest: (String) -> Unit,
     onRemoveFriend: (String) -> Unit,
-    getUserFlow: (String) -> Flow<User>
+    getUserFlow: (String) -> Flow<User>,
+    onFriendChatClick: (com.example.newstart.domain.model.Friendship) -> Unit
 ) {
     Column {
         android.util.Log.d("SocialScreen", "FriendsTabWrapper recomposed with searchQuery = '$searchQuery'")
@@ -351,7 +396,8 @@ fun FriendsTabWrapper(
                             friendship = friendship,
                             currentUserId = currentUserId,
                             getUserFlow = getUserFlow,
-                            onRemoveFriend = onRemoveFriend
+                            onRemoveFriend = onRemoveFriend,
+                            onChatClick = { onFriendChatClick(friendship) }
                         )
                     }
                 } else {
@@ -625,10 +671,12 @@ fun SquadsTabWrapper(
 }
 
 @Composable
-fun UserItem(user: User, action: @Composable () -> Unit) {
+fun UserItem(user: User, onClick: (() -> Unit)? = null, action: @Composable () -> Unit) {
     val isDark = LocalDarkTheme.current
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface
@@ -791,7 +839,8 @@ fun FriendItem(
     friendship: com.example.newstart.domain.model.Friendship,
     currentUserId: String,
     getUserFlow: (String) -> Flow<User>,
-    onRemoveFriend: (String) -> Unit
+    onRemoveFriend: (String) -> Unit,
+    onChatClick: () -> Unit
 ) {
     val friendId = friendship.userIds.firstOrNull { it != currentUserId } ?: return
     val userState by remember(friendId) {
@@ -827,6 +876,7 @@ fun FriendItem(
 
     UserItem(
         user = userState,
+        onClick = onChatClick,
         action = {
             IconButton(
                 onClick = { showConfirmDialog = true },
@@ -1646,4 +1696,529 @@ fun SquadDetailViewWrapper(
         onBack = onBack,
         hasBottomBar = hasBottomBar
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun DirectChatView(
+    friendship: Friendship,
+    currentUserId: String,
+    mainViewModel: MainViewModel,
+    onBack: () -> Unit
+) {
+    val isDark = LocalDarkTheme.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    
+    // Lấy thông tin người bạn
+    val friendId = friendship.userIds.firstOrNull { it != currentUserId } ?: ""
+    val friendFlow = remember(friendId) { mainViewModel.getUserById(friendId) }
+    val friendState by friendFlow.collectAsState(initial = User(name = stringResource(R.string.squad_loading)))
+    val displayName = friendState.name.ifBlank { stringResource(R.string.social_default_user_name) }
+    
+    // Danh sách tin nhắn
+    val messagesFlow = remember(friendship.id) { mainViewModel.getDirectMessages(friendship.id) }
+    val messages by messagesFlow.collectAsState(initial = emptyList())
+    
+    var messageText by remember { mutableStateOf("") }
+    var activeTimestampMessageId by remember { mutableStateOf<String?>(null) }
+    val lazyListState = rememberLazyListState()
+    
+    // Tự động cuộn xuống tin nhắn mới nhất
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            lazyListState.animateScrollToItem(0)
+        }
+    }
+    
+    val isKeyboardVisible = WindowInsets.isImeVisible
+    LaunchedEffect(isKeyboardVisible) {
+        if (isKeyboardVisible && messages.isNotEmpty()) {
+            lazyListState.animateScrollToItem(0)
+        }
+    }
+    
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(32.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        ) {
+                            if (!friendState.avatarUrl.isNullOrEmpty()) {
+                                AsyncImage(
+                                    model = friendState.avatarUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(displayName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        },
+        bottomBar = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(bottom = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .shadow(8.dp, shape = RoundedCornerShape(24.dp))
+                        .background(
+                            color = if (isDark) Color(0xFF1E1E22) else Color.White,
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = messageText,
+                        onValueChange = { messageText = it },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        maxLines = 4,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                        decorationBox = { innerTextField ->
+                            Box(contentAlignment = Alignment.CenterStart) {
+                                if (messageText.isEmpty()) {
+                                    Text(
+                                        text = stringResource(R.string.squad_chat_placeholder),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
+                    )
+                    
+                    val sendButtonScale by animateFloatAsState(
+                        targetValue = if (messageText.isNotBlank()) 1f else 0.85f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "SendButtonScale"
+                    )
+                    
+                    IconButton(
+                        onClick = {
+                            if (messageText.isNotBlank()) {
+                                mainViewModel.sendDirectMessage(friendship.id, messageText.trim())
+                                messageText = ""
+                            }
+                        },
+                        enabled = messageText.isNotBlank(),
+                        modifier = Modifier
+                            .scale(sendButtonScale)
+                            .size(40.dp)
+                            .background(
+                                color = if (messageText.isNotBlank()) MaterialTheme.colorScheme.primary 
+                                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                shape = CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Send, 
+                            contentDescription = "Send", 
+                            tint = if (messageText.isNotBlank()) MaterialTheme.colorScheme.onPrimary 
+                                   else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+        }
+    ) { padding ->
+        val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+        
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = { focusManager.clearFocus() })
+                }
+        ) {
+            if (messages.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Chưa có tin nhắn nào. Gửi lời chào với người bạn này!", color = Color.Gray, fontSize = 13.sp)
+                }
+            } else {
+                val reversedMessages = remember(messages) { messages.asReversed() }
+                LazyColumn(
+                    state = lazyListState,
+                    reverseLayout = true,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 12.dp,
+                        bottom = 8.dp
+                    )
+                ) {
+                    itemsIndexed(reversedMessages) { indexInReversed, message ->
+                        val originalIndex = messages.size - 1 - indexInReversed
+                        val isMe = message.senderId == currentUserId
+                        val timeString = remember(message.timestamp) { timeFormatter.format(message.timestamp ?: java.util.Date()) }
+                        
+                        val prevMessage = if (originalIndex > 0) messages[originalIndex - 1] else null
+                        val isPrevSameSenderAndClose = prevMessage != null && 
+                                prevMessage.senderId == message.senderId && 
+                                (message.timestamp != null && prevMessage.timestamp != null && message.timestamp.time - prevMessage.timestamp.time < 3 * 60 * 1000)
+                        
+                        val nextMessage = if (originalIndex < messages.size - 1) messages[originalIndex + 1] else null
+                        val isNextSameSender = nextMessage != null && nextMessage.senderId == message.senderId
+                        
+                        val bottomSpacing = if (isNextSameSender) 8.dp else 16.dp
+                        val isTimestampVisible = activeTimestampMessageId == message.id
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = bottomSpacing),
+                            horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            if (!isMe && !isNextSameSender) {
+                                Surface(
+                                    modifier = Modifier.size(28.dp),
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                ) {
+                                    if (!friendState.avatarUrl.isNullOrEmpty()) {
+                                        AsyncImage(
+                                            model = friendState.avatarUrl,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Icon(Icons.Default.Person, null, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                            } else if (!isMe) {
+                                Spacer(modifier = Modifier.width(36.dp))
+                            }
+
+                            Column(
+                                horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
+                            ) {
+                                if (!isMe && !isPrevSameSenderAndClose) {
+                                    Text(
+                                        text = message.senderName, 
+                                        style = MaterialTheme.typography.labelSmall, 
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                }
+
+                                Surface(
+                                    color = if (isMe) MaterialTheme.colorScheme.primary else {
+                                        if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                    },
+                                    shape = RoundedCornerShape(
+                                        topStart = 16.dp,
+                                        topEnd = 16.dp,
+                                        bottomStart = if (isMe) 16.dp else 4.dp,
+                                        bottomEnd = if (isMe) 4.dp else 16.dp
+                                    ),
+                                    modifier = Modifier.clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = {
+                                            activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                        }
+                                    )
+                                ) {
+                                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                        if (!message.sharedJournalId.isNullOrEmpty()) {
+                                            SharedJournalCard(
+                                                authorName = message.sharedJournalAuthorName ?: "",
+                                                text = message.sharedJournalText ?: "",
+                                                imageUrl = message.sharedJournalImageUrl,
+                                                emoji = message.sharedJournalEmoji ?: "",
+                                                isMe = isMe
+                                            )
+                                            if (message.text.isNotEmpty()) {
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                            }
+                                        }
+                                        
+                                        if (message.text.isNotEmpty()) {
+                                            Text(
+                                                text = message.text,
+                                                color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = isTimestampVisible,
+                                    enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                                    exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                                ) {
+                                    Text(
+                                        text = timeString,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.padding(top = 2.dp, start = if (isMe) 0.dp else 4.dp, end = if (isMe) 4.dp else 0.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SharedJournalCard(
+    authorName: String,
+    text: String,
+    imageUrl: String?,
+    emoji: String,
+    isMe: Boolean
+) {
+    Surface(
+        color = if (isMe) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) 
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isMe) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f)
+                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        ),
+        modifier = Modifier.width(220.dp)
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (authorName == "Bạn") "Bài đăng của bạn" else "Bài đăng của $authorName",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isMe) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary
+                )
+                Text(emoji, fontSize = 14.sp)
+            }
+            
+            if (text.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                )
+            }
+            
+            if (!imageUrl.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatsTabWrapper(
+    friends: List<Friendship>,
+    currentUserId: String,
+    mainViewModel: MainViewModel,
+    onFriendChatClick: (Friendship) -> Unit
+) {
+    if (friends.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Bạn chưa có bạn bè nào. Hãy kết bạn để nhắn tin!",
+                color = Color.Gray,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(bottom = 20.dp)
+        ) {
+            item {
+                SectionTitle("Đoạn hội thoại")
+            }
+            items(friends) { friendship ->
+                ChatItem(
+                    friendship = friendship,
+                    currentUserId = currentUserId,
+                    mainViewModel = mainViewModel,
+                    onClick = { onFriendChatClick(friendship) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatItem(
+    friendship: Friendship,
+    currentUserId: String,
+    mainViewModel: MainViewModel,
+    onClick: () -> Unit
+) {
+    val isDark = LocalDarkTheme.current
+    val friendId = friendship.userIds.firstOrNull { it != currentUserId } ?: return
+    val friendFlow = remember(friendId) { mainViewModel.getUserById(friendId) }
+    val friendState by friendFlow.collectAsState(initial = User(name = stringResource(R.string.squad_loading)))
+    
+    val lastMessageFlow = remember(friendship.id) { mainViewModel.getLastMessage(friendship.id) }
+    val lastMessage by lastMessageFlow.collectAsState(initial = null)
+    
+    val displayName = friendState.name.ifBlank { stringResource(R.string.social_default_user_name) }
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (!friendState.avatarUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = friendState.avatarUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = displayName,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                val messageText = if (lastMessage != null) {
+                    val prefix = if (lastMessage!!.senderId == currentUserId) "Bạn: " else ""
+                    if (!lastMessage!!.sharedJournalId.isNullOrEmpty()) {
+                        if (lastMessage!!.text.isEmpty()) {
+                            "${prefix}[Bài viết chia sẻ]"
+                        } else {
+                            "${prefix}${lastMessage!!.text}"
+                        }
+                    } else {
+                        "${prefix}${lastMessage!!.text}"
+                    }
+                } else {
+                    "Chưa có tin nhắn nào. Click để trò chuyện"
+                }
+                
+                Text(
+                    text = messageText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (lastMessage != null) MaterialTheme.colorScheme.onSurfaceVariant 
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
+            
+            if (lastMessage != null) {
+                val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+                val timeString = remember(lastMessage!!.timestamp) {
+                    timeFormatter.format(lastMessage!!.timestamp ?: java.util.Date())
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = timeString,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+            }
+        }
+    }
 }

@@ -1,6 +1,7 @@
 package com.example.newstart.ui.features.habits.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -71,11 +72,34 @@ fun NewHabitSheet(
     
     val presets = remember(selectedCategory) {
         when (selectedCategory) {
-            "Health", "Sức khỏe" -> listOf(HabitPreset("Ngủ", "🛌"), HabitPreset("Uống nước", "💧"), HabitPreset("Đứng", "🧍"), HabitPreset("Lượng Calo", "🔥"))
-            "Sports", "Thể thao" -> listOf(HabitPreset("Chạy bộ", "🏃"), HabitPreset("Đạp xe", "🚴"), HabitPreset("Tập thể dục", "💪"), HabitPreset("Đi bộ", "🚶"))
-            "Mind", "Tâm trí" -> listOf(HabitPreset("Thiền", "🧘"), HabitPreset("Ngủ", "🛌"), HabitPreset("Đọc sách", "📚"))
-            "Study", "Học tập" -> listOf(HabitPreset("Đọc sách", "📚"), HabitPreset("Học bài", "✍️"), HabitPreset("Lập trình", "💻"))
-            else -> listOf(HabitPreset("Đi bộ", "🚶"), HabitPreset("Ngủ", "🛌"), HabitPreset("Uống nước", "💧"), HabitPreset("Chạy bộ", "🏃"))
+            "Health", "Sức khỏe" -> listOf(
+                HabitPreset("Ngủ", "🛌", Color(0xFFAF52DE)),
+                HabitPreset("Uống nước", "💧", Color(0xFF007AFF)),
+                HabitPreset("Đứng", "🧍", Color(0xFF34C759)),
+                HabitPreset("Lượng Calo", "🔥", Color(0xFFFF9500))
+            )
+            "Sports", "Thể thao" -> listOf(
+                HabitPreset("Chạy bộ", "🏃", Color(0xFF34C759)),
+                HabitPreset("Đạp xe", "🚴", Color(0xFF007AFF)),
+                HabitPreset("Tập thể dục", "💪", Color(0xFFFF3B30)),
+                HabitPreset("Đi bộ", "🚶", Color(0xFF34C759))
+            )
+            "Mind", "Tâm trí" -> listOf(
+                HabitPreset("Thiền", "🧘", Color(0xFFAF52DE)),
+                HabitPreset("Ngủ", "🛌", Color(0xFFAF52DE)),
+                HabitPreset("Đọc sách", "📚", Color(0xFFFF9500))
+            )
+            "Study", "Học tập" -> listOf(
+                HabitPreset("Đọc sách", "📚", Color(0xFFFF9500)),
+                HabitPreset("Học bài", "✍️", Color(0xFF007AFF)),
+                HabitPreset("Lập trình", "💻", Color(0xFF007AFF))
+            )
+            else -> listOf(
+                HabitPreset("Đi bộ", "🚶", Color(0xFF34C759)),
+                HabitPreset("Ngủ", "🛌", Color(0xFFAF52DE)),
+                HabitPreset("Uống nước", "💧", Color(0xFF007AFF)),
+                HabitPreset("Chạy bộ", "🏃", Color(0xFF34C759))
+            )
         }
     }
 
@@ -140,6 +164,30 @@ fun HabitConfigContent(
     var minsBefore by remember { mutableStateOf(habit?.reminderMinutesBefore ?: preset?.minsBefore ?: 0) }
     var selectedSquadId by remember { mutableStateOf(habit?.squadId) }
 
+    val colorOptions = remember {
+        listOf(
+            Color(0xFF007AFF), // Blue
+            Color(0xFF34C759), // Green
+            Color(0xFFFF9500), // Orange
+            Color(0xFFFF3B30), // Red
+            Color(0xFFAF52DE), // Purple
+            Color(0xFFFF2D55), // Pink
+            Color(0xFFFFCC00)  // Yellow
+        )
+    }
+    
+    var selectedColor by remember {
+        mutableStateOf(
+            habit?.colorHex?.let {
+                try {
+                    Color(android.graphics.Color.parseColor(it))
+                } catch (e: Exception) {
+                    null
+                }
+            } ?: preset?.color ?: colorOptions[0]
+        )
+    }
+
     val timePickerState = rememberTimePickerState(
         initialHour = selectedTime?.split(":")?.get(0)?.toInt() ?: 0,
         initialMinute = selectedTime?.split(":")?.get(1)?.toInt() ?: 0
@@ -168,6 +216,28 @@ fun HabitConfigContent(
             Column(horizontalAlignment = Alignment.End) {
                 TextButton(onClick = { showDatePicker = true }) { Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(16.dp)); Spacer(modifier = Modifier.width(4.dp)); Text(selectedDate.format(DateTimeFormatter.ofPattern("dd/MM")), fontSize = 14.sp) }
                 Button(onClick = { showTimePicker = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), modifier = Modifier.height(36.dp), shape = RoundedCornerShape(8.dp)) { Icon(Icons.Default.AccessTime, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface); Spacer(modifier = Modifier.width(4.dp)); Text(selectedTime ?: "Giờ", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface) }
+            }
+        }
+
+        Text("Màu sắc đại diện", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            colorOptions.forEach { colorOption ->
+                val isSelected = selectedColor == colorOption
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(colorOption)
+                        .border(
+                            width = if (isSelected) 3.dp else 0.dp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            shape = CircleShape
+                        )
+                        .clickable { selectedColor = colorOption }
+                )
             }
         }
 
@@ -211,7 +281,7 @@ fun HabitConfigContent(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { if (name.isNotBlank() && selectedTime != null) onConfirm(name, icon, selectedTime, minsBefore, Color.Black, selectedDate, selectedSquadId) }, enabled = name.isNotBlank() && selectedTime != null, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) { Text(stringResource(R.string.habits_btn_create), fontWeight = FontWeight.Bold) }
+        Button(onClick = { if (name.isNotBlank() && selectedTime != null) onConfirm(name, icon, selectedTime, minsBefore, selectedColor, selectedDate, selectedSquadId) }, enabled = name.isNotBlank() && selectedTime != null, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) { Text(stringResource(R.string.habits_btn_create), fontWeight = FontWeight.Bold) }
     }
 }
 

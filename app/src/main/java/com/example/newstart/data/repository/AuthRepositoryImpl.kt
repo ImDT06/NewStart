@@ -47,6 +47,11 @@ class AuthRepositoryImpl @Inject constructor(
             // Reload user to get latest verification status
             firebaseUser.reload().await()
             
+            if (!firebaseUser.isEmailVerified) {
+                firebaseAuth.signOut()
+                throw Exception("Vui lòng xác thực email của bạn trước khi đăng nhập.")
+            }
+            
             Result.success(
                 User(
                     id = firebaseUser.uid,

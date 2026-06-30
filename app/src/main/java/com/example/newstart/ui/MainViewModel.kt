@@ -32,6 +32,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+import androidx.compose.runtime.*
 
 enum class AuthState {
     Loading, Authenticated, Unauthenticated
@@ -664,4 +665,21 @@ class MainViewModel @Inject constructor(
     )
 
     fun getUserById(userId: String) = userRepository.getUserById(userId)
+
+    var pendingChatUserId by mutableStateOf<String?>(null)
+    var pendingSharedJournal by mutableStateOf<JournalEntry?>(null)
+
+    fun getDirectMessages(friendshipId: String): Flow<List<com.example.newstart.domain.model.DirectMessage>> {
+        return socialRepository.getDirectMessages(friendshipId)
+    }
+
+    fun sendDirectMessage(friendshipId: String, text: String, sharedJournal: JournalEntry? = null) {
+        viewModelScope.launch {
+            socialRepository.sendDirectMessage(friendshipId, text, sharedJournal)
+        }
+    }
+
+    fun getLastMessage(friendshipId: String): Flow<com.example.newstart.domain.model.DirectMessage?> {
+        return socialRepository.getLastMessage(friendshipId)
+    }
 }

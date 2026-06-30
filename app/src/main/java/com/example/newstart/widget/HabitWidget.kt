@@ -88,8 +88,8 @@ class HabitWidget : GlanceAppWidget() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return emptyList()
         val db = getDatabase(context)
         return try {
-            val entities = db.todoDao().getAllTodosSync()
-            entities.map { it.toDomain() }.filter { !it.isCompleted && it.userId == userId }
+            val entities = db.todoDao().getAllTodosSync(userId)
+            entities.map { it.toDomain() }.filter { !it.isCompleted }
         } catch (e: Exception) {
             android.util.Log.e("HabitWidget", "Error fetching todos: ${e.message}", e)
             emptyList()

@@ -85,6 +85,7 @@ class RegisterViewModel @Inject constructor(
             
             if (result.isSuccess) {
                 authRepository.sendEmailVerification()
+                authRepository.logout() // Đăng xuất để tránh race condition tự động đăng nhập
                 _uiState.update { it.copy(isLoading = false, registerResult = Resource.Success(Unit)) }
             } else {
                 _uiState.update { it.copy(
@@ -127,6 +128,7 @@ class RegisterViewModel @Inject constructor(
         }
 
         if (!state.acceptTerms) {
+            _uiState.update { it.copy(registerResult = Resource.Error("Bạn cần đồng ý với Điều khoản dịch vụ & Chính sách bảo mật")) }
             isValid = false
         }
 

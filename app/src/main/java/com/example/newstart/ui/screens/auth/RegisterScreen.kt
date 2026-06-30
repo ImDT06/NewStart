@@ -291,29 +291,47 @@ fun RegisterContent(
                         )
                     )
 
-                    Text(
-                        text = buildAnnotatedString {
-                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                append(stringResource(id = R.string.register_terms_prefix))
-                            }
-                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
-                                append(stringResource(id = R.string.register_terms_service))
-                            }
-                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                append(stringResource(id = R.string.register_terms_and))
-                            }
-                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
-                                append(stringResource(id = R.string.register_terms_privacy))
-                            }
-                        },
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp,
-                        letterSpacing = 0.5.sp,
+                    Row(
                         modifier = Modifier
-                            .padding(horizontal = 4.dp, vertical = 8.dp)
-                            .clickable { onAcceptTermsChange(!acceptTerms) },
-                        textAlign = TextAlign.Start
-                    )
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = acceptTerms,
+                            onCheckedChange = onAcceptTermsChange,
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = MaterialTheme.colorScheme.primary,
+                                uncheckedColor = MaterialTheme.colorScheme.outline
+                            )
+                        )
+                        Text(
+                            text = buildAnnotatedString {
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                                    append(stringResource(id = R.string.register_terms_prefix))
+                                }
+                                append(" ")
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
+                                    append(stringResource(id = R.string.register_terms_service))
+                                }
+                                append(" ")
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                                    append(stringResource(id = R.string.register_terms_and))
+                                }
+                                append(" ")
+                                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
+                                    append(stringResource(id = R.string.register_terms_privacy))
+                                }
+                            },
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            letterSpacing = 0.5.sp,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onAcceptTermsChange(!acceptTerms) },
+                            textAlign = TextAlign.Start
+                        )
+                    }
                 }
 
                 Column(

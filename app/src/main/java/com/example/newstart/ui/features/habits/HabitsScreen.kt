@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -37,6 +38,7 @@ import com.example.newstart.domain.model.Squad
 import com.example.newstart.domain.model.User
 import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.components.RatingBar
+import com.example.newstart.ui.navigation.Screen
 import com.example.newstart.ui.features.journal.JournalViewModel
 import com.example.newstart.ui.features.social.SocialViewModel
 import com.example.newstart.ui.theme.LocalDarkTheme
@@ -70,6 +72,7 @@ fun HabitsScreen(
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Bảng tin, 1: Bạn bè, 2: Nhóm
     var activeSquadDetail by remember { mutableStateOf<Squad?>(null) }
     val activeSquad = squads.find { it.id == activeSquadDetail?.id } ?: activeSquadDetail
+    var activeReplyJournal by remember { mutableStateOf<JournalEntry?>(null) }
 
     val context = LocalContext.current
     val isDark = LocalDarkTheme.current
@@ -234,7 +237,10 @@ fun HabitsScreen(
                                 dateTimeFormatter = dateTimeFormatter,
                                 onImageClick = { /* Full screen photo logic */ },
                                 getUserFlow = { journalViewModel.getUserById(it) },
-                                onReactToPost = { postId, emoji -> journalViewModel.reactToPost(postId, emoji) }
+                                onReactToPost = { postId, emoji -> journalViewModel.reactToPost(postId, emoji) },
+                                onReplyToPost = { entry ->
+                                    activeReplyJournal = entry
+                                }
                             )
                             1 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 com.example.newstart.ui.features.social.FriendsTabWrapper(
@@ -250,7 +256,14 @@ fun HabitsScreen(
                                     onAcceptRequest = { socialViewModel.acceptRequest(it) },
                                     onDeclineRequest = { socialViewModel.declineRequest(it) },
                                     onRemoveFriend = { socialViewModel.removeFriend(it) },
-                                    getUserFlow = { socialViewModel.getUserById(it) }
+                                    getUserFlow = { socialViewModel.getUserById(it) },
+                                    onFriendChatClick = { friendship ->
+                                        val friendId = friendship.userIds.firstOrNull { it != (currentUserId ?: "") }
+                                        if (friendId != null) {
+                                            mainViewModel.pendingChatUserId = friendId
+                                            navController.navigate(Screen.Social.route)
+                                        }
+                                    }
                                 )
                             }
                             2 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -268,7 +281,133 @@ fun HabitsScreen(
                     }
                 }
             }
+
+    if (activeReplyJournal != null) {
+        val replyJournal = activeReplyJournal!!
+        var replyText by remember { mutableStateOf("") }
+        val authorState by remember(replyJournal.userId) {
+            journalViewModel.getUserById(replyJournal.userId)
+        }.collectAsState(initial = User(name = "Đang tải..."))
+        
+        ModalBottomSheet(
+            onDismissRequest = { activeReplyJournal = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 36.dp)
+            ) {
+                Text(
+                    text = "Phản hồi bài viết",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                // Preview of the shared journal
+                Surface(
+                    color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = replyJournal.emoji,
+                            fontSize = 24.sp,
+                            modifier = Modifier.padding(end = 12.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Bài viết của ${authorState.name.ifBlank { "Người dùng" }}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            if (replyJournal.text.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = replyJournal.text,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Message Input field
+                OutlinedTextField(
+                    value = replyText,
+                    onValueChange = { replyText = it },
+                    placeholder = { Text("Viết bình luận phản hồi gửi vào tin nhắn...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    maxLines = 4,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedContainerColor = if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                        unfocusedContainerColor = if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = Color.Transparent
+                    )
+                )
+                
+                // Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = { activeReplyJournal = null },
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text("Hủy", fontWeight = FontWeight.Medium)
+                    }
+                    
+                    Button(
+                        onClick = {
+                            val friendship = friends.find { it.userIds.contains(replyJournal.userId) }
+                            if (friendship != null) {
+                                mainViewModel.sendDirectMessage(
+                                    friendshipId = friendship.id,
+                                    text = replyText.trim(),
+                                    sharedJournal = replyJournal
+                                )
+                                android.widget.Toast.makeText(context, "Đã gửi phản hồi vào tin nhắn trực tiếp!", android.widget.Toast.LENGTH_SHORT).show()
+                                activeReplyJournal = null
+                            } else {
+                                android.widget.Toast.makeText(context, "Bạn chỉ có thể phản hồi bài viết của bạn bè!", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        enabled = true,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Send, contentDescription = "Send", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Gửi phản hồi")
+                    }
+                }
+            }
+        }
     }
+}
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -282,7 +421,8 @@ private fun SocialFeedList(
     dateTimeFormatter: SimpleDateFormat,
     onImageClick: (String) -> Unit,
     getUserFlow: (String) -> Flow<User>,
-    onReactToPost: (String, String) -> Unit
+    onReactToPost: (String, String) -> Unit,
+    onReplyToPost: (JournalEntry) -> Unit
 ) {
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -331,7 +471,8 @@ private fun SocialFeedList(
                         timeFormatted = remember(entry.timestamp) { entry.timestamp?.let { dateTimeFormatter.format(it) } ?: "--:--" },
                         onImageClick = onImageClick,
                         getUserFlow = getUserFlow,
-                        onReactToPost = onReactToPost
+                        onReactToPost = onReactToPost,
+                        onReplyToPost = onReplyToPost
                     )
                 }
             }
@@ -346,7 +487,8 @@ fun SocialFeedItem(
     timeFormatted: String,
     onImageClick: (String) -> Unit,
     getUserFlow: (String) -> Flow<User>,
-    onReactToPost: (String, String) -> Unit
+    onReactToPost: (String, String) -> Unit,
+    onReplyToPost: (JournalEntry) -> Unit
 ) {
     val isDark = LocalDarkTheme.current
     val currentUserId = remember {
@@ -394,7 +536,7 @@ fun SocialFeedItem(
                                     contentDescription = null,
                                     modifier = Modifier.fillMaxSize().clip(CircleShape),
                                     contentScale = ContentScale.Crop
-                                )
+                               )
                             } else {
                                 Icon(Icons.Default.Person, null, modifier = Modifier.size(26.dp), tint = MaterialTheme.colorScheme.primary)
                             }
@@ -487,61 +629,95 @@ fun SocialFeedItem(
 
             Spacer(modifier = Modifier.height(20.dp))
             
+            // Reactions and Comments Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val commonEmojis = listOf("❤️", "👍", "🔥", "😂", "👏")
-                commonEmojis.forEach { emoji ->
-                    val count = entry.reactions.values.count { it == emoji }
-                    val hasReacted = entry.reactions[currentUserId] == emoji
-                    
-                    val scale by androidx.compose.animation.core.animateFloatAsState(
-                        targetValue = if (hasReacted) 1.08f else 1f,
-                        animationSpec = androidx.compose.animation.core.spring(
-                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
-                        ),
-                        label = "ReactionScale"
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    val commonEmojis = listOf("❤️", "👍", "🔥", "😂", "👏")
+                    commonEmojis.forEach { emoji ->
+                        val count = entry.reactions.values.count { it == emoji }
+                        val hasReacted = entry.reactions[currentUserId] == emoji
+                        
+                        val scale by androidx.compose.animation.core.animateFloatAsState(
+                            targetValue = if (hasReacted) 1.08f else 1f,
+                            animationSpec = androidx.compose.animation.core.spring(
+                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+                            ),
+                            label = "ReactionScale"
+                        )
 
-                    val buttonColor = if (hasReacted) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                    }
-                    
-                    val contentColor = if (hasReacted) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                    
-                    Surface(
-                        onClick = { onReactToPost(entry.id, emoji) },
-                        shape = RoundedCornerShape(18.dp),
-                        color = buttonColor,
-                        border = if (hasReacted) null else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                        modifier = Modifier
-                            .height(36.dp)
-                            .scale(scale)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        val buttonColor = if (hasReacted) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        }
+                        
+                        val contentColor = if (hasReacted) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        
+                        Surface(
+                            onClick = { onReactToPost(entry.id, emoji) },
+                            shape = RoundedCornerShape(18.dp),
+                            color = buttonColor,
+                            border = if (hasReacted) null else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .height(36.dp)
+                                .scale(scale)
                         ) {
-                            Text(emoji, fontSize = 16.sp)
-                            if (count > 0) {
-                                Text(
-                                    text = count.toString(),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = contentColor,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(emoji, fontSize = 16.sp)
+                                if (count > 0) {
+                                    Text(
+                                        text = count.toString(),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = contentColor,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
                             }
                         }
+                    }
+                }
+                
+                // Reply/Chat button on the right side of the row!
+                Surface(
+                    onClick = { onReplyToPost(entry) },
+                    shape = RoundedCornerShape(18.dp),
+                    color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Chat,
+                            contentDescription = "Phản hồi",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Phản hồi",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

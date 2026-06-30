@@ -31,4 +31,9 @@ interface SocialRepository {
     suspend fun reactToPost(postId: String, emoji: String)
     suspend fun removeFriend(friendshipId: String)
     suspend fun declineFriendRequest(requestId: String)
+    
+    // Direct Messages
+    fun getDirectMessages(friendshipId: String): Flow<List<com.example.newstart.domain.model.DirectMessage>>
+    suspend fun sendDirectMessage(friendshipId: String, text: String, sharedJournal: JournalEntry? = null): Result<Unit>
+    fun getLastMessage(friendshipId: String): Flow<com.example.newstart.domain.model.DirectMessage?>
 }

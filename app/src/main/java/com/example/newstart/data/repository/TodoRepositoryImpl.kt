@@ -121,7 +121,7 @@ class TodoRepositoryImpl @Inject constructor(
                 syncTodosFromNetwork(userId)
             }
         }
-        return todoDao.getAllTodos().map { entities ->
+        return todoDao.getAllTodos(userId).map { entities ->
             entities.map { it.toDomain() }
         }
     }
