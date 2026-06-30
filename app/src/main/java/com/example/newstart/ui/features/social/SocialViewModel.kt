@@ -52,6 +52,9 @@ class SocialViewModel @Inject constructor(
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
+    private val _isCreatingSquad = MutableStateFlow(false)
+    val isCreatingSquad: StateFlow<Boolean> = _isCreatingSquad.asStateFlow()
+
     private var searchJob: kotlinx.coroutines.Job? = null
 
     fun onSearchQueryChange(query: String) {
@@ -82,12 +85,14 @@ class SocialViewModel @Inject constructor(
     fun acceptRequest(requestId: String) {
         viewModelScope.launch {
             socialRepository.acceptFriendRequest(requestId)
+            socialRepository.refreshFriends()
         }
     }
 
     fun removeFriend(friendshipId: String) {
         viewModelScope.launch {
             socialRepository.removeFriend(friendshipId)
+            socialRepository.refreshFriends()
         }
     }
 
@@ -98,8 +103,15 @@ class SocialViewModel @Inject constructor(
     }
 
     fun createSquad(name: String, description: String, members: List<String>) {
+        if (_isCreatingSquad.value) return
         viewModelScope.launch {
-            socialRepository.createSquad(Squad(name = name, description = description, members = members))
+            try {
+                _isCreatingSquad.value = true
+                socialRepository.createSquad(Squad(name = name, description = description, members = members))
+                socialRepository.refreshSquads()
+            } finally {
+                _isCreatingSquad.value = false
+            }
         }
     }
 
@@ -126,6 +138,18 @@ class SocialViewModel @Inject constructor(
     fun sendSquadMessage(squadId: String, text: String) {
         viewModelScope.launch {
             socialRepository.sendSquadMessage(squadId, text)
+        }
+    }
+
+    fun refreshFriends() {
+        viewModelScope.launch {
+            socialRepository.refreshFriends()
+        }
+    }
+
+    fun refreshSquads() {
+        viewModelScope.launch {
+            socialRepository.refreshSquads()
         }
     }
 

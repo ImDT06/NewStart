@@ -65,6 +65,7 @@ fun SocialScreen(
     val incomingRequests by viewModel.incomingRequests.collectAsStateWithLifecycle()
     val squads by viewModel.squads.collectAsStateWithLifecycle()
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
+    val isCreatingSquad by viewModel.isCreatingSquad.collectAsStateWithLifecycle()
     val friends by viewModel.friends.collectAsStateWithLifecycle()
     val sentRequests by viewModel.sentRequests.collectAsStateWithLifecycle()
     val currentUserId = viewModel.currentUserId
@@ -237,6 +238,7 @@ fun SocialScreen(
                                 squads = squads,
                                 friends = friends,
                                 currentUserId = currentUserId ?: "",
+                                isCreating = isCreatingSquad,
                                 getUserFlow = { id -> viewModel.getUserById(id) },
                                 onCreateSquad = { n, d, m -> viewModel.createSquad(n, d, m) },
                                 onUpdateSquad = { id, n, d -> viewModel.updateSquad(id, n, d) },
@@ -417,6 +419,7 @@ fun SquadsTabWrapper(
     squads: List<Squad>,
     friends: List<com.example.newstart.domain.model.Friendship>,
     currentUserId: String,
+    isCreating: Boolean = false,
     getUserFlow: (String) -> Flow<User>,
     onCreateSquad: (String, String, List<String>) -> Unit,
     onUpdateSquad: (String, String, String) -> Unit,
@@ -605,9 +608,13 @@ fun SquadsTabWrapper(
                             selectedMembers = emptySet()
                         }
                     },
-                    enabled = squadName.isNotBlank()
+                    enabled = squadName.isNotBlank() && !isCreating
                 ) {
-                    Text(stringResource(R.string.squad_btn_create))
+                    if (isCreating) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                    } else {
+                        Text(stringResource(R.string.squad_btn_create))
+                    }
                 }
             },
             dismissButton = {

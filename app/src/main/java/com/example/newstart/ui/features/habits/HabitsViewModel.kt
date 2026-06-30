@@ -3,7 +3,10 @@ package com.example.newstart.ui.features.habits
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.newstart.domain.model.Habit
+import com.example.newstart.domain.model.Todo
+import com.example.newstart.domain.model.Priority
 import com.example.newstart.domain.repository.HabitRepository
+import com.example.newstart.domain.repository.TodoRepository
 import com.example.newstart.data.remote.AiHabitService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +21,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
@@ -26,7 +30,7 @@ sealed class AiState {
     object Loading : AiState()
     data class Success(val message: String) : AiState()
     data class Error(val message: String) : AiState()
-    data class Drafting(val habits: List<Habit>) : AiState()
+    data class Drafting(val habits: List<Habit>, val todos: List<Todo>) : AiState()
 }
 
 enum class HabitFilter {
@@ -36,6 +40,7 @@ enum class HabitFilter {
 @HiltViewModel
 class HabitsViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
+    private val todoRepository: TodoRepository,
     private val aiHabitService: AiHabitService
 ) : ViewModel() {
 
@@ -112,27 +117,72 @@ class HabitsViewModel @Inject constructor(
                 val results = response.getJSONArray("results")
                 
                 val draftHabits = mutableListOf<Habit>()
+                val draftTodos = mutableListOf<Todo>()
+                
+                val isTodoCommand = command.contains("todo", ignoreCase = true) ||
+                        command.contains("việc", ignoreCase = true) ||
+                        command.contains("task", ignoreCase = true) ||
+                        command.contains("cần làm", ignoreCase = true)
+                
                 for (i in 0 until results.length()) {
                     val item = results.getJSONObject(i)
                     val action = item.optString("action", "ADD")
                     if (action == "ADD") {
-                        draftHabits.add(Habit(
-                            id = "ai_${System.currentTimeMillis()}_$i",
-                            name = item.optString("name", "Thói quen mới"),
-                            icon = item.optString("icon", "✨"),
-                            goal = "1",
-                            colorHex = "#FF007AFF", 
-                            reminderTime = item.optString("time", "08:00"),
-                            reminderMinutesBefore = item.optInt("minsBefore", 5),
-                            date = item.optString("date", LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))
-                        ))
+                        val isTodo = item.optString("type").lowercase() == "todo" ||
+                                item.has("task") ||
+                                isTodoCommand
+                                
+                        if (isTodo) {
+                            val taskName = item.optString("task").ifBlank {
+                                item.optString("name", "Việc cần làm mới")
+                            }.trim()
+                            val dateStr = item.optString("date").ifBlank {
+                                item.optString("dueDate")
+                            }
+                            val parsedDate = if (dateStr.isNotEmpty()) {
+                                try {
+                                    val localDate = LocalDate.parse(dateStr)
+                                    java.util.Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant())
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            } else null
+                            
+                            val priorityStr = item.optString("priority").uppercase()
+                            val priority = try {
+                                Priority.valueOf(priorityStr)
+                            } catch (e: Exception) {
+                                Priority.MEDIUM
+                            }
+                            
+                            draftTodos.add(
+                                Todo(
+                                    id = "ai_${System.currentTimeMillis()}_$i",
+                                    task = taskName,
+                                    priority = priority,
+                                    dueDate = parsedDate,
+                                    createdAt = java.util.Date()
+                                )
+                            )
+                        } else {
+                            draftHabits.add(Habit(
+                                id = "ai_${System.currentTimeMillis()}_$i",
+                                name = item.optString("name", "Thói quen mới"),
+                                icon = item.optString("icon", "✨"),
+                                goal = "1",
+                                colorHex = "#000000", 
+                                reminderTime = item.optString("time", "08:00"),
+                                reminderMinutesBefore = item.optInt("minsBefore", 5),
+                                date = item.optString("date", LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))
+                            ))
+                        }
                     }
                 }
 
-                if (draftHabits.isNotEmpty()) {
-                    _aiState.value = AiState.Drafting(draftHabits)
+                if (draftHabits.isNotEmpty() || draftTodos.isNotEmpty()) {
+                    _aiState.value = AiState.Drafting(draftHabits, draftTodos)
                 } else {
-                    _aiState.value = AiState.Error("Xin lỗi, tôi không tìm thấy thói quen nào trong câu lệnh của bạn.")
+                    _aiState.value = AiState.Error("Xin lỗi, tôi không tìm thấy thói quen hoặc việc cần làm nào trong câu lệnh của bạn.")
                 }
             } catch (e: Exception) {
                 android.util.Log.e("HabitsViewModel", "AI Error: ${e.message}")
@@ -141,12 +191,15 @@ class HabitsViewModel @Inject constructor(
         }
     }
 
-    fun confirmAiHabits(habits: List<Habit>) {
+    fun confirmAiDrafts(habits: List<Habit>, todos: List<Todo>) {
         viewModelScope.launch {
             habits.forEach { habit ->
                 habitRepository.saveHabit(habit)
             }
-            _aiState.value = AiState.Success("Đã thêm thói quen thành công!")
+            todos.forEach { todo ->
+                todoRepository.insertTodo(todo)
+            }
+            _aiState.value = AiState.Success("Đã thêm thói quen & việc cần làm thành công!")
         }
     }
 

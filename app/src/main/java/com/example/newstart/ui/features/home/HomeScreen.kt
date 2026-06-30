@@ -38,6 +38,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -319,7 +320,7 @@ fun HomeScreen(
                     habitsViewModel.clearAiState()
                 },
                 onProcessCommand = { habitsViewModel.processAiCommand(it) },
-                onConfirmHabits = { habitsViewModel.confirmAiHabits(it) },
+                onConfirmHabits = { habits, todos -> habitsViewModel.confirmAiDrafts(habits, todos) },
                 onClearState = { habitsViewModel.clearAiState() },
                 isListening = isListening,
                 onToggleListening = {
@@ -1541,7 +1542,7 @@ private fun AiInteractionSheet(
     onAiCommandChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onProcessCommand: (String) -> Unit,
-    onConfirmHabits: (List<Habit>) -> Unit,
+    onConfirmHabits: (List<Habit>, List<Todo>) -> Unit,
     onClearState: () -> Unit,
     isListening: Boolean,
     onToggleListening: () -> Unit,
@@ -1560,7 +1561,7 @@ private fun AiInteractionSheet(
     ) {
         AnimatedContent(targetState = aiState, label = "ai_content_anim") { state ->
             when (state) {
-                is AiState.Drafting -> AiDraftingView(state.habits, squads, onConfirmHabits, onClearState)
+                is AiState.Drafting -> AiDraftingView(state.habits, state.todos, squads, onConfirmHabits, onClearState)
                 else -> AiInputView(state, aiCommand, onAiCommandChange, onProcessCommand, isListening, onToggleListening, aiGradient)
             }
         }
@@ -1570,11 +1571,13 @@ private fun AiInteractionSheet(
 @Composable
 private fun AiDraftingView(
     initialHabits: List<Habit>,
+    initialTodos: List<Todo>,
     squads: List<com.example.newstart.domain.model.Squad> = emptyList(),
-    onConfirm: (List<Habit>) -> Unit,
+    onConfirm: (List<Habit>, List<Todo>) -> Unit,
     onCancel: () -> Unit
 ) {
     var draftHabits by remember(initialHabits) { mutableStateOf(initialHabits) }
+    var draftTodos by remember(initialTodos) { mutableStateOf(initialTodos) }
     var editingHabit by remember { mutableStateOf<Habit?>(null) }
     var editingIndex by remember { mutableStateOf(-1) }
 
@@ -1606,10 +1609,7 @@ private fun AiDraftingView(
                 habit = editingHabit!!,
                 squads = squads,
                 onConfirm = { name, icon, time, mins, color, date, squadId ->
-                    val colorInt = (color.red * 255).toInt() shl 16 or
-                                  (color.green * 255).toInt() shl 8 or
-                                  (color.blue * 255).toInt()
-                    val colorHex = String.format("#%06X", colorInt)
+                    val colorHex = String.format("#%06X", 0xFFFFFF and color.toArgb())
                     val updatedHabit = editingHabit!!.copy(
                         name = name,
                         icon = icon,
@@ -1641,55 +1641,112 @@ private fun AiDraftingView(
             .padding(start = 24.dp, end = 24.dp, bottom = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Xác nhận thói quen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text("AI đề xuất các thói quen sau (Bấm để chỉnh sửa)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Đề xuất từ AI", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text("AI đề xuất các mục sau", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
-        draftHabits.forEachIndexed { index, habit ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-                    .clickable {
-                        editingHabit = habit
-                        editingIndex = index
-                    },
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+        
+        if (draftHabits.isNotEmpty()) {
+            Text(
+                text = "Thói quen đề xuất (Bấm để sửa)", 
+                style = MaterialTheme.typography.titleSmall, 
+                fontWeight = FontWeight.Bold, 
+                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
+            )
+            draftHabits.forEachIndexed { index, habit ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                        .clickable {
+                            editingHabit = habit
+                            editingIndex = index
+                        },
+                    shape = RoundedCornerShape(20.dp)
                 ) {
-                    Surface(
-                        modifier = Modifier.size(48.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(habit.icon, fontSize = 24.sp)
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(habit.icon, fontSize = 24.sp)
+                            }
                         }
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(habit.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        habit.reminderTime?.let { time ->
-                            Text(time, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(16.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(habit.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            habit.reminderTime?.let { time ->
+                                Text(time, color = MaterialTheme.colorScheme.primary)
+                            }
                         }
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
                 }
             }
         }
+        
+        if (draftTodos.isNotEmpty()) {
+            Text(
+                text = "Việc cần làm đề xuất", 
+                style = MaterialTheme.typography.titleSmall, 
+                fontWeight = FontWeight.Bold, 
+                modifier = Modifier.align(Alignment.Start).padding(top = 12.dp, bottom = 8.dp)
+            )
+            draftTodos.forEachIndexed { index, todo ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle, 
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(todo.task, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "Độ ưu tiên: ${todo.priority.name}", 
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        
+        Spacer(Modifier.height(16.dp))
         Button(
-            onClick = { onConfirm(draftHabits) },
+            onClick = { onConfirm(draftHabits, draftTodos) },
             modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = RoundedCornerShape(16.dp)
         ) {
-            Text("Thêm tất cả vào lịch trình", fontWeight = FontWeight.Bold)
+            Text("Thêm tất cả vào ứng dụng", fontWeight = FontWeight.Bold)
         }
         TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
             Text("Hủy bỏ", color = MaterialTheme.colorScheme.onSurfaceVariant)

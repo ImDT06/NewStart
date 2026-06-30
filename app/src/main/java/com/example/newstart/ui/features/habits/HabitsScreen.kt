@@ -67,6 +67,7 @@ fun HabitsScreen(
     val friends by socialViewModel.friends.collectAsStateWithLifecycle()
     val sentRequests by socialViewModel.sentRequests.collectAsStateWithLifecycle()
     val isRefreshingFeed by journalViewModel.isRefreshingFeed.collectAsStateWithLifecycle()
+    val isCreatingSquad by socialViewModel.isCreatingSquad.collectAsStateWithLifecycle()
     val currentUserId = socialViewModel.currentUserId
     
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Bảng tin, 1: Bạn bè, 2: Nhóm
@@ -205,8 +206,10 @@ fun HabitsScreen(
                                             indication = null,
                                             onClick = { 
                                                 selectedTab = index 
-                                                if (index == 0) {
-                                                    journalViewModel.refreshSocialFeed()
+                                                when (index) {
+                                                    0 -> journalViewModel.refreshSocialFeed()
+                                                    1 -> socialViewModel.refreshFriends()
+                                                    2 -> socialViewModel.refreshSquads()
                                                 }
                                             }
                                         ),
@@ -271,6 +274,7 @@ fun HabitsScreen(
                                     squads = squads,
                                     friends = friends,
                                     currentUserId = currentUserId ?: "",
+                                    isCreating = isCreatingSquad,
                                     getUserFlow = { id -> socialViewModel.getUserById(id) },
                                     onCreateSquad = { n, d, m -> socialViewModel.createSquad(n, d, m) },
                                     onUpdateSquad = { id, n, d -> socialViewModel.updateSquad(id, n, d) },

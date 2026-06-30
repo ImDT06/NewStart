@@ -36,45 +36,56 @@ class SocialRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context
 ) : SocialRepository {
 
-    override fun getFriends(): Flow<List<Friendship>> = callbackFlow {
-        val userId = auth.currentUser?.uid ?: ""
-        if (userId.isEmpty()) {
-            trySend(emptyList())
-            return@callbackFlow
-        }
+    private val feedRefreshTrigger = MutableSharedFlow<Unit>(replay = 1).apply { tryEmit(Unit) }
+    private val squadsRefreshTrigger = MutableSharedFlow<Unit>(replay = 1).apply { tryEmit(Unit) }
+    private val friendsRefreshTrigger = MutableSharedFlow<Unit>(replay = 1).apply { tryEmit(Unit) }
 
-        // 1. Phát ra dữ liệu từ Room cache cục bộ trước
-        val localJob = launch {
-            socialDao.getFriends(userId).collect { entities ->
-                trySend(entities.map { it.toDomain() })
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    override fun getFriends(): Flow<List<Friendship>> = friendsRefreshTrigger.flatMapLatest {
+        callbackFlow {
+            val userId = auth.currentUser?.uid ?: ""
+            if (userId.isEmpty()) {
+                trySend(emptyList())
+                return@callbackFlow
+            }
+
+            // 1. Phát ra dữ liệu từ Room cache cục bộ trước
+            val localJob = launch {
+                socialDao.getFriends(userId).collect { entities ->
+                    trySend(entities.map { it.toDomain() })
+                }
+            }
+
+            // 2. Chạy ngầm gọi API để cập nhật cache
+            launch(Dispatchers.IO) {
+                try {
+                    val response = apiService.getFriends()
+                    val friendshipEntities = response.map { dto ->
+                        Friendship(
+                            id = dto.id,
+                            userIds = dto.userIds,
+                            status = dto.status
+                        ).toEntity(cachedForUserId = userId)
+                    }
+                    
+                    // Xóa cache cũ của user và ghi đè mới
+                    socialDao.clearFriends(userId)
+                    if (friendshipEntities.isNotEmpty()) {
+                        socialDao.insertFriends(friendshipEntities)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("SocialRepository", "API getFriends error: ${e.message}", e)
+                }
+            }
+
+            awaitClose {
+                localJob.cancel()
             }
         }
+    }
 
-        // 2. Chạy ngầm gọi API để cập nhật cache
-        launch(Dispatchers.IO) {
-            try {
-                val response = apiService.getFriends()
-                val friendshipEntities = response.map { dto ->
-                    Friendship(
-                        id = dto.id,
-                        userIds = dto.userIds,
-                        status = dto.status
-                    ).toEntity(cachedForUserId = userId)
-                }
-                
-                // Xóa cache cũ của user và ghi đè mới
-                socialDao.clearFriends(userId)
-                if (friendshipEntities.isNotEmpty()) {
-                    socialDao.insertFriends(friendshipEntities)
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("SocialRepository", "API getFriends error: ${e.message}", e)
-            }
-        }
-
-        awaitClose {
-            localJob.cancel()
-        }
+    override suspend fun refreshFriends() {
+        friendsRefreshTrigger.emit(Unit)
     }
 
     override suspend fun sendFriendRequest(toUserId: String) {
@@ -131,49 +142,56 @@ class SocialRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getSquads(): Flow<List<Squad>> = callbackFlow {
-        val userId = auth.currentUser?.uid ?: ""
-        if (userId.isEmpty()) {
-            trySend(emptyList())
-            return@callbackFlow
-        }
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    override fun getSquads(): Flow<List<Squad>> = squadsRefreshTrigger.flatMapLatest {
+        callbackFlow {
+            val userId = auth.currentUser?.uid ?: ""
+            if (userId.isEmpty()) {
+                trySend(emptyList())
+                return@callbackFlow
+            }
 
-        // 1. Phát ra dữ liệu từ Room cache cục bộ trước
-        val localJob = launch {
-            socialDao.getSquads(userId).collect { entities ->
-                trySend(entities.map { it.toDomain() })
+            // 1. Phát ra dữ liệu từ Room cache cục bộ trước
+            val localJob = launch {
+                socialDao.getSquads(userId).collect { entities ->
+                    trySend(entities.map { it.toDomain() })
+                }
+            }
+
+            // 2. Chạy ngầm gọi API để cập nhật cache
+            launch(Dispatchers.IO) {
+                try {
+                    val response = apiService.getSquads()
+                    val squadEntities = response.map { dto ->
+                        Squad(
+                            id = dto.id ?: "",
+                            name = dto.name,
+                            description = dto.description,
+                            habitCategory = dto.habitCategory,
+                            members = dto.members,
+                            adminId = dto.adminId ?: "",
+                            createdAt = dto.createdAt.toEpochMilliseconds()?.let { java.util.Date(it) }
+                        ).toEntity(cachedForUserId = userId)
+                    }
+
+                    // Xóa cache cũ của user và ghi đè mới
+                    socialDao.clearSquads(userId)
+                    if (squadEntities.isNotEmpty()) {
+                        socialDao.insertSquads(squadEntities)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("SocialRepository", "API getSquads error: ${e.message}", e)
+                }
+            }
+
+            awaitClose {
+                localJob.cancel()
             }
         }
+    }
 
-        // 2. Chạy ngầm gọi API để cập nhật cache
-        launch(Dispatchers.IO) {
-            try {
-                val response = apiService.getSquads()
-                val squadEntities = response.map { dto ->
-                    Squad(
-                        id = dto.id ?: "",
-                        name = dto.name,
-                        description = dto.description,
-                        habitCategory = dto.habitCategory,
-                        members = dto.members,
-                        adminId = dto.adminId ?: "",
-                        createdAt = dto.createdAt.toEpochMilliseconds()?.let { java.util.Date(it) }
-                    ).toEntity(cachedForUserId = userId)
-                }
-
-                // Xóa cache cũ của user và ghi đè mới
-                socialDao.clearSquads(userId)
-                if (squadEntities.isNotEmpty()) {
-                    socialDao.insertSquads(squadEntities)
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("SocialRepository", "API getSquads error: ${e.message}", e)
-            }
-        }
-
-        awaitClose {
-            localJob.cancel()
-        }
+    override suspend fun refreshSquads() {
+        squadsRefreshTrigger.emit(Unit)
     }
 
     override suspend fun createSquad(squad: Squad) {
@@ -213,10 +231,8 @@ class SocialRepositoryImpl @Inject constructor(
         // Tạm thời để trống hoặc gọi API update nếu có
     }
 
-    private val refreshTrigger = MutableSharedFlow<Unit>(replay = 1).apply { tryEmit(Unit) }
-
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    override fun getSocialFeed(): Flow<List<JournalEntry>> = refreshTrigger.flatMapLatest {
+    override fun getSocialFeed(): Flow<List<JournalEntry>> = feedRefreshTrigger.flatMapLatest {
         flow {
             try {
                 val response = apiService.getSocialFeed()
@@ -244,7 +260,7 @@ class SocialRepositoryImpl @Inject constructor(
     }
 
     override suspend fun refreshSocialFeed() {
-        refreshTrigger.emit(Unit)
+        feedRefreshTrigger.emit(Unit)
     }
 
     override suspend fun reactToPost(postId: String, emoji: String) {

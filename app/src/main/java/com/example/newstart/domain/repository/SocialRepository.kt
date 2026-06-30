@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 interface SocialRepository {
     // Friends
     fun getFriends(): Flow<List<Friendship>>
+    suspend fun refreshFriends()
     suspend fun sendFriendRequest(toUserId: String)
     fun getIncomingRequests(): Flow<List<FriendRequest>>
     fun getSentRequests(): Flow<List<FriendRequest>>
@@ -16,6 +17,7 @@ interface SocialRepository {
     
     // Squads
     fun getSquads(): Flow<List<Squad>>
+    suspend fun refreshSquads()
     suspend fun createSquad(squad: Squad)
     suspend fun joinSquad(squadId: String)
     suspend fun leaveSquad(squadId: String)

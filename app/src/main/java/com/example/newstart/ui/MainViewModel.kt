@@ -84,6 +84,9 @@ class MainViewModel @Inject constructor(
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
 
+    private val _isSavingHabit = MutableStateFlow(false)
+    val isSavingHabit: StateFlow<Boolean> = _isSavingHabit.asStateFlow()
+
     private val _aiSuggestedEmojis = MutableStateFlow<List<String>>(emptyList())
     val aiSuggestedEmojis: StateFlow<List<String>> = _aiSuggestedEmojis.asStateFlow()
 
@@ -419,25 +422,30 @@ class MainViewModel @Inject constructor(
         squadId: String? = null,
         onSuccess: () -> Unit
     ) {
+        if (_isSavingHabit.value) return
         viewModelScope.launch {
-            val finalDate = date ?: _selectedHabitDate.value
-            val newHabit = Habit(
-                id = id,
-                name = name,
-                icon = icon,
-                goal = goal,
-                colorHex = colorHex,
-                date = finalDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                reminderTime = reminderTime,
-                reminderMinutesBefore = reminderMinutesBefore,
-                squadId = squadId
-            )
-            val result = saveHabitUseCase(newHabit)
-            if (result.isSuccess) {
-                onSuccess()
-            } else {
-                // In lỗi ra Logcat để kiểm tra
-                android.util.Log.e("MainViewModel", "Lưu thói quen thất bại: ${result.exceptionOrNull()?.message}")
+            try {
+                _isSavingHabit.value = true
+                val finalDate = date ?: _selectedHabitDate.value
+                val newHabit = Habit(
+                    id = id,
+                    name = name,
+                    icon = icon,
+                    goal = goal,
+                    colorHex = colorHex,
+                    date = finalDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                    reminderTime = reminderTime,
+                    reminderMinutesBefore = reminderMinutesBefore,
+                    squadId = squadId
+                )
+                val result = saveHabitUseCase(newHabit)
+                if (result.isSuccess) {
+                    onSuccess()
+                } else {
+                    android.util.Log.e("MainViewModel", "Lưu thói quen thất bại: ${result.exceptionOrNull()?.message}")
+                }
+            } finally {
+                _isSavingHabit.value = false
             }
         }
     }
