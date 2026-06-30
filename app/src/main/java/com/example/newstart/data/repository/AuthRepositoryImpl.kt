@@ -125,4 +125,17 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun logout() {
         firebaseAuth.signOut()
     }
+
+    override suspend fun checkIsAdmin(): Boolean {
+        return try {
+            val user = firebaseAuth.currentUser ?: return false
+            if (user.email == "tdt2706@gmail.com") return true
+            val tokenResult = user.getIdToken(false).await()
+            val isAdmin = tokenResult.claims["admin"] as? Boolean ?: false
+            isAdmin
+        } catch (e: Exception) {
+            android.util.Log.e("AuthRepository", "Error checking admin status: ${e.message}")
+            false
+        }
+    }
 }

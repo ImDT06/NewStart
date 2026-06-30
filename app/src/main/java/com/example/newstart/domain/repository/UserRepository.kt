@@ -12,4 +12,7 @@ interface UserRepository {
     suspend fun updateFcmToken(token: String): Result<Unit>
     suspend fun updateProfileFields(updates: Map<String, String>): Result<Unit>
     suspend fun updateEmail(newEmail: String): Result<Unit>
+    fun getAllUsers(): Flow<List<User>>
+    suspend fun blockUser(userId: String, block: Boolean): Result<Unit>
+    fun getBlockedUsers(): Flow<Set<String>>
 }

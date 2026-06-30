@@ -269,4 +269,58 @@ class UserRepositoryImpl @Inject constructor(
             null
         }
     }
+
+    override fun getAllUsers(): Flow<List<User>> = callbackFlow {
+        val listener = firestore.collection("users")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("UserRepository", "Error listing users: ${error.message}", error)
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val users = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            doc.toObject(User::class.java)?.copy(id = doc.id)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    trySend(users)
+                }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    override suspend fun blockUser(userId: String, block: Boolean): Result<Unit> {
+        return try {
+            if (block) {
+                firestore.collection("blocked_users").document(userId)
+                    .set(mapOf("blocked" to true))
+                    .await()
+            } else {
+                firestore.collection("blocked_users").document(userId)
+                    .delete()
+                    .await()
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override fun getBlockedUsers(): Flow<Set<String>> = callbackFlow {
+        val listener = firestore.collection("blocked_users")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(emptySet())
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val ids = snapshot.documents.map { it.id }.toSet()
+                    trySend(ids)
+                }
+            }
+        awaitClose { listener.remove() }
+    }
 }

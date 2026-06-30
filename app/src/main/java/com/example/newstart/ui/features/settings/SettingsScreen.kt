@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 fun SettingsScreen(
     onNavigateToSocial: () -> Unit,
     onNavigateToHome: () -> Unit,
+    onNavigateToAdmin: () -> Unit = {},
     modifier: Modifier = Modifier,
     mainViewModel: MainViewModel = hiltViewModel()
 ) {
@@ -96,6 +97,7 @@ fun SettingsScreen(
     val isSearchable by mainViewModel.isSearchable.collectAsStateWithLifecycle()
     val isHabitNotifEnabled by mainViewModel.isHabitNotificationsEnabled.collectAsStateWithLifecycle()
     val isCommunityNotifEnabled by mainViewModel.isCommunityNotificationsEnabled.collectAsStateWithLifecycle()
+    val isAdmin by mainViewModel.isAdmin.collectAsStateWithLifecycle()
 
     var userEmailText by remember(currentUser) { mutableStateOf(currentUser?.email ?: "") }
     
@@ -635,6 +637,21 @@ fun SettingsScreen(
                             checked = isSearchable,
                             onCheckedChange = { mainViewModel.setSearchable(it) }
                         )
+                    }
+                }
+
+                // 4.5. Admin Section
+                if (isAdmin) {
+                    item { SectionTitle(title = if (isVi) "Quản trị hệ thống" else "Administration") }
+                    item {
+                        SettingsCard {
+                            SettingsItem(
+                                icon = Icons.Default.AdminPanelSettings,
+                                title = if (isVi) "Bảng quản trị" else "Admin Dashboard",
+                                subtitle = if (isVi) "Quản lý bài đăng và tài khoản người dùng" else "Manage community posts and user accounts",
+                                onClick = onNavigateToAdmin
+                            )
+                        }
                     }
                 }
 

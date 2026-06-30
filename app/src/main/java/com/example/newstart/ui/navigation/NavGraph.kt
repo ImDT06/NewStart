@@ -24,6 +24,7 @@ import com.example.newstart.ui.features.habits.StatisticsScreen
 import com.example.newstart.ui.features.social.SocialScreen
 import com.example.newstart.ui.features.pomodoro.PomodoroScreen
 import com.example.newstart.ui.screens.PlaceholderScreen
+import com.example.newstart.ui.features.admin.AdminScreen
 
 import com.example.newstart.ui.MainViewModel
 
@@ -148,12 +149,24 @@ fun NavGraph(
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = false }
                     }
+                },
+                onNavigateToAdmin = {
+                    navController.navigate(Screen.Admin.route)
                 }
             )
         }
 
         composable(route = Screen.Social.route) {
             SocialScreen(
+                mainViewModel = mainViewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(route = Screen.Admin.route) {
+            AdminScreen(
                 mainViewModel = mainViewModel,
                 onNavigateBack = {
                     navController.popBackStack()

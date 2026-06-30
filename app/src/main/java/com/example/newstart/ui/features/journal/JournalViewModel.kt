@@ -150,17 +150,30 @@ class JournalViewModel @Inject constructor(
     private val _socialFeed = MutableStateFlow<List<JournalEntry>>(emptyList())
     val socialFeed: StateFlow<List<JournalEntry>> = _socialFeed.asStateFlow()
 
-    init {
-        refreshSocialFeed()
-    }
+    private val _isRefreshingFeed = MutableStateFlow(false)
+    val isRefreshingFeed: StateFlow<Boolean> = _isRefreshingFeed.asStateFlow()
 
-    fun refreshSocialFeed() {
+    init {
         viewModelScope.launch {
             socialRepository.getSocialFeed().collect { entries ->
                 // Chỉ hiển thị các bài viết không phải PRIVATE trên Bảng tin
                 _socialFeed.value = entries.filter { 
                     it.privacy != com.example.newstart.domain.model.JournalPrivacy.PRIVATE 
                 }
+            }
+        }
+    }
+
+    fun refreshSocialFeed() {
+        viewModelScope.launch {
+            _isRefreshingFeed.value = true
+            try {
+                socialRepository.refreshSocialFeed()
+                kotlinx.coroutines.delay(800)
+            } catch (e: Exception) {
+                android.util.Log.e("JournalViewModel", "Error refreshing feed: ${e.message}")
+            } finally {
+                _isRefreshingFeed.value = false
             }
         }
     }

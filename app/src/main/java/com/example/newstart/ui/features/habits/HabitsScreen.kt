@@ -43,6 +43,9 @@ import com.example.newstart.ui.theme.LocalDarkTheme
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +64,7 @@ fun HabitsScreen(
     val isSearching by socialViewModel.isSearching.collectAsStateWithLifecycle()
     val friends by socialViewModel.friends.collectAsStateWithLifecycle()
     val sentRequests by socialViewModel.sentRequests.collectAsStateWithLifecycle()
+    val isRefreshingFeed by journalViewModel.isRefreshingFeed.collectAsStateWithLifecycle()
     val currentUserId = socialViewModel.currentUserId
     
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Bảng tin, 1: Bạn bè, 2: Nhóm
@@ -223,6 +227,8 @@ fun HabitsScreen(
                         when (selectedTab) {
                             0 -> SocialFeedList(
                                 socialFeed = socialFeed,
+                                isRefreshing = isRefreshingFeed,
+                                onRefresh = { journalViewModel.refreshSocialFeed() },
                                 isVietnamese = isVietnamese,
                                 isDark = isDark,
                                 dateTimeFormatter = dateTimeFormatter,
@@ -265,9 +271,12 @@ fun HabitsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SocialFeedList(
     socialFeed: List<JournalEntry>,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
     isVietnamese: Boolean,
     isDark: Boolean,
     dateTimeFormatter: SimpleDateFormat,
@@ -275,47 +284,56 @@ private fun SocialFeedList(
     getUserFlow: (String) -> Flow<User>,
     onReactToPost: (String, String) -> Unit
 ) {
-    if (socialFeed.isEmpty()) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                Icons.Default.Diversity3, 
-                null, 
-                modifier = Modifier.size(90.dp), 
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-            )
-            Spacer(Modifier.height(32.dp))
-            Text(
-                if (isVietnamese) "Bảng tin cộng đồng" else "Community Feed",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                if (isVietnamese) "Kết nối với bạn bè để cùng nhau kỷ luật" else "Connect with friends to stay disciplined together",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp, start = 16.dp, end = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(items = socialFeed, key = { it.id }) { entry ->
-                SocialFeedItem(
-                    entry = entry,
-                    timeFormatted = remember(entry.timestamp) { entry.timestamp?.let { dateTimeFormatter.format(it) } ?: "--:--" },
-                    onImageClick = onImageClick,
-                    getUserFlow = getUserFlow,
-                    onReactToPost = onReactToPost
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        if (socialFeed.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    Icons.Default.Diversity3, 
+                    null, 
+                    modifier = Modifier.size(90.dp), 
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                 )
+                Spacer(Modifier.height(32.dp))
+                Text(
+                    if (isVietnamese) "Bảng tin cộng đồng" else "Community Feed",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (isVietnamese) "Kết nối với bạn bè để cùng nhau kỷ luật" else "Connect with friends to stay disciplined together",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp, start = 16.dp, end = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(items = socialFeed, key = { it.id }) { entry ->
+                    SocialFeedItem(
+                        entry = entry,
+                        timeFormatted = remember(entry.timestamp) { entry.timestamp?.let { dateTimeFormatter.format(it) } ?: "--:--" },
+                        onImageClick = onImageClick,
+                        getUserFlow = getUserFlow,
+                        onReactToPost = onReactToPost
+                    )
+                }
             }
         }
     }
