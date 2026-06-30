@@ -68,10 +68,15 @@ fun HabitsScreen(
     val activeSquad = squads.find { it.id == activeSquadDetail?.id } ?: activeSquadDetail
 
     val context = LocalContext.current
+    val isDark = LocalDarkTheme.current
+    
+    LaunchedEffect(Unit) {
+        journalViewModel.refreshSocialFeed()
+    }
+
     val locale = remember(context) { context.resources.configuration.locales[0] }
     val isVietnamese = locale.language == "vi"
     val dateTimeFormatter = remember { SimpleDateFormat("HH:mm - dd/MM/yyyy", locale) }
-    val isDark = LocalDarkTheme.current
 
     DisposableEffect(activeSquad) {
         if (activeSquad != null) {
@@ -191,7 +196,12 @@ fun HabitsScreen(
                                         .clickable(
                                             interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                             indication = null,
-                                            onClick = { selectedTab = index }
+                                            onClick = { 
+                                                selectedTab = index 
+                                                if (index == 0) {
+                                                    journalViewModel.refreshSocialFeed()
+                                                }
+                                            }
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
