@@ -76,8 +76,6 @@ fun SettingsScreen(
     var countdownSeconds by remember { mutableStateOf(3) }
     var deleteAccountPasswordText by remember { mutableStateOf("") }
 
-    val sharedPrefs = remember(context) { context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE) }
-    var isStreakWidgetEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("is_streak_widget_enabled", true)) }
     val scope = rememberCoroutineScope()
     var showChangeEmailDialog by remember { mutableStateOf(false) }
     var showBirthdayDialog by remember { mutableStateOf(false) }
@@ -514,24 +512,6 @@ fun SettingsScreen(
                             title = stringResource(id = R.string.settings_add_widget),
                             subtitle = stringResource(id = R.string.settings_add_widget_desc),
                             onClick = { requestPinWidget() }
-                        )
-
-                        SettingsDivider()
-                        SettingsToggleItem(
-                            icon = Icons.Default.Whatshot,
-                            title = stringResource(id = R.string.settings_widget_streak),
-                            checked = isStreakWidgetEnabled,
-                            onCheckedChange = {
-                                isStreakWidgetEnabled = it
-                                sharedPrefs.edit().putBoolean("is_streak_widget_enabled", it).apply()
-                                scope.launch {
-                                    try {
-                                        HabitWidget().updateAll(context)
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("SettingsScreen", "Error updating widget: ${e.message}")
-                                    }
-                                }
-                            }
                         )
                     }
                 }

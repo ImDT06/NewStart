@@ -32,6 +32,9 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.*
 
 enum class AuthState {
@@ -50,7 +53,8 @@ class MainViewModel @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val saveJournalEntryUseCase: SaveJournalEntryUseCase,
     private val suggestEmojiUseCase: SuggestEmojiUseCase,
-    private val saveHabitUseCase: SaveHabitUseCase
+    private val saveHabitUseCase: SaveHabitUseCase,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _selectedHabitDate = MutableStateFlow(LocalDate.now())
@@ -240,6 +244,13 @@ class MainViewModel @Inject constructor(
         )
 
     val squads: StateFlow<List<com.example.newstart.domain.model.Squad>> = socialRepository.getSquads()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val friends: StateFlow<List<com.example.newstart.domain.model.Friendship>> = socialRepository.getFriends()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -683,7 +694,17 @@ class MainViewModel @Inject constructor(
 
     fun sendDirectMessage(friendshipId: String, text: String, sharedJournal: JournalEntry? = null) {
         viewModelScope.launch {
-            socialRepository.sendDirectMessage(friendshipId, text, sharedJournal)
+            val result = socialRepository.sendDirectMessage(friendshipId, text, sharedJournal)
+            result.onFailure { e ->
+                android.util.Log.e("MainViewModel", "Failed to send direct message: ${e.message}", e)
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "Lỗi gửi tin: ${e.localizedMessage}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
     }
 

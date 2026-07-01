@@ -497,6 +497,12 @@ class MainActivity : AppCompatActivity() {
                                                     ) {
                                                         showBottomSheet = false
                                                         mainViewModel.startEditingHabit(null)
+                                                        // Chuyển về màn hình Home sau khi tạo/sửa thói quen
+                                                        if (navController.currentDestination?.route != Screen.Home.route) {
+                                                            navController.navigate(Screen.Home.route) {
+                                                                popUpTo(Screen.Home.route) { inclusive = false }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             )

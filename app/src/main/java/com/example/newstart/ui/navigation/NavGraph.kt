@@ -136,7 +136,8 @@ fun NavGraph(
             StatisticsScreen(
                 onNavigateBack = {
                     navController.popBackStack()
-                }
+                },
+                mainViewModel = mainViewModel
             )
         }
 

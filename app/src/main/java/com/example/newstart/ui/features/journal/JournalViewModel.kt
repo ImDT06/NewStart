@@ -34,17 +34,33 @@ class JournalViewModel @Inject constructor(
     private val userRepository: UserRepository
 ) : ViewModel() {
 
+    private val _socialFeed = MutableStateFlow<List<JournalEntry>>(emptyList())
+    val socialFeed: StateFlow<List<JournalEntry>> = _socialFeed.asStateFlow()
+
+    private val _isRefreshingFeed = MutableStateFlow(false)
+    val isRefreshingFeed: StateFlow<Boolean> = _isRefreshingFeed.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            socialRepository.getSocialFeed().collect { entries ->
+                _socialFeed.value = entries.filter { 
+                    it.privacy != com.example.newstart.domain.model.JournalPrivacy.PRIVATE 
+                }
+            }
+        }
+    }
+
     fun getUserById(userId: String): Flow<User> = userRepository.getUserById(userId)
 
     fun reactToPost(postId: String, emoji: String) {
         val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return
         
-        // 1. Cập nhật UI lập tức (Optimistic Update)
+        // Optimistic Update
         _socialFeed.value = _socialFeed.value.map { entry ->
             if (entry.id == postId) {
                 val newReactions = entry.reactions.toMutableMap()
                 if (newReactions[uid] == emoji) {
-                    newReactions.remove(uid) // Bỏ thả tim nếu đã thả cùng loại
+                    newReactions.remove(uid)
                 } else {
                     newReactions[uid] = emoji
                 }
@@ -54,7 +70,6 @@ class JournalViewModel @Inject constructor(
             }
         }
 
-        // 2. Gửi API lên server ngầm
         viewModelScope.launch {
             try {
                 socialRepository.reactToPost(postId, emoji)
@@ -67,7 +82,7 @@ class JournalViewModel @Inject constructor(
     private val _selectedDateRange = MutableStateFlow<Pair<LocalDate, LocalDate?>>(LocalDate.now() to null)
     val selectedDateRange: StateFlow<Pair<LocalDate, LocalDate?>> = _selectedDateRange.asStateFlow()
 
-    private val _currentTab = MutableStateFlow(0) // 0: Cá nhân, 1: Cộng đồng
+    private val _currentTab = MutableStateFlow(0) 
     val currentTab: StateFlow<Int> = _currentTab.asStateFlow()
 
     val selectedDate: StateFlow<LocalDate> = _selectedDateRange.map { it.first }
@@ -81,11 +96,7 @@ class JournalViewModel @Inject constructor(
             entries.filter { it.imageUrl != null }.sortedByDescending { it.timestamp } 
         }
         .flowOn(Dispatchers.Default)
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val uniqueMovieTitles: StateFlow<List<String>> = journalRepository.getJournalEntries()
         .map { entries ->
@@ -141,28 +152,7 @@ class JournalViewModel @Inject constructor(
                 }.sortedByDescending { it.timestamp }
             }.flowOn(Dispatchers.Default)
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-    private val _socialFeed = MutableStateFlow<List<JournalEntry>>(emptyList())
-    val socialFeed: StateFlow<List<JournalEntry>> = _socialFeed.asStateFlow()
-
-    private val _isRefreshingFeed = MutableStateFlow(false)
-    val isRefreshingFeed: StateFlow<Boolean> = _isRefreshingFeed.asStateFlow()
-
-    init {
-        viewModelScope.launch {
-            socialRepository.getSocialFeed().collect { entries ->
-                // Chỉ hiển thị các bài viết không phải PRIVATE trên Bảng tin
-                _socialFeed.value = entries.filter { 
-                    it.privacy != com.example.newstart.domain.model.JournalPrivacy.PRIVATE 
-                }
-            }
-        }
-    }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun refreshSocialFeed() {
         viewModelScope.launch {
@@ -193,27 +183,11 @@ class JournalViewModel @Inject constructor(
     fun setQuickFilter(filter: String) {
         val today = LocalDate.now()
         when (filter) {
-            "All" -> {
-                _selectedDateRange.value = LocalDate.of(2000, 1, 1) to LocalDate.of(2100, 12, 31)
-            }
-            "Year" -> {
-                val start = today.withDayOfYear(1)
-                val end = today.withDayOfYear(today.lengthOfYear())
-                _selectedDateRange.value = start to end
-            }
-            "Month" -> {
-                val start = today.withDayOfMonth(1)
-                val end = today.withDayOfMonth(today.lengthOfMonth())
-                _selectedDateRange.value = start to end
-            }
-            "Week" -> {
-                val start = today.with(java.time.DayOfWeek.MONDAY)
-                val end = today.with(java.time.DayOfWeek.SUNDAY)
-                _selectedDateRange.value = start to end
-            }
-            "Today" -> {
-                _selectedDateRange.value = today to null
-            }
+            "All" -> _selectedDateRange.value = LocalDate.of(2000, 1, 1) to LocalDate.of(2100, 12, 31)
+            "Year" -> _selectedDateRange.value = today.withDayOfYear(1) to today.withDayOfYear(today.lengthOfYear())
+            "Month" -> _selectedDateRange.value = today.withDayOfMonth(1) to today.withDayOfMonth(today.lengthOfMonth())
+            "Week" -> _selectedDateRange.value = today.with(java.time.DayOfWeek.MONDAY) to today.with(java.time.DayOfWeek.SUNDAY)
+            "Today" -> _selectedDateRange.value = today to null
         }
     }
 

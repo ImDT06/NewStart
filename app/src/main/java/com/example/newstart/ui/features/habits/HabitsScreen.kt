@@ -58,22 +58,23 @@ fun HabitsScreen(
     socialViewModel: SocialViewModel = hiltViewModel(),
     journalViewModel: JournalViewModel = hiltViewModel()
 ) {
-    val socialFeed by journalViewModel.socialFeed.collectAsStateWithLifecycle()
+    val socialFeed by journalViewModel.socialFeed.collectAsState()
     val searchQuery by socialViewModel.searchQuery.collectAsStateWithLifecycle()
     val searchResults by socialViewModel.searchResults.collectAsStateWithLifecycle()
     val incomingRequests by socialViewModel.incomingRequests.collectAsStateWithLifecycle()
     val squads by socialViewModel.squads.collectAsStateWithLifecycle()
     val isSearching by socialViewModel.isSearching.collectAsStateWithLifecycle()
-    val friends by socialViewModel.friends.collectAsStateWithLifecycle()
+    val friends by mainViewModel.friends.collectAsState()
     val sentRequests by socialViewModel.sentRequests.collectAsStateWithLifecycle()
-    val isRefreshingFeed by journalViewModel.isRefreshingFeed.collectAsStateWithLifecycle()
+    val isRefreshingFeed by journalViewModel.isRefreshingFeed.collectAsState()
     val isCreatingSquad by socialViewModel.isCreatingSquad.collectAsStateWithLifecycle()
     val currentUserId = socialViewModel.currentUserId
     
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Bảng tin, 1: Bạn bè, 2: Nhóm
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Bảng tin, 1: Tin nhắn, 2: Bạn bè, 3: Nhóm
     var activeSquadDetail by remember { mutableStateOf<Squad?>(null) }
     val activeSquad = squads.find { it.id == activeSquadDetail?.id } ?: activeSquadDetail
     var activeReplyJournal by remember { mutableStateOf<JournalEntry?>(null) }
+    var activeChatFriendship by remember { mutableStateOf<com.example.newstart.domain.model.Friendship?>(null) }
 
     val context = LocalContext.current
     val isDark = LocalDarkTheme.current
@@ -106,6 +107,13 @@ fun HabitsScreen(
             mainViewModel = mainViewModel,
             onBack = { activeSquadDetail = null },
             hasBottomBar = false
+        )
+    } else if (activeChatFriendship != null) {
+        com.example.newstart.ui.features.social.DirectChatView(
+            friendship = activeChatFriendship!!,
+            currentUserId = currentUserId ?: "",
+            mainViewModel = mainViewModel,
+            onBack = { activeChatFriendship = null }
         )
     } else {
         val backgroundColor = MaterialTheme.colorScheme.background
@@ -145,6 +153,7 @@ fun HabitsScreen(
                     // Modern Segmented Control Style Tabs with smooth sliding animation
                     val tabs = listOf(
                         if (isVietnamese) "Bảng tin" else "Feed",
+                        if (isVietnamese) "Tin nhắn" else "Messages",
                         stringResource(R.string.social_tab_friends),
                         stringResource(R.string.social_tab_squads)
                     )
@@ -209,7 +218,8 @@ fun HabitsScreen(
                                                 when (index) {
                                                     0 -> journalViewModel.refreshSocialFeed()
                                                     1 -> socialViewModel.refreshFriends()
-                                                    2 -> socialViewModel.refreshSquads()
+                                                    2 -> socialViewModel.refreshFriends()
+                                                    3 -> socialViewModel.refreshSquads()
                                                 }
                                             }
                                         ),
@@ -245,7 +255,13 @@ fun HabitsScreen(
                                     activeReplyJournal = entry
                                 }
                             )
-                            1 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            1 -> com.example.newstart.ui.features.social.ChatsTabWrapper(
+                                friends = friends,
+                                currentUserId = currentUserId ?: "",
+                                mainViewModel = mainViewModel,
+                                onFriendChatClick = { activeChatFriendship = it }
+                            )
+                            2 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 com.example.newstart.ui.features.social.FriendsTabWrapper(
                                     searchQuery = searchQuery,
                                     onSearchQueryChange = { socialViewModel.onSearchQueryChange(it) },
@@ -261,15 +277,11 @@ fun HabitsScreen(
                                     onRemoveFriend = { socialViewModel.removeFriend(it) },
                                     getUserFlow = { socialViewModel.getUserById(it) },
                                     onFriendChatClick = { friendship ->
-                                        val friendId = friendship.userIds.firstOrNull { it != (currentUserId ?: "") }
-                                        if (friendId != null) {
-                                            mainViewModel.pendingChatUserId = friendId
-                                            navController.navigate(Screen.Social.route)
-                                        }
+                                        activeChatFriendship = friendship
                                     }
                                 )
                             }
-                            2 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            3 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 com.example.newstart.ui.features.social.SquadsTabWrapper(
                                     squads = squads,
                                     friends = friends,
@@ -314,100 +326,68 @@ fun HabitsScreen(
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
                 
-                // Preview of the shared journal
-                Surface(
-                    color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = replyJournal.emoji,
-                            fontSize = 24.sp,
-                            modifier = Modifier.padding(end = 12.dp)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Bài viết của ${authorState.name.ifBlank { "Người dùng" }}",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            if (replyJournal.text.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = replyJournal.text,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                }
                 
-                // Message Input field
+                // Message Input field (Capsule style)
+                val authorName = authorState.name.ifBlank { "Người dùng" }
                 OutlinedTextField(
                     value = replyText,
                     onValueChange = { replyText = it },
-                    placeholder = { Text("Viết bình luận phản hồi gửi vào tin nhắn...") },
+                    placeholder = { 
+                        Text(
+                            text = "Trả lời $authorName...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        ) 
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp),
+                        .padding(bottom = 12.dp),
                     maxLines = 4,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(28.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = MaterialTheme.colorScheme.onSurface,
                         unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                         focusedContainerColor = if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
                         unfocusedContainerColor = if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
                         unfocusedBorderColor = Color.Transparent
-                    )
-                )
-                
-                // Action Buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(
-                        onClick = { activeReplyJournal = null },
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text("Hủy", fontWeight = FontWeight.Medium)
-                    }
-                    
-                    Button(
-                        onClick = {
-                            val friendship = friends.find { it.userIds.contains(replyJournal.userId) }
-                            if (friendship != null) {
-                                mainViewModel.sendDirectMessage(
-                                    friendshipId = friendship.id,
-                                    text = replyText.trim(),
-                                    sharedJournal = replyJournal
+                    ),
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                val friendship = friends.find { it.userIds.contains(replyJournal.userId) }
+                                if (friendship != null) {
+                                    mainViewModel.sendDirectMessage(
+                                        friendshipId = friendship.id,
+                                        text = replyText.trim(),
+                                        sharedJournal = replyJournal
+                                    )
+                                    android.widget.Toast.makeText(context, "Đã gửi phản hồi!", android.widget.Toast.LENGTH_SHORT).show()
+                                    activeReplyJournal = null
+                                } else {
+                                    android.widget.Toast.makeText(context, "Bạn chỉ có thể phản hồi bài viết của bạn bè!", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            enabled = replyText.isNotBlank(),
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .size(32.dp)
+                                .background(
+                                    color = if (replyText.isNotBlank()) MaterialTheme.colorScheme.primary 
+                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                    shape = CircleShape
                                 )
-                                android.widget.Toast.makeText(context, "Đã gửi phản hồi vào tin nhắn trực tiếp!", android.widget.Toast.LENGTH_SHORT).show()
-                                activeReplyJournal = null
-                            } else {
-                                android.widget.Toast.makeText(context, "Bạn chỉ có thể phản hồi bài viết của bạn bè!", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        enabled = true,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Send, contentDescription = "Send", modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Gửi phản hồi")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowUpward,
+                                contentDescription = "Send",
+                                modifier = Modifier.size(18.dp),
+                                tint = if (replyText.isNotBlank()) MaterialTheme.colorScheme.onPrimary 
+                                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                        }
                     }
-                }
+                )
             }
         }
     }
@@ -636,14 +616,15 @@ fun SocialFeedItem(
             // Reactions and Comments Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.weight(1f)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f, fill = false)
                 ) {
-                    val commonEmojis = listOf("❤️", "👍", "🔥", "😂", "👏")
+                    val commonEmojis = listOf("❤️", "👍", "🔥")
                     commonEmojis.forEach { emoji ->
                         val count = entry.reactions.values.count { it == emoji }
                         val hasReacted = entry.reactions[currentUserId] == emoji
@@ -698,30 +679,22 @@ fun SocialFeedItem(
                 }
                 
                 // Reply/Chat button on the right side of the row!
-                Surface(
-                    onClick = { onReplyToPost(entry) },
-                    shape = RoundedCornerShape(18.dp),
-                    color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                if (entry.userId != currentUserId) {
+                    Surface(
+                        onClick = { onReplyToPost(entry) },
+                        shape = CircleShape,
+                        color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                        modifier = Modifier.size(36.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Chat,
-                            contentDescription = "Phản hồi",
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "Phản hồi",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Chat,
+                                contentDescription = "Phản hồi",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }

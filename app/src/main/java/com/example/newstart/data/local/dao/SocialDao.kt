@@ -11,6 +11,9 @@ interface SocialDao {
     @Query("SELECT * FROM friendships WHERE cachedForUserId = :userId")
     fun getFriends(userId: String): Flow<List<FriendshipEntity>>
 
+    @Query("SELECT * FROM friendships WHERE id = :friendshipId LIMIT 1")
+    suspend fun getFriendshipById(friendshipId: String): FriendshipEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFriends(friendships: List<FriendshipEntity>)
 

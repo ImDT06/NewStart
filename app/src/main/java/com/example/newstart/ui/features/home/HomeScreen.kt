@@ -26,6 +26,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
@@ -66,6 +67,7 @@ import com.example.newstart.ui.features.habits.AiState
 import com.example.newstart.ui.features.habits.HabitFilter
 import com.example.newstart.ui.features.habits.HabitsViewModel
 import com.example.newstart.ui.features.habits.components.HabitItem
+import com.example.newstart.ui.features.habits.components.HabitSwipeableItem
 import com.example.newstart.ui.navigation.Screen
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.util.AppCombinedPreviews
@@ -292,6 +294,7 @@ fun HomeScreen(
                 scope.launch { pagerState.animateScrollToPage(500) }
             },
             onShowMonthPicker = { showMonthPicker = true },
+            onShowHabitList = { navController.navigate(Screen.Statistics.route) },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -448,6 +451,7 @@ fun HomeContent(
     onDateSelected: (LocalDate) -> Unit,
     onTodayClick: () -> Unit,
     onShowMonthPicker: () -> Unit,
+    onShowHabitList: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val activeTodos = remember(todos) {
@@ -488,7 +492,11 @@ fun HomeContent(
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 100.dp)) {
-                item { HomeHeaderSection(userName = user?.name ?: "Guest") }
+                item { 
+                    HomeHeaderSection(
+                        userName = user?.name ?: "Guest"
+                    ) 
+                }
                 if (isTimerRunning) {
                     item { TimerCard(timerSeconds, onStopTimer) }
                 }
@@ -503,7 +511,8 @@ fun HomeContent(
                         isVietnamese = isVietnamese,
                         locale = locale,
                         onTodayClick = onTodayClick,
-                        onShowMonthPicker = onShowMonthPicker
+                        onShowMonthPicker = onShowMonthPicker,
+                        onShowHabitList = onShowHabitList
                     )
                 }
 
@@ -733,87 +742,6 @@ private fun List<Habit>.groupByTimeOfDay(): List<Pair<String, List<Habit>>> {
 }
 
 @Composable
-private fun HabitSwipeableItem(
-    modifier: Modifier = Modifier,
-    habit: Habit,
-    onDelete: () -> Unit,
-    onToggle: (Habit, Boolean) -> Unit,
-    onEdit: (Habit) -> Unit
-) {
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    val anchorWidth = with(density) { 80.dp.toPx() }
-    val dismissThreshold = with(density) { 180.dp.toPx() }
-    
-    val offsetX = remember { Animatable(0f) }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFFFF4444))
-                .clickable { 
-                    scope.launch {
-                        offsetX.animateTo(-1500f, spring(stiffness = Spring.StiffnessMedium))
-                        onDelete()
-                    }
-                },
-            contentAlignment = Alignment.CenterEnd
-        ) {
-            Box(
-                modifier = Modifier.width(80.dp).fillMaxHeight(),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
-                .fillMaxWidth()
-                .pointerInput(habit.id) {
-                    detectHorizontalDragGestures(
-                        onHorizontalDrag = { change, dragAmount ->
-                            val newOffset = (offsetX.value + dragAmount).coerceAtMost(0f)
-                            scope.launch { offsetX.snapTo(newOffset) }
-                            change.consume()
-                        },
-                        onDragEnd = {
-                            scope.launch {
-                                if (offsetX.value < -dismissThreshold) {
-                                    offsetX.animateTo(-1500f, spring(stiffness = Spring.StiffnessMedium))
-                                    onDelete()
-                                } else if (offsetX.value < -anchorWidth / 2) {
-                                    offsetX.animateTo(-anchorWidth, spring(dampingRatio = Spring.DampingRatioNoBouncy))
-                                } else {
-                                    offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy))
-                                }
-                            }
-                        }
-                    )
-                }
-        ) {
-            HabitItem(
-                habit = habit, 
-                onToggle = { onToggle(habit, !habit.isCompleted) }, 
-                onEdit = { onEdit(habit) }
-            )
-        }
-    }
-}
-
-@Composable
 private fun HabitsHeader(
     selectedDate: LocalDate,
     currentFilter: HabitFilter,
@@ -823,6 +751,7 @@ private fun HabitsHeader(
     locale: Locale,
     onTodayClick: () -> Unit,
     onShowMonthPicker: () -> Unit,
+    onShowHabitList: () -> Unit,
 ) {
     var showFilterMenu by remember { mutableStateOf(false) }
 
@@ -918,16 +847,27 @@ private fun HabitsHeader(
             textAlign = TextAlign.Center
         )
 
-        IconButton(
-            onClick = onShowMonthPicker,
-            modifier = Modifier.align(Alignment.CenterEnd)
+        Row(
+            modifier = Modifier.align(Alignment.CenterEnd),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.CalendarMonth,
-                null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onBackground
-            )
+            IconButton(onClick = onShowHabitList) {
+                Icon(
+                    Icons.AutoMirrored.Filled.FormatListBulleted,
+                    null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
+            
+            IconButton(onClick = onShowMonthPicker) {
+                Icon(
+                    Icons.Default.CalendarMonth,
+                    null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
         }
     }
 }
@@ -1069,15 +1009,21 @@ private fun TodoSwipeableItem(
 
 @Composable
 private fun HomeHeaderSection(userName: String) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        val greetingRes = when (hour) {
-            in 5..10 -> R.string.home_hello_morning
-            in 11..13 -> R.string.home_hello_noon
-            in 14..17 -> R.string.home_hello_afternoon
-            else -> R.string.home_hello_evening
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            val greetingRes = when (hour) {
+                in 5..10 -> R.string.home_hello_morning
+                in 11..13 -> R.string.home_hello_noon
+                in 14..17 -> R.string.home_hello_afternoon
+                else -> R.string.home_hello_evening
+            }
+            Text(text = stringResource(id = greetingRes, userName), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
         }
-        Text(text = stringResource(id = greetingRes, userName), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
     }
 }
 

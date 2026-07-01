@@ -42,6 +42,7 @@ class HabitRepositoryImpl @Inject constructor(
         id = id,
         name = name,
         icon = icon,
+        colorHex = colorHex,
         reminderTime = reminderTime,
         isCompleted = isCompleted,
         date = date,
@@ -54,6 +55,7 @@ class HabitRepositoryImpl @Inject constructor(
         userId = userId,
         name = name,
         icon = icon,
+        colorHex = colorHex ?: "#1D5FE2",
         isCompleted = isCompleted,
         date = date,
         reminderTime = reminderTime,
@@ -199,7 +201,26 @@ class HabitRepositoryImpl @Inject constructor(
                     val remoteHabits = apiService.getHabits(date)
                     println(">>> Đã nhận được ${remoteHabits.size} thói quen từ Server!")
                     if (remoteHabits.isNotEmpty()) {
-                        habitDao.insertHabits(remoteHabits.map { it.toDomain().toEntity(isSynced = true) })
+                        val currentLocalHabits = habitDao.getHabitsSync(userId, date)
+                        val entitiesToInsert = remoteHabits.map { dto ->
+                            val domain = dto.toDomain()
+                            
+                            // Kiểm tra xem có thói quen nào ở local trùng lặp (cùng tên, icon, ngày) nhưng khác ID không
+                            val duplicate = currentLocalHabits.find { h ->
+                                h.name == domain.name && 
+                                h.icon == domain.icon && 
+                                h.date == domain.date && 
+                                h.id != domain.id
+                            }
+                            
+                            if (duplicate != null) {
+                                // Nếu tìm thấy trùng lặp, xóa cái cũ ở local đi để dùng cái từ server (có ID server)
+                                habitDao.deleteHabit(duplicate.id)
+                            }
+                            
+                            domain.toEntity(isSynced = true)
+                        }
+                        habitDao.insertHabits(entitiesToInsert)
                     }
                 } catch (e: Exception) {
                     println(">>> Lỗi gọi API Spring Boot: ${e.message}")

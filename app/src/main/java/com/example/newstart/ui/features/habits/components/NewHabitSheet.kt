@@ -101,7 +101,7 @@ fun NewHabitSheet(
         Row(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurface) }
             Text(text = stringResource(R.string.habits_new_title), color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            IconButton(onClick = { }) { Icon(Icons.Default.Storefront, null, tint = MaterialTheme.colorScheme.primary) }
+            Spacer(modifier = Modifier.size(48.dp))
         }
 
         LazyRow(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -265,8 +265,6 @@ fun PresetItem(preset: HabitPreset, onClick: () -> Unit) {
             Text(preset.icon, fontSize = 20.sp)
             Spacer(modifier = Modifier.width(12.dp))
             Text(preset.name, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.FavoriteBorder, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
             Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
         }
     }
