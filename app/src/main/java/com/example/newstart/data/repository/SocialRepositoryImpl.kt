@@ -17,6 +17,19 @@ import com.example.newstart.data.local.toDomain
 import com.example.newstart.data.local.toEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import com.example.newstart.util.AppConstants
 
 
 @Singleton
@@ -28,6 +41,7 @@ class SocialRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context
 ) : SocialRepository {
 
+    private val client = OkHttpClient()
     private val friendsRefreshTrigger = MutableStateFlow(0)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -210,10 +224,15 @@ class SocialRepositoryImpl @Inject constructor(
                 if (snapshot != null) {
                     val messages = snapshot.documents.mapNotNull { doc ->
                         try {
+                            val singleUrl = doc.getString("imageUrl")
+                            val urls = doc.get("imageUrls") as? List<*>
+                            val imageUrls = urls?.mapNotNull { it as? String } ?: if (singleUrl != null) listOf(singleUrl) else emptyList()
                             com.example.newstart.domain.model.SquadMessage(
                                 id = doc.id, senderId = doc.getString("senderId") ?: "",
                                 senderName = doc.getString("senderName") ?: "Người dùng",
                                 text = doc.getString("text") ?: "",
+                                imageUrl = singleUrl,
+                                imageUrls = imageUrls,
                                 timestamp = doc.getTimestamp("timestamp")?.toDate() ?: java.util.Date()
                             )
                         } catch (e: Exception) { null }
@@ -224,8 +243,8 @@ class SocialRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }
 
-    override suspend fun sendSquadMessage(squadId: String, text: String) {
-        try { apiService.sendSquadMessage(squadId, SquadMessageDto(text = text)) } catch (e: Exception) {}
+    override suspend fun sendSquadMessage(squadId: String, text: String, imageUrls: List<String>, imageUrl: String?) {
+        try { apiService.sendSquadMessage(squadId, SquadMessageDto(text = text, imageUrls = imageUrls, imageUrl = imageUrl)) } catch (e: Exception) {}
     }
 
     override fun getDirectMessages(friendshipId: String): Flow<List<DirectMessage>> = callbackFlow {
@@ -234,10 +253,15 @@ class SocialRepositoryImpl @Inject constructor(
                 if (snapshot != null) {
                     val messages = snapshot.documents.mapNotNull { doc ->
                         try {
+                            val singleUrl = doc.getString("imageUrl")
+                            val urls = doc.get("imageUrls") as? List<*>
+                            val imageUrls = urls?.mapNotNull { it as? String } ?: if (singleUrl != null) listOf(singleUrl) else emptyList()
                             DirectMessage(
                                 id = doc.id, senderId = doc.getString("senderId") ?: "",
                                 senderName = doc.getString("senderName") ?: "Người dùng",
                                 text = doc.getString("text") ?: "",
+                                imageUrl = singleUrl,
+                                imageUrls = imageUrls,
                                 timestamp = doc.getTimestamp("timestamp")?.toDate() ?: java.util.Date(),
                                 sharedJournalId = doc.getString("sharedJournalId"),
                                 sharedJournalText = doc.getString("sharedJournalText"),
@@ -253,7 +277,13 @@ class SocialRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }
 
-    override suspend fun sendDirectMessage(friendshipId: String, text: String, sharedJournal: JournalEntry?): Result<Unit> {
+    override suspend fun sendDirectMessage(
+        friendshipId: String,
+        text: String,
+        sharedJournal: JournalEntry?,
+        imageUrls: List<String>,
+        imageUrl: String?
+    ): Result<Unit> {
         return try {
             val user = auth.currentUser ?: throw Exception("User not logged in")
             
@@ -279,6 +309,11 @@ class SocialRepositoryImpl @Inject constructor(
                 "text" to text,
                 "timestamp" to com.google.firebase.firestore.FieldValue.serverTimestamp()
             )
+            
+            if (imageUrls.isNotEmpty()) {
+                messageData["imageUrls"] = imageUrls
+            }
+            imageUrl?.let { messageData["imageUrl"] = it }
             
             if (sharedJournal != null) {
                 messageData["sharedJournalId"] = sharedJournal.id
@@ -310,6 +345,7 @@ class SocialRepositoryImpl @Inject constructor(
                             id = doc.id, senderId = doc.getString("senderId") ?: "",
                             senderName = doc.getString("senderName") ?: "Người dùng",
                             text = doc.getString("text") ?: "",
+                            imageUrl = doc.getString("imageUrl"),
                             timestamp = doc.getTimestamp("timestamp")?.toDate() ?: java.util.Date(),
                             sharedJournalId = doc.getString("sharedJournalId"),
                             sharedJournalText = doc.getString("sharedJournalText"),
@@ -321,5 +357,100 @@ class SocialRepositoryImpl @Inject constructor(
                 } else { trySend(null) }
             }
         awaitClose { listener.remove() }
+    }
+
+    override suspend fun uploadImage(uri: android.net.Uri): Result<String> {
+        return try {
+            val url = uploadToCloudinary(uri)
+            if (url != null) {
+                Result.success(url)
+            } else {
+                Result.failure(Exception("Upload to Cloudinary failed"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun uploadToCloudinary(uri: android.net.Uri): String? = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val bytes = compressImage(uri) ?: return@withContext null
+            
+            val requestBody = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("file", "image.jpg", 
+                    bytes.toRequestBody("image/*".toMediaTypeOrNull()))
+                .addFormDataPart("upload_preset", AppConstants.CLOUDINARY_UPLOAD_PRESET)
+                .build()
+
+            val request = Request.Builder()
+                .url(AppConstants.CLOUDINARY_UPLOAD_URL)
+                .post(requestBody)
+                .build()
+
+            val call = client.newCall(request)
+            
+            val response = suspendCancellableCoroutine<Response> { continuation ->
+                continuation.invokeOnCancellation {
+                    call.cancel()
+                }
+                call.enqueue(object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        continuation.resumeWithException(e)
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        continuation.resume(response)
+                    }
+                })
+            }
+
+            response.use { resp ->
+                val responseData = resp.body?.string()
+                
+                if (resp.isSuccessful && responseData != null) {
+                    val jsonObject = JSONObject(responseData)
+                    jsonObject.getString("secure_url")
+                } else {
+                    android.util.Log.e("Cloudinary", "Upload failed: $responseData")
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            android.util.Log.e("Cloudinary", "Upload failed: ${e.message}", e)
+            null
+        }
+    }
+
+    private fun compressImage(uri: android.net.Uri): ByteArray? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val originalBitmap = BitmapFactory.decodeStream(inputStream) ?: return null
+            
+            val maxDimension = 1024
+            val width = originalBitmap.width
+            val height = originalBitmap.height
+            
+            val (newWidth, newHeight) = if (width > height) {
+                if (width > maxDimension) {
+                    val ratio = width.toFloat() / maxDimension
+                    maxDimension to (height / ratio).toInt()
+                } else width to height
+            } else {
+                if (height > maxDimension) {
+                    val ratio = height.toFloat() / maxDimension
+                    (width / ratio).toInt() to maxDimension
+                } else width to height
+            }
+
+            val resizedBitmap = Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+            val outputStream = ByteArrayOutputStream()
+            resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+            outputStream.toByteArray()
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Compression failed: ${e.message}")
+            null
+        }
     }
 }

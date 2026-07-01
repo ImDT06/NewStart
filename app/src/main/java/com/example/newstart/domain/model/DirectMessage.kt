@@ -7,6 +7,8 @@ data class DirectMessage(
     val senderId: String = "",
     val senderName: String = "",
     val text: String = "",
+    val imageUrl: String? = null,
+    val imageUrls: List<String> = emptyList(),
     val timestamp: Date? = null,
     val sharedJournalId: String? = null,
     val sharedJournalText: String? = null,

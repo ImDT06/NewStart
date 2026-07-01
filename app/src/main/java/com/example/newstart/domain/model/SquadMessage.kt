@@ -11,5 +11,7 @@ data class SquadMessage(
     val senderId: String = "",
     val senderName: String = "",
     val text: String = "",
+    val imageUrl: String? = null,
+    val imageUrls: List<String> = emptyList(),
     val timestamp: Date = Date()
 )

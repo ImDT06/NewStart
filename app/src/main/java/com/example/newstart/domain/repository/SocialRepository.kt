@@ -25,7 +25,7 @@ interface SocialRepository {
     suspend fun addMemberToSquad(squadId: String, memberId: String)
     suspend fun removeMemberFromSquad(squadId: String, memberId: String)
     fun getSquadMessages(squadId: String): Flow<List<com.example.newstart.domain.model.SquadMessage>>
-    suspend fun sendSquadMessage(squadId: String, text: String)
+    suspend fun sendSquadMessage(squadId: String, text: String, imageUrls: List<String> = emptyList(), imageUrl: String? = null)
     
     // Feed
     fun getSocialFeed(): Flow<List<JournalEntry>>
@@ -36,6 +36,13 @@ interface SocialRepository {
     
     // Direct Messages
     fun getDirectMessages(friendshipId: String): Flow<List<com.example.newstart.domain.model.DirectMessage>>
-    suspend fun sendDirectMessage(friendshipId: String, text: String, sharedJournal: JournalEntry? = null): Result<Unit>
+    suspend fun sendDirectMessage(
+        friendshipId: String,
+        text: String,
+        sharedJournal: JournalEntry? = null,
+        imageUrls: List<String> = emptyList(),
+        imageUrl: String? = null
+    ): Result<Unit>
     fun getLastMessage(friendshipId: String): Flow<com.example.newstart.domain.model.DirectMessage?>
+    suspend fun uploadImage(uri: android.net.Uri): Result<String>
 }

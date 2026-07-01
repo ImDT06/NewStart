@@ -687,14 +687,41 @@ class MainViewModel @Inject constructor(
 
     var pendingChatUserId by mutableStateOf<String?>(null)
     var pendingSharedJournal by mutableStateOf<JournalEntry?>(null)
+    var isImageUploading by mutableStateOf(false)
+        private set
 
     fun getDirectMessages(friendshipId: String): Flow<List<com.example.newstart.domain.model.DirectMessage>> {
         return socialRepository.getDirectMessages(friendshipId)
     }
 
-    fun sendDirectMessage(friendshipId: String, text: String, sharedJournal: JournalEntry? = null) {
+    fun sendDirectMessage(
+        friendshipId: String,
+        text: String,
+        sharedJournal: JournalEntry? = null,
+        imageUris: List<android.net.Uri> = emptyList(),
+        imageUri: android.net.Uri? = null
+    ) {
         viewModelScope.launch {
-            val result = socialRepository.sendDirectMessage(friendshipId, text, sharedJournal)
+            val urisToUpload = if (imageUris.isNotEmpty()) imageUris else if (imageUri != null) listOf(imageUri) else emptyList()
+            var imageUrls: List<String> = emptyList()
+            if (urisToUpload.isNotEmpty()) {
+                isImageUploading = true
+                try {
+                    val uploadedUrls = mutableListOf<String>()
+                    urisToUpload.forEach { uri ->
+                        socialRepository.uploadImage(uri).onSuccess { url ->
+                            uploadedUrls.add(url)
+                        }.onFailure { e ->
+                            android.util.Log.e("MainViewModel", "Failed to upload DM image: ${e.message}", e)
+                        }
+                    }
+                    imageUrls = uploadedUrls
+                } finally {
+                    isImageUploading = false
+                }
+            }
+            val firstImageUrl = imageUrls.firstOrNull()
+            val result = socialRepository.sendDirectMessage(friendshipId, text, sharedJournal, imageUrls, firstImageUrl)
             result.onFailure { e ->
                 android.util.Log.e("MainViewModel", "Failed to send direct message: ${e.message}", e)
                 withContext(kotlinx.coroutines.Dispatchers.Main) {

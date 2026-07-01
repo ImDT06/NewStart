@@ -21,6 +21,9 @@ import javax.inject.Inject
 import com.example.newstart.domain.model.SquadMessage
 import kotlinx.coroutines.flow.Flow
 
+import android.net.Uri
+import kotlinx.coroutines.flow.asStateFlow
+
 @HiltViewModel
 class SocialViewModel @Inject constructor(
     private val socialRepository: SocialRepository,
@@ -54,6 +57,9 @@ class SocialViewModel @Inject constructor(
 
     private val _isCreatingSquad = MutableStateFlow(false)
     val isCreatingSquad: StateFlow<Boolean> = _isCreatingSquad.asStateFlow()
+
+    private val _isImageUploading = MutableStateFlow(false)
+    val isImageUploading: StateFlow<Boolean> = _isImageUploading.asStateFlow()
 
     private var searchJob: kotlinx.coroutines.Job? = null
 
@@ -135,9 +141,28 @@ class SocialViewModel @Inject constructor(
 
     fun getSquadMessages(squadId: String): Flow<List<SquadMessage>> = socialRepository.getSquadMessages(squadId)
 
-    fun sendSquadMessage(squadId: String, text: String) {
+    fun sendSquadMessage(squadId: String, text: String, imageUris: List<Uri> = emptyList(), imageUri: Uri? = null) {
         viewModelScope.launch {
-            socialRepository.sendSquadMessage(squadId, text)
+            val urisToUpload = if (imageUris.isNotEmpty()) imageUris else if (imageUri != null) listOf(imageUri) else emptyList()
+            var imageUrls: List<String> = emptyList()
+            if (urisToUpload.isNotEmpty()) {
+                _isImageUploading.value = true
+                try {
+                    val uploadedUrls = mutableListOf<String>()
+                    urisToUpload.forEach { uri ->
+                        socialRepository.uploadImage(uri).onSuccess { url ->
+                            uploadedUrls.add(url)
+                        }.onFailure { e ->
+                            android.util.Log.e("SocialViewModel", "Failed to upload squad image: ${e.message}", e)
+                        }
+                    }
+                    imageUrls = uploadedUrls
+                } finally {
+                    _isImageUploading.value = false
+                }
+            }
+            val firstImageUrl = imageUrls.firstOrNull()
+            socialRepository.sendSquadMessage(squadId, text, imageUrls, firstImageUrl)
         }
     }
 

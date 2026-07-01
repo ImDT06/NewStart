@@ -9,5 +9,7 @@ data class SquadMessageDto(
     val senderId: String? = null,
     val senderName: String? = null,
     val text: String,
+    val imageUrl: String? = null,
+    val imageUrls: List<String> = emptyList(),
     val timestamp: JsonElement? = null
 )
