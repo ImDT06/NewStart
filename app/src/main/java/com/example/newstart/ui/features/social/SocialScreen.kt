@@ -39,6 +39,7 @@ import com.example.newstart.domain.model.Squad
 import com.example.newstart.domain.model.User
 import com.example.newstart.domain.model.Friendship
 import com.example.newstart.domain.model.DirectMessage
+import com.example.newstart.domain.model.SquadMessage
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -1108,6 +1109,8 @@ fun SquadDetailView(
     }
     val isImageUploading by viewModel.isImageUploading.collectAsStateWithLifecycle()
     var activeTimestampMessageId by remember { mutableStateOf<String?>(null) }
+    var showReactionPickerMessageId by remember { mutableStateOf<String?>(null) }
+    var showSquadMessageOptionsDialog by remember { mutableStateOf<com.example.newstart.domain.model.SquadMessage?>(null) }
 
     var showAddMemberDialog by remember { mutableStateOf(false) }
     var showCreateHabitDialog by remember { mutableStateOf(false) }
@@ -1283,7 +1286,7 @@ fun SquadDetailView(
                                         )
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Send, 
+                                        imageVector = Icons.Default.Send,
                                         contentDescription = "Send", 
                                         tint = if (isSendEnabled) MaterialTheme.colorScheme.onPrimary 
                                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
@@ -1476,43 +1479,184 @@ fun SquadDetailView(
                                         }
                                         
                                         val isTimestampVisible = activeTimestampMessageId == message.id
+                                        val isReactionPickerVisible = showReactionPickerMessageId == message.id
 
-                                        if (message.imageUrls.isNotEmpty()) {
-                                            ChatImageGrid(
-                                                imageUrls = message.imageUrls,
-                                                onImageClick = { index ->
-                                                    activeFullScreenImageUrls = message.imageUrls
-                                                    activeFullScreenImageIndex = index
-                                                },
-                                                modifier = Modifier.padding(bottom = if (message.text.isNotEmpty()) 6.dp else 0.dp)
-                                            )
-                                        }
-                                        
-                                        if (message.text.isNotEmpty()) {
+                                        if (message.isRevoked) {
                                             Surface(
-                                                color = if (isMe) MaterialTheme.colorScheme.primary else {
-                                                    if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                                                },
-                                                shape = RoundedCornerShape(
-                                                    topStart = 16.dp,
-                                                    topEnd = 16.dp,
-                                                    bottomStart = if (isMe) 16.dp else 4.dp,
-                                                    bottomEnd = if (isMe) 4.dp else 16.dp
-                                                ),
-                                                modifier = Modifier.clickable(
-                                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                                                    indication = null,
-                                                    onClick = {
-                                                        activeTimestampMessageId = if (isTimestampVisible) null else message.id
-                                                    }
-                                                )
+                                                color = if (isDark) Color(0xFF1E1E22) else Color(0xFFF2F2F7),
+                                                shape = RoundedCornerShape(16.dp),
+                                                modifier = Modifier.padding(vertical = 4.dp)
                                             ) {
                                                 Text(
-                                                    text = message.text,
-                                                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
+                                                    text = "Tin nhắn đã bị thu hồi",
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                                    ),
+                                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
                                                 )
+                                            }
+                                        } else {
+                                            Column(
+                                                horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+                                                modifier = Modifier.pointerInput(Unit) {
+                                                    detectTapGestures(
+                                                        onTap = {
+                                                            activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                                        },
+                                                        onLongPress = {
+                                                            activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                                            showReactionPickerMessageId = if (isReactionPickerVisible) null else message.id
+                                                        }
+                                                    )
+                                                }
+                                            ) {
+                                                if (message.imageUrls.isNotEmpty()) {
+                                                    ChatImageGrid(
+                                                        imageUrls = message.imageUrls,
+                                                        onImageClick = { index ->
+                                                            activeFullScreenImageUrls = message.imageUrls
+                                                            activeFullScreenImageIndex = index
+                                                        },
+                                                        modifier = Modifier.padding(bottom = if (message.text.isNotEmpty()) 6.dp else 0.dp)
+                                                    )
+                                                }
+                                                
+                                                if (message.text.isNotEmpty()) {
+                                                    Surface(
+                                                        color = if (isMe) MaterialTheme.colorScheme.primary else {
+                                                            if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                                        },
+                                                        shape = RoundedCornerShape(
+                                                            topStart = 16.dp,
+                                                            topEnd = 16.dp,
+                                                            bottomStart = if (isMe) 16.dp else 4.dp,
+                                                            bottomEnd = if (isMe) 4.dp else 16.dp
+                                                        )
+                                                    ) {
+                                                        Text(
+                                                            text = message.text,
+                                                            color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if (isReactionPickerVisible) {
+                                                androidx.compose.ui.window.Popup(
+                                                    alignment = if (isMe) Alignment.TopEnd else Alignment.TopStart,
+                                                    offset = androidx.compose.ui.unit.IntOffset(x = if (isMe) -10 else 10, y = -110),
+                                                    onDismissRequest = { showReactionPickerMessageId = null },
+                                                    properties = androidx.compose.ui.window.PopupProperties(focusable = true)
+                                                ) {
+                                                    Card(
+                                                        shape = RoundedCornerShape(24.dp),
+                                                        colors = CardDefaults.cardColors(
+                                                            containerColor = if (isDark) Color(0xFF252528) else Color.White
+                                                        ),
+                                                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                                                        modifier = Modifier
+                                                            .padding(horizontal = 8.dp)
+                                                            .border(
+                                                                width = 1.5.dp,
+                                                                color = if (isDark) Color(0xFF35353A) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                                                shape = RoundedCornerShape(24.dp)
+                                                            )
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            val emojis = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
+                                                            emojis.forEach { emoji ->
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .clip(CircleShape)
+                                                                        .clickable {
+                                                                            viewModel.reactToSquadMessage(squad.id, message.id, emoji)
+                                                                            showReactionPickerMessageId = null
+                                                                        }
+                                                                        .padding(4.dp)
+                                                                ) {
+                                                                    Text(text = emoji, fontSize = 22.sp)
+                                                                }
+                                                            }
+                                                            
+                                                            if (isMe) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .width(1.dp)
+                                                                        .height(20.dp)
+                                                                        .background(
+                                                                            if (isDark) Color(0xFF45454A) 
+                                                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                                                                        )
+                                                                )
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .clip(CircleShape)
+                                                                        .clickable {
+                                                                            showSquadMessageOptionsDialog = message
+                                                                            showReactionPickerMessageId = null
+                                                                        }
+                                                                        .padding(4.dp),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Icon(
+                                                                        imageVector = Icons.Default.Delete,
+                                                                        contentDescription = "Thu hồi",
+                                                                        tint = MaterialTheme.colorScheme.error,
+                                                                        modifier = Modifier.size(22.dp)
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if (message.reactions.isNotEmpty()) {
+                                                val reactionGroups = message.reactions.entries
+                                                    .groupBy { it.value }
+                                                    .mapValues { it.value.map { entry -> entry.key } }
+                                                
+                                                androidx.compose.foundation.layout.FlowRow(
+                                                    modifier = Modifier.padding(top = 4.dp),
+                                                    horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    reactionGroups.forEach { (emoji, userIds) ->
+                                                        val hasReacted = userIds.contains(currentUserId)
+                                                        val chipColor = if (hasReacted) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) 
+                                                                        else if (isDark) Color(0xFF2D2D32) 
+                                                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                        val borderColor = if (hasReacted) MaterialTheme.colorScheme.primary else Color.Transparent
+                                                        
+                                                        Surface(
+                                                            color = chipColor,
+                                                            border = BorderStroke(1.dp, borderColor),
+                                                            shape = RoundedCornerShape(12.dp),
+                                                            modifier = Modifier
+                                                                .clickable {
+                                                                    viewModel.reactToSquadMessage(squad.id, message.id, emoji)
+                                                                }
+                                                        ) {
+                                                            Row(
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            ) {
+                                                                Text(text = emoji, fontSize = 11.sp)
+                                                                if (userIds.size > 1) {
+                                                                    Text(text = userIds.size.toString(), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                         
@@ -1727,6 +1871,32 @@ fun SquadDetailView(
             onDismiss = { activeFullScreenImageUrls = null }
         )
     }
+
+    if (showSquadMessageOptionsDialog != null) {
+        AlertDialog(
+            onDismissRequest = { showSquadMessageOptionsDialog = null },
+            title = { Text("Thu hồi tin nhắn") },
+            text = { Text("Bạn có chắc chắn muốn thu hồi tin nhắn này không?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val msg = showSquadMessageOptionsDialog
+                        if (msg != null) {
+                            viewModel.revokeSquadMessage(squad.id, msg.id)
+                        }
+                        showSquadMessageOptionsDialog = null
+                    }
+                ) {
+                    Text("Thu hồi", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSquadMessageOptionsDialog = null }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -1843,6 +2013,8 @@ fun DirectChatView(
     }
     val isImageUploading = mainViewModel.isImageUploading
     var activeTimestampMessageId by remember { mutableStateOf<String?>(null) }
+    var showReactionPickerMessageId by remember { mutableStateOf<String?>(null) }
+    var showDirectMessageOptionsDialog by remember { mutableStateOf<com.example.newstart.domain.model.DirectMessage?>(null) }
     val lazyListState = rememberLazyListState()
     
     // Tự động cuộn xuống tin nhắn mới nhất
@@ -2038,7 +2210,7 @@ fun DirectChatView(
                                     )
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Send, 
+                                    imageVector = Icons.Default.Send,
                                     contentDescription = "Send", 
                                     tint = if (isSendEnabled) MaterialTheme.colorScheme.onPrimary 
                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
@@ -2136,61 +2308,202 @@ fun DirectChatView(
                                     Spacer(modifier = Modifier.height(2.dp))
                                 }
 
-                                if (message.imageUrls.isNotEmpty()) {
-                                    ChatImageGrid(
-                                        imageUrls = message.imageUrls,
-                                        onImageClick = { index ->
-                                            activeFullScreenImageUrls = message.imageUrls
-                                            activeFullScreenImageIndex = index
-                                        },
-                                        modifier = Modifier.padding(bottom = if (message.text.isNotEmpty() || !message.sharedJournalId.isNullOrEmpty()) 6.dp else 0.dp)
-                                    )
-                                }
+                                val isReactionPickerVisible = showReactionPickerMessageId == message.id
 
-                                 if (message.text.isNotEmpty() || !message.sharedJournalId.isNullOrEmpty()) {
+                                 if (message.isRevoked) {
                                      Surface(
-                                         color = if (isMe) MaterialTheme.colorScheme.primary else {
-                                             if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                                         },
-                                         shape = RoundedCornerShape(
-                                             topStart = 16.dp,
-                                             topEnd = 16.dp,
-                                             bottomStart = if (isMe) 16.dp else 4.dp,
-                                             bottomEnd = if (isMe) 4.dp else 16.dp
-                                         ),
-                                         modifier = Modifier.clickable(
-                                             interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                                             indication = null,
-                                             onClick = {
-                                                 activeTimestampMessageId = if (isTimestampVisible) null else message.id
-                                             }
-                                         )
+                                         color = if (isDark) Color(0xFF1E1E22) else Color(0xFFF2F2F7),
+                                         shape = RoundedCornerShape(16.dp),
+                                         modifier = Modifier.padding(vertical = 4.dp)
                                      ) {
-                                         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                                             if (!message.sharedJournalId.isNullOrEmpty()) {
-                                                 SharedJournalCard(
-                                                     authorName = message.sharedJournalAuthorName ?: "",
-                                                     text = message.sharedJournalText ?: "",
-                                                     imageUrl = message.sharedJournalImageUrl,
-                                                     emoji = message.sharedJournalEmoji ?: "",
-                                                     isMe = isMe
+                                         Text(
+                                             text = "Tin nhắn đã bị thu hồi",
+                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                             style = MaterialTheme.typography.bodyMedium.copy(
+                                                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                             ),
+                                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                                         )
+                                     }
+                                 } else {
+                                     Column(
+                                         horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+                                         modifier = Modifier.pointerInput(Unit) {
+                                             detectTapGestures(
+                                                 onTap = {
+                                                     activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                                 },
+                                                 onLongPress = {
+                                                     activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                                     showReactionPickerMessageId = if (isReactionPickerVisible) null else message.id
+                                                 }
+                                             )
+                                         }
+                                     ) {
+                                         if (message.imageUrls.isNotEmpty()) {
+                                             ChatImageGrid(
+                                                 imageUrls = message.imageUrls,
+                                                 onImageClick = { index ->
+                                                     activeFullScreenImageUrls = message.imageUrls
+                                                     activeFullScreenImageIndex = index
+                                                 },
+                                                 modifier = Modifier.padding(bottom = if (message.text.isNotEmpty() || !message.sharedJournalId.isNullOrEmpty()) 6.dp else 0.dp)
+                                             )
+                                         }
+
+                                         if (message.text.isNotEmpty() || !message.sharedJournalId.isNullOrEmpty()) {
+                                             Surface(
+                                                 color = if (isMe) MaterialTheme.colorScheme.primary else {
+                                                     if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                                 },
+                                                 shape = RoundedCornerShape(
+                                                     topStart = 16.dp,
+                                                     topEnd = 16.dp,
+                                                     bottomStart = if (isMe) 16.dp else 4.dp,
+                                                     bottomEnd = if (isMe) 4.dp else 16.dp
                                                  )
-                                                 if (message.text.isNotEmpty()) {
-                                                     Spacer(modifier = Modifier.height(8.dp))
+                                             ) {
+                                                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                                     if (!message.sharedJournalId.isNullOrEmpty()) {
+                                                         SharedJournalCard(
+                                                             authorName = message.sharedJournalAuthorName ?: "",
+                                                             text = message.sharedJournalText ?: "",
+                                                             imageUrl = message.sharedJournalImageUrl,
+                                                             emoji = message.sharedJournalEmoji ?: "",
+                                                             isMe = isMe
+                                                         )
+                                                         if (message.text.isNotEmpty()) {
+                                                             Spacer(modifier = Modifier.height(8.dp))
+                                                         }
+                                                     }
+                                                     
+                                                     if (message.text.isNotEmpty()) {
+                                                         Text(
+                                                             text = message.text,
+                                                             color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                                             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
+                                                         )
+                                                     }
                                                  }
                                              }
-                                             
-                                             if (message.text.isNotEmpty()) {
-                                                 Text(
-                                                     text = message.text,
-                                                     color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                                                     style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
-                                                 )
+                                         }
+                                     }
+
+                                     if (isReactionPickerVisible) {
+                                         androidx.compose.ui.window.Popup(
+                                             alignment = if (isMe) Alignment.TopEnd else Alignment.TopStart,
+                                             offset = androidx.compose.ui.unit.IntOffset(x = if (isMe) -10 else 10, y = -110),
+                                             onDismissRequest = { showReactionPickerMessageId = null },
+                                             properties = androidx.compose.ui.window.PopupProperties(focusable = true)
+                                         ) {
+                                             Card(
+                                                 shape = RoundedCornerShape(24.dp),
+                                                 colors = CardDefaults.cardColors(
+                                                     containerColor = if (isDark) Color(0xFF252528) else Color.White
+                                                 ),
+                                                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                                                 modifier = Modifier
+                                                     .padding(horizontal = 8.dp)
+                                                     .border(
+                                                         width = 1.5.dp,
+                                                         color = if (isDark) Color(0xFF35353A) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                                         shape = RoundedCornerShape(24.dp)
+                                                     )
+                                             ) {
+                                                 Row(
+                                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                     verticalAlignment = Alignment.CenterVertically
+                                                 ) {
+                                                     val emojis = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
+                                                     emojis.forEach { emoji ->
+                                                         Box(
+                                                             modifier = Modifier
+                                                                 .clip(CircleShape)
+                                                                 .clickable {
+                                                                     mainViewModel.reactToDirectMessage(friendship.id, message.id, emoji)
+                                                                     showReactionPickerMessageId = null
+                                                                 }
+                                                                 .padding(4.dp)
+                                                         ) {
+                                                             Text(text = emoji, fontSize = 22.sp)
+                                                         }
+                                                     }
+                                                     
+                                                     if (isMe) {
+                                                         Box(
+                                                             modifier = Modifier
+                                                                 .width(1.dp)
+                                                                 .height(20.dp)
+                                                                 .background(
+                                                                     if (isDark) Color(0xFF45454A) 
+                                                                     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                                                                 )
+                                                         )
+                                                         Box(
+                                                             modifier = Modifier
+                                                                 .clip(CircleShape)
+                                                                 .clickable {
+                                                                     showDirectMessageOptionsDialog = message
+                                                                     showReactionPickerMessageId = null
+                                                                 }
+                                                                 .padding(4.dp),
+                                                             contentAlignment = Alignment.Center
+                                                         ) {
+                                                             Icon(
+                                                                 imageVector = Icons.Default.Delete,
+                                                                 contentDescription = "Thu hồi",
+                                                                 tint = MaterialTheme.colorScheme.error,
+                                                                 modifier = Modifier.size(22.dp)
+                                                             )
+                                                         }
+                                                     }
+                                                 }
+                                             }
+                                         }
+                                     }
+
+                                     if (message.reactions.isNotEmpty()) {
+                                         val reactionGroups = message.reactions.entries
+                                             .groupBy { it.value }
+                                             .mapValues { it.value.map { entry -> entry.key } }
+                                         
+                                         androidx.compose.foundation.layout.FlowRow(
+                                             modifier = Modifier.padding(top = 4.dp),
+                                             horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+                                             verticalArrangement = Arrangement.spacedBy(4.dp)
+                                         ) {
+                                             reactionGroups.forEach { (emoji, userIds) ->
+                                                 val hasReacted = userIds.contains(currentUserId)
+                                                 val chipColor = if (hasReacted) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) 
+                                                                 else if (isDark) Color(0xFF2D2D32) 
+                                                                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                 val borderColor = if (hasReacted) MaterialTheme.colorScheme.primary else Color.Transparent
+                                                 
+                                                 Surface(
+                                                     color = chipColor,
+                                                     border = BorderStroke(1.dp, borderColor),
+                                                     shape = RoundedCornerShape(12.dp),
+                                                     modifier = Modifier
+                                                         .clickable {
+                                                             mainViewModel.reactToDirectMessage(friendship.id, message.id, emoji)
+                                                         }
+                                                 ) {
+                                                     Row(
+                                                         verticalAlignment = Alignment.CenterVertically,
+                                                         horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                     ) {
+                                                         Text(text = emoji, fontSize = 11.sp)
+                                                         if (userIds.size > 1) {
+                                                             Text(text = userIds.size.toString(), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                         }
+                                                     }
+                                                 }
                                              }
                                          }
                                      }
                                  }
-
                                 androidx.compose.animation.AnimatedVisibility(
                                     visible = isTimestampVisible,
                                     enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
@@ -2216,6 +2529,32 @@ fun DirectChatView(
             imageUrls = activeFullScreenImageUrls!!,
             initialIndex = activeFullScreenImageIndex,
             onDismiss = { activeFullScreenImageUrls = null }
+        )
+    }
+
+    if (showDirectMessageOptionsDialog != null) {
+        AlertDialog(
+            onDismissRequest = { showDirectMessageOptionsDialog = null },
+            title = { Text("Thu hồi tin nhắn") },
+            text = { Text("Bạn có chắc chắn muốn thu hồi tin nhắn này không?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val msg = showDirectMessageOptionsDialog
+                        if (msg != null) {
+                            mainViewModel.revokeDirectMessage(friendship.id, msg.id)
+                        }
+                        showDirectMessageOptionsDialog = null
+                    }
+                ) {
+                    Text("Thu hồi", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDirectMessageOptionsDialog = null }) {
+                    Text("Hủy")
+                }
+            }
         )
     }
 }

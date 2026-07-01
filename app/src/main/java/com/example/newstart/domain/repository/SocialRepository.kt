@@ -45,4 +45,8 @@ interface SocialRepository {
     ): Result<Unit>
     fun getLastMessage(friendshipId: String): Flow<com.example.newstart.domain.model.DirectMessage?>
     suspend fun uploadImage(uri: android.net.Uri): Result<String>
+    suspend fun reactToSquadMessage(squadId: String, messageId: String, emoji: String)
+    suspend fun reactToDirectMessage(friendshipId: String, messageId: String, emoji: String)
+    suspend fun revokeSquadMessage(squadId: String, messageId: String)
+    suspend fun revokeDirectMessage(friendshipId: String, messageId: String)
 }

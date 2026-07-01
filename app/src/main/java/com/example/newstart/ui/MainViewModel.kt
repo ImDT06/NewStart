@@ -738,4 +738,16 @@ class MainViewModel @Inject constructor(
     fun getLastMessage(friendshipId: String): Flow<com.example.newstart.domain.model.DirectMessage?> {
         return socialRepository.getLastMessage(friendshipId)
     }
+
+    fun reactToDirectMessage(friendshipId: String, messageId: String, emoji: String) {
+        viewModelScope.launch {
+            socialRepository.reactToDirectMessage(friendshipId, messageId, emoji)
+        }
+    }
+
+    fun revokeDirectMessage(friendshipId: String, messageId: String) {
+        viewModelScope.launch {
+            socialRepository.revokeDirectMessage(friendshipId, messageId)
+        }
+    }
 }

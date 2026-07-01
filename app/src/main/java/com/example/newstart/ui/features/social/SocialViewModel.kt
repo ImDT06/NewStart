@@ -178,5 +178,25 @@ class SocialViewModel @Inject constructor(
         }
     }
 
+    fun reactToSquadMessage(squadId: String, messageId: String, emoji: String) {
+        viewModelScope.launch {
+            socialRepository.reactToSquadMessage(squadId, messageId, emoji)
+        }
+    }
+
+    fun revokeSquadMessage(squadId: String, messageId: String) {
+        viewModelScope.launch {
+            socialRepository.revokeSquadMessage(squadId, messageId)
+        }
+    }
+
+    fun leaveSquad(squadId: String, onSuccess: () -> Unit = {}) {
+        viewModelScope.launch {
+            socialRepository.leaveSquad(squadId)
+            socialRepository.refreshSquads()
+            onSuccess()
+        }
+    }
+
     fun getUserById(userId: String) = userRepository.getUserById(userId)
 }

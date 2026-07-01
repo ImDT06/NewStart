@@ -13,5 +13,7 @@ data class SquadMessage(
     val text: String = "",
     val imageUrl: String? = null,
     val imageUrls: List<String> = emptyList(),
-    val timestamp: Date = Date()
+    val timestamp: Date = Date(),
+    val reactions: Map<String, String> = emptyMap(),
+    val isRevoked: Boolean = false
 )

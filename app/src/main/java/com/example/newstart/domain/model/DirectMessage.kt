@@ -14,5 +14,7 @@ data class DirectMessage(
     val sharedJournalText: String? = null,
     val sharedJournalImageUrl: String? = null,
     val sharedJournalEmoji: String? = null,
-    val sharedJournalAuthorName: String? = null
+    val sharedJournalAuthorName: String? = null,
+    val reactions: Map<String, String> = emptyMap(),
+    val isRevoked: Boolean = false
 )

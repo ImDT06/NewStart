@@ -35,4 +35,20 @@ interface SocialDao {
     
     @Query("DELETE FROM squads WHERE id = :squadId")
     suspend fun deleteSquad(squadId: String)
+
+    @Transaction
+    suspend fun refreshSquadsTransaction(userId: String, squadsList: List<SquadEntity>) {
+        clearSquads(userId)
+        if (squadsList.isNotEmpty()) {
+            insertSquads(squadsList)
+        }
+    }
+
+    @Transaction
+    suspend fun refreshFriendsTransaction(userId: String, friendships: List<FriendshipEntity>) {
+        clearFriends(userId)
+        if (friendships.isNotEmpty()) {
+            insertFriends(friendships)
+        }
+    }
 }

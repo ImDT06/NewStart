@@ -65,8 +65,7 @@ class SocialRepositoryImpl @Inject constructor(
                     val friendshipEntities = response.map { dto ->
                         Friendship(id = dto.id, userIds = dto.userIds, status = dto.status).toEntity(cachedForUserId = userId)
                     }
-                    socialDao.clearFriends(userId)
-                    if (friendshipEntities.isNotEmpty()) socialDao.insertFriends(friendshipEntities)
+                    socialDao.refreshFriendsTransaction(userId, friendshipEntities)
                 } catch (e: Exception) {
                     android.util.Log.e("SocialRepository", "API getFriends error: ${e.message}")
                 }
@@ -115,39 +114,45 @@ class SocialRepositoryImpl @Inject constructor(
         try { apiService.acceptFriendRequest(requestId) } catch (e: Exception) {}
     }
 
-    override fun getSquads(): Flow<List<Squad>> = callbackFlow {
-        val userId = auth.currentUser?.uid ?: ""
-        if (userId.isEmpty()) {
-            trySend(emptyList())
-            return@callbackFlow
-        }
+    private val squadsRefreshTrigger = MutableStateFlow(0)
 
-        val localJob = launch {
-            socialDao.getSquads(userId).collect { entities ->
-                trySend(entities.map { it.toDomain() })
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    override fun getSquads(): Flow<List<Squad>> = squadsRefreshTrigger.flatMapLatest {
+        callbackFlow {
+            val userId = auth.currentUser?.uid ?: ""
+            if (userId.isEmpty()) {
+                trySend(emptyList())
+                return@callbackFlow
             }
-        }
 
-        launch(Dispatchers.IO) {
-            try {
-                val response = apiService.getSquads()
-                val squadEntities = response.map { dto ->
-                    Squad(
-                        id = dto.id ?: "", name = dto.name, description = dto.description,
-                        habitCategory = dto.habitCategory, members = dto.members, adminId = dto.adminId ?: "",
-                        createdAt = dto.createdAt.toEpochMilliseconds()?.let { java.util.Date(it) }
-                    ).toEntity(cachedForUserId = userId)
+            val localJob = launch {
+                socialDao.getSquads(userId).collect { entities ->
+                    trySend(entities.map { it.toDomain() })
                 }
-                socialDao.clearSquads(userId)
-                if (squadEntities.isNotEmpty()) socialDao.insertSquads(squadEntities)
-            } catch (e: Exception) {
-                android.util.Log.e("SocialRepository", "API getSquads error: ${e.message}")
             }
+
+            launch(Dispatchers.IO) {
+                try {
+                    val response = apiService.getSquads()
+                    val squadEntities = response.map { dto ->
+                        Squad(
+                            id = dto.id ?: "", name = dto.name, description = dto.description,
+                            habitCategory = dto.habitCategory, members = dto.members, adminId = dto.adminId ?: "",
+                            createdAt = dto.createdAt.toEpochMilliseconds()?.let { java.util.Date(it) }
+                        ).toEntity(cachedForUserId = userId)
+                    }
+                    socialDao.refreshSquadsTransaction(userId, squadEntities)
+                } catch (e: Exception) {
+                    android.util.Log.e("SocialRepository", "API getSquads error: ${e.message}")
+                }
+            }
+            awaitClose { localJob.cancel() }
         }
-        awaitClose { localJob.cancel() }
     }
 
-    override suspend fun refreshSquads() {}
+    override suspend fun refreshSquads() {
+        squadsRefreshTrigger.value += 1
+    }
 
     override suspend fun createSquad(squad: Squad) {
         try {
@@ -227,13 +232,17 @@ class SocialRepositoryImpl @Inject constructor(
                             val singleUrl = doc.getString("imageUrl")
                             val urls = doc.get("imageUrls") as? List<*>
                             val imageUrls = urls?.mapNotNull { it as? String } ?: if (singleUrl != null) listOf(singleUrl) else emptyList()
+                            val reactionsMap = doc.get("reactions") as? Map<*, *>
+                            val reactions = reactionsMap?.map { it.key.toString() to it.value.toString() }?.toMap() ?: emptyMap()
                             com.example.newstart.domain.model.SquadMessage(
                                 id = doc.id, senderId = doc.getString("senderId") ?: "",
                                 senderName = doc.getString("senderName") ?: "Người dùng",
                                 text = doc.getString("text") ?: "",
                                 imageUrl = singleUrl,
                                 imageUrls = imageUrls,
-                                timestamp = doc.getTimestamp("timestamp")?.toDate() ?: java.util.Date()
+                                timestamp = doc.getTimestamp("timestamp")?.toDate() ?: java.util.Date(),
+                                reactions = reactions,
+                                isRevoked = doc.getBoolean("isRevoked") ?: false
                             )
                         } catch (e: Exception) { null }
                     }
@@ -256,6 +265,8 @@ class SocialRepositoryImpl @Inject constructor(
                             val singleUrl = doc.getString("imageUrl")
                             val urls = doc.get("imageUrls") as? List<*>
                             val imageUrls = urls?.mapNotNull { it as? String } ?: if (singleUrl != null) listOf(singleUrl) else emptyList()
+                            val reactionsMap = doc.get("reactions") as? Map<*, *>
+                            val reactions = reactionsMap?.map { it.key.toString() to it.value.toString() }?.toMap() ?: emptyMap()
                             DirectMessage(
                                 id = doc.id, senderId = doc.getString("senderId") ?: "",
                                 senderName = doc.getString("senderName") ?: "Người dùng",
@@ -267,7 +278,9 @@ class SocialRepositoryImpl @Inject constructor(
                                 sharedJournalText = doc.getString("sharedJournalText"),
                                 sharedJournalImageUrl = doc.getString("sharedJournalImageUrl"),
                                 sharedJournalEmoji = doc.getString("sharedJournalEmoji"),
-                                sharedJournalAuthorName = doc.getString("sharedJournalAuthorName")
+                                sharedJournalAuthorName = doc.getString("sharedJournalAuthorName"),
+                                reactions = reactions,
+                                isRevoked = doc.getBoolean("isRevoked") ?: false
                             )
                         } catch (e: Exception) { null }
                     }
@@ -341,6 +354,8 @@ class SocialRepositoryImpl @Inject constructor(
                 val doc = snapshot?.documents?.firstOrNull()
                 if (doc != null) {
                     try {
+                        val reactionsMap = doc.get("reactions") as? Map<*, *>
+                        val reactions = reactionsMap?.map { it.key.toString() to it.value.toString() }?.toMap() ?: emptyMap()
                         trySend(DirectMessage(
                             id = doc.id, senderId = doc.getString("senderId") ?: "",
                             senderName = doc.getString("senderName") ?: "Người dùng",
@@ -351,7 +366,8 @@ class SocialRepositoryImpl @Inject constructor(
                             sharedJournalText = doc.getString("sharedJournalText"),
                             sharedJournalImageUrl = doc.getString("sharedJournalImageUrl"),
                             sharedJournalEmoji = doc.getString("sharedJournalEmoji"),
-                            sharedJournalAuthorName = doc.getString("sharedJournalAuthorName")
+                            sharedJournalAuthorName = doc.getString("sharedJournalAuthorName"),
+                            reactions = reactions
                         ))
                     } catch (e: Exception) { trySend(null) }
                 } else { trySend(null) }
@@ -451,6 +467,86 @@ class SocialRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             android.util.Log.e("SocialRepository", "Compression failed: ${e.message}")
             null
+        }
+    }
+
+    override suspend fun reactToSquadMessage(squadId: String, messageId: String, emoji: String) {
+        try {
+            val userId = auth.currentUser?.uid ?: return
+            val docRef = firestore.collection("squads").document(squadId)
+                .collection("messages").document(messageId)
+            
+            firestore.runTransaction { transaction ->
+                val snapshot = transaction.get(docRef)
+                val reactions = snapshot.get("reactions") as? Map<*, *>
+                val currentEmoji = reactions?.get(userId) as? String
+                
+                if (currentEmoji == emoji) {
+                    transaction.update(docRef, "reactions.$userId", com.google.firebase.firestore.FieldValue.delete())
+                } else {
+                    transaction.update(docRef, "reactions.$userId", emoji)
+                }
+            }.await()
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error reacting to squad message: ${e.message}")
+        }
+    }
+
+    override suspend fun reactToDirectMessage(friendshipId: String, messageId: String, emoji: String) {
+        try {
+            val userId = auth.currentUser?.uid ?: return
+            val docRef = firestore.collection("friendships").document(friendshipId)
+                .collection("messages").document(messageId)
+            
+            firestore.runTransaction { transaction ->
+                val snapshot = transaction.get(docRef)
+                val reactions = snapshot.get("reactions") as? Map<*, *>
+                val currentEmoji = reactions?.get(userId) as? String
+                
+                if (currentEmoji == emoji) {
+                    transaction.update(docRef, "reactions.$userId", com.google.firebase.firestore.FieldValue.delete())
+                } else {
+                    transaction.update(docRef, "reactions.$userId", emoji)
+                }
+            }.await()
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error reacting to direct message: ${e.message}")
+        }
+    }
+
+    override suspend fun revokeSquadMessage(squadId: String, messageId: String) {
+        try {
+            val docRef = firestore.collection("squads").document(squadId)
+                .collection("messages").document(messageId)
+            docRef.update(
+                mapOf(
+                    "isRevoked" to true,
+                    "text" to "",
+                    "imageUrls" to emptyList<String>(),
+                    "imageUrl" to null,
+                    "reactions" to emptyMap<String, String>()
+                )
+            ).await()
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error revoking squad message: ${e.message}")
+        }
+    }
+
+    override suspend fun revokeDirectMessage(friendshipId: String, messageId: String) {
+        try {
+            val docRef = firestore.collection("friendships").document(friendshipId)
+                .collection("messages").document(messageId)
+            docRef.update(
+                mapOf(
+                    "isRevoked" to true,
+                    "text" to "",
+                    "imageUrls" to emptyList<String>(),
+                    "imageUrl" to null,
+                    "reactions" to emptyMap<String, String>()
+                )
+            ).await()
+        } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "Error revoking direct message: ${e.message}")
         }
     }
 }
