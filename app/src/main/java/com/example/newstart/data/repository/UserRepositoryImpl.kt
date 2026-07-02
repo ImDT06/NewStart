@@ -330,9 +330,13 @@ class UserRepositoryImpl @Inject constructor(
 
     override suspend fun blockUser(userId: String, block: Boolean): Result<Unit> {
         return try {
-            apiService.blockUser(userId, block)
-            blockedUsersRefreshTrigger.tryEmit(Unit)
-            Result.success(Unit)
+            val response = apiService.blockUser(userId, block)
+            if (response.isSuccessful) {
+                blockedUsersRefreshTrigger.tryEmit(Unit)
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Lỗi từ server: ${response.code()}"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

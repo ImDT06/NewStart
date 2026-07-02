@@ -81,7 +81,7 @@ interface NewStartApiService {
     suspend fun blockUser(
         @Path("id") id: String,
         @Query("block") block: Boolean
-    ): Map<String, Boolean>
+    ): retrofit2.Response<Unit>
 
     @GET("api/users/blocked")
     suspend fun getBlockedUsers(): Set<String>
