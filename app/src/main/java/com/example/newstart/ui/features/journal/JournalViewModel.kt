@@ -1,7 +1,9 @@
 package com.example.newstart.ui.features.journal
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import androidx.lifecycle.viewModelScope
 import com.example.newstart.domain.model.JournalEntry
 import com.example.newstart.domain.model.JournalType
@@ -31,7 +33,8 @@ class JournalViewModel @Inject constructor(
     private val journalRepository: JournalRepository,
     private val socialRepository: SocialRepository,
     private val saveJournalEntryUseCase: SaveJournalEntryUseCase,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _socialFeed = MutableStateFlow<List<JournalEntry>>(emptyList())
@@ -199,6 +202,11 @@ class JournalViewModel @Inject constructor(
             if (result.isSuccess) {
                 socialRepository.refreshSocialFeed()
                 onSuccess()
+            } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "Lưu nhật ký thất bại"
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
+                }
             }
         }
     }

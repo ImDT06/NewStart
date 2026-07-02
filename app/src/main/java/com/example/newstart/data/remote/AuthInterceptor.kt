@@ -28,6 +28,10 @@ class AuthInterceptor @Inject constructor() : Interceptor {
             requestBuilder.addHeader("Authorization", "Bearer $it")
         }
 
-        return chain.proceed(requestBuilder.build())
+        val response = chain.proceed(requestBuilder.build())
+        if (response.code == 403) {
+            FirebaseAuth.getInstance().signOut()
+        }
+        return response
     }
 }

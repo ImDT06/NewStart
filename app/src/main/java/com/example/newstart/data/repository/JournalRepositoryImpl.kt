@@ -92,6 +92,8 @@ class JournalRepositoryImpl @Inject constructor(
     ): Result<Unit> {
         return try {
             val userId = auth.currentUser?.uid ?: throw Exception("User not logged in")
+            
+
             val entryId = UUID.randomUUID().toString()
             
             // 1. Lưu local trước (isSynced = false)

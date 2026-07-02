@@ -54,6 +54,7 @@ class MainViewModel @Inject constructor(
     private val saveJournalEntryUseCase: SaveJournalEntryUseCase,
     private val suggestEmojiUseCase: SuggestEmojiUseCase,
     private val saveHabitUseCase: SaveHabitUseCase,
+    private val apiService: com.example.newstart.data.remote.NewStartApiService,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -68,6 +69,33 @@ class MainViewModel @Inject constructor(
 
     private val _isBottomBarVisible = MutableStateFlow(true)
     val isBottomBarVisible: StateFlow<Boolean> = _isBottomBarVisible.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            authRepository.currentUser.collectLatest { firebaseUser ->
+                if (firebaseUser != null) {
+                    val docRef = firestore.collection("blocked_users").document(firebaseUser.id)
+                    docRef.addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            android.util.Log.e("MainViewModel", "Snapshot listener error for uid: ${firebaseUser.id}", error)
+                            return@addSnapshotListener
+                        }
+                        val exists = snapshot?.exists() == true
+                        val blockedVal = snapshot?.getBoolean("blocked")
+                        android.util.Log.d("MainViewModel", "Snapshot listener update: uid: ${firebaseUser.id}, exists: $exists, blockedVal: $blockedVal")
+                        if (snapshot != null && snapshot.exists() && snapshot.getBoolean("blocked") == true) {
+                            viewModelScope.launch {
+                                logout()
+                                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    android.widget.Toast.makeText(context, "Tài khoản của bạn đã bị khóa.", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     fun setBottomBarVisible(visible: Boolean) {
         _isBottomBarVisible.value = visible
@@ -174,9 +202,35 @@ class MainViewModel @Inject constructor(
             initialValue = null
         )
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val authState: StateFlow<AuthState> = authRepository.currentUser
-        .map { user ->
-            if (user != null) AuthState.Authenticated else AuthState.Unauthenticated
+        .flatMapLatest { firebaseUser ->
+            if (firebaseUser == null) {
+                flowOf(AuthState.Unauthenticated)
+            } else {
+                flow {
+                    emit(AuthState.Loading)
+                    val isBlocked = try {
+                        apiService.getUserById(firebaseUser.id)
+                        false
+                    } catch (e: retrofit2.HttpException) {
+                        android.util.Log.d("MainViewModel", "authState flatMapLatest check: uid: ${firebaseUser.id}, code: ${e.code()}")
+                        e.code() == 403
+                    } catch (e: Exception) {
+                        android.util.Log.e("MainViewModel", "authState flatMapLatest error for uid: ${firebaseUser.id}", e)
+                        false
+                    }
+                    if (isBlocked) {
+                        logout()
+                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            android.widget.Toast.makeText(context, "Tài khoản của bạn đã bị khóa.", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                        emit(AuthState.Unauthenticated)
+                    } else {
+                        emit(AuthState.Authenticated)
+                    }
+                }
+            }
         }
         .stateIn(
             scope = viewModelScope,
@@ -409,6 +463,11 @@ class MainViewModel @Inject constructor(
                 if (result.isSuccess) {
                     socialRepository.refreshSocialFeed()
                     onSuccess()
+                } else {
+                    val errorMsg = result.exceptionOrNull()?.message ?: "Lưu nhật ký thất bại"
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }
             } finally {
                 _isUploading.value = false
@@ -601,7 +660,18 @@ class MainViewModel @Inject constructor(
 
     fun blockUser(userId: String, block: Boolean) {
         viewModelScope.launch {
-            userRepository.blockUser(userId, block)
+            val result = userRepository.blockUser(userId, block)
+            result.onSuccess {
+                android.util.Log.d("MainViewModel", "blockUser success: userId: $userId, block: $block")
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, if (block) "Đã khóa người dùng" else "Đã mở khóa người dùng", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }.onFailure { e ->
+                android.util.Log.e("MainViewModel", "blockUser failed: userId: $userId, block: $block", e)
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Lỗi: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 

@@ -77,6 +77,15 @@ interface NewStartApiService {
     @GET("api/users/{id}")
     suspend fun getUserById(@Path("id") id: String): UserDto
 
+    @PUT("api/users/{id}/block")
+    suspend fun blockUser(
+        @Path("id") id: String,
+        @Query("block") block: Boolean
+    ): Map<String, Boolean>
+
+    @GET("api/users/blocked")
+    suspend fun getBlockedUsers(): Set<String>
+
     @GET("api/users/search")
     suspend fun searchUsers(@Query("query") query: String): List<UserDto>
 

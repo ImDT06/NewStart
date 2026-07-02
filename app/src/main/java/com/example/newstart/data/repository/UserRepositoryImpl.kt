@@ -33,6 +33,8 @@ import com.example.newstart.data.local.toDomain
 import com.example.newstart.data.local.toEntity
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 
 
 @Singleton
@@ -322,35 +324,32 @@ class UserRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }
 
+    private val blockedUsersRefreshTrigger = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(replay = 1).apply {
+        tryEmit(Unit)
+    }
+
     override suspend fun blockUser(userId: String, block: Boolean): Result<Unit> {
         return try {
-            if (block) {
-                firestore.collection("blocked_users").document(userId)
-                    .set(mapOf("blocked" to true))
-                    .await()
-            } else {
-                firestore.collection("blocked_users").document(userId)
-                    .delete()
-                    .await()
-            }
+            apiService.blockUser(userId, block)
+            blockedUsersRefreshTrigger.tryEmit(Unit)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    override fun getBlockedUsers(): Flow<Set<String>> = callbackFlow {
-        val listener = firestore.collection("blocked_users")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    trySend(emptySet())
-                    return@addSnapshotListener
-                }
-                if (snapshot != null) {
-                    val ids = snapshot.documents.map { it.id }.toSet()
-                    trySend(ids)
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    override fun getBlockedUsers(): Flow<Set<String>> {
+        return blockedUsersRefreshTrigger.flatMapLatest {
+            kotlinx.coroutines.flow.flow {
+                try {
+                    val blocked = apiService.getBlockedUsers()
+                    emit(blocked)
+                } catch (e: Exception) {
+                    android.util.Log.e("UserRepository", "Error getting blocked users", e)
+                    emit(emptySet())
                 }
             }
-        awaitClose { listener.remove() }
+        }
     }
 }
