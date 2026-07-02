@@ -3,6 +3,9 @@ package com.example.newstart.data.repository
 import com.example.newstart.domain.model.User
 import com.example.newstart.domain.repository.AuthRepository
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
@@ -125,7 +128,12 @@ class AuthRepositoryImpl @Inject constructor(
                 )
             )
         } catch (e: Exception) {
-            Result.failure(e)
+            val friendlyMessage = when (e) {
+                is FirebaseAuthInvalidUserException -> "Email này chưa được đăng ký tài khoản."
+                is FirebaseAuthInvalidCredentialsException -> "Mật khẩu không chính xác."
+                else -> e.message ?: "Đăng nhập thất bại"
+            }
+            Result.failure(Exception(friendlyMessage))
         }
     }
 
@@ -151,7 +159,11 @@ class AuthRepositoryImpl @Inject constructor(
 
             Result.success(newUser)
         } catch (e: Exception) {
-            Result.failure(e)
+            val friendlyMessage = when (e) {
+                is FirebaseAuthUserCollisionException -> "Email này đã được sử dụng bởi một tài khoản khác."
+                else -> e.message ?: "Đăng ký thất bại"
+            }
+            Result.failure(Exception(friendlyMessage))
         }
     }
 
@@ -160,7 +172,11 @@ class AuthRepositoryImpl @Inject constructor(
             firebaseAuth.currentUser?.sendEmailVerification()?.await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            val friendlyMessage = when (e) {
+                is FirebaseAuthInvalidUserException -> "Không tìm thấy tài khoản nào với email này."
+                else -> e.message ?: "Không thể gửi email xác thực"
+            }
+            Result.failure(Exception(friendlyMessage))
         }
     }
 
@@ -169,7 +185,11 @@ class AuthRepositoryImpl @Inject constructor(
             firebaseAuth.sendPasswordResetEmail(email).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            val friendlyMessage = when (e) {
+                is FirebaseAuthInvalidUserException -> "Không tìm thấy tài khoản nào với email này."
+                else -> e.message ?: "Không thể gửi email đặt lại mật khẩu"
+            }
+            Result.failure(Exception(friendlyMessage))
         }
     }
 
@@ -216,7 +236,12 @@ class AuthRepositoryImpl @Inject constructor(
                 )
             )
         } catch (e: Exception) {
-            Result.failure(e)
+            val friendlyMessage = when (e) {
+                is FirebaseAuthInvalidUserException -> "Tài khoản không tồn tại."
+                is FirebaseAuthInvalidCredentialsException -> "Thông tin đăng nhập không hợp lệ."
+                else -> e.message ?: "Đăng nhập bằng Google thất bại"
+            }
+            Result.failure(Exception(friendlyMessage))
         }
     }
 
