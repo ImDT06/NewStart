@@ -1,6 +1,7 @@
 package com.example.newstart.ui.features.habits
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -255,12 +256,14 @@ fun HabitsScreen(
                                     activeReplyJournal = entry
                                 }
                             )
-                            1 -> com.example.newstart.ui.features.social.ChatsTabWrapper(
-                                friends = friends,
-                                currentUserId = currentUserId ?: "",
-                                viewModel = socialViewModel,
-                                onFriendChatClick = { activeChatFriendship = it }
-                            )
+                            1 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                com.example.newstart.ui.features.social.ChatsTabWrapper(
+                                    friends = friends,
+                                    currentUserId = currentUserId ?: "",
+                                    viewModel = socialViewModel,
+                                    onFriendChatClick = { activeChatFriendship = it }
+                                )
+                            }
                             2 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 com.example.newstart.ui.features.social.FriendsTabWrapper(
                                     searchQuery = searchQuery,
@@ -303,7 +306,7 @@ fun HabitsScreen(
         var replyText by remember { mutableStateOf("") }
         val authorState by remember(replyJournal.userId) {
             journalViewModel.getUserById(replyJournal.userId)
-        }.collectAsState(initial = User(name = "Đang tải..."))
+        }.collectAsState(initial = User(name = if (isVietnamese) "Đang tải..." else "Loading..."))
         
         ModalBottomSheet(
             onDismissRequest = { activeReplyJournal = null },
@@ -320,7 +323,7 @@ fun HabitsScreen(
                     .padding(bottom = 36.dp)
             ) {
                 Text(
-                    text = "Phản hồi bài viết",
+                    text = if (isVietnamese) "Phản hồi bài viết" else "Reply to post",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Black,
                     modifier = Modifier.padding(bottom = 12.dp)
@@ -362,10 +365,10 @@ fun HabitsScreen(
                                         text = replyText.trim(),
                                         sharedJournal = replyJournal
                                     )
-                                    android.widget.Toast.makeText(context, "Đã gửi phản hồi!", android.widget.Toast.LENGTH_SHORT).show()
+                                    android.widget.Toast.makeText(context, if (isVietnamese) "Đã gửi phản hồi!" else "Reply sent!", android.widget.Toast.LENGTH_SHORT).show()
                                     activeReplyJournal = null
                                 } else {
-                                    android.widget.Toast.makeText(context, "Bạn chỉ có thể phản hồi bài viết của bạn bè!", android.widget.Toast.LENGTH_SHORT).show()
+                                    android.widget.Toast.makeText(context, if (isVietnamese) "Bạn chỉ có thể phản hồi bài viết của bạn bè!" else "You can only reply to friends' posts!", android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             },
                             enabled = replyText.isNotBlank(),

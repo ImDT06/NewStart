@@ -54,11 +54,13 @@ fun PomodoroScreen(
     var isEditingTime by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
+    val locale = remember(context) { context.resources.configuration.locales[0] }
+    val isVietnamese = locale.language == "vi"
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Pomodoro", fontWeight = FontWeight.Bold) },
+                title = { Text(if (isVietnamese) "Pomodoro" else "Pomodoro", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -82,7 +84,7 @@ fun PomodoroScreen(
                     modifier = Modifier.padding(bottom = 60.dp)
                 ) {
                     Text(
-                        text = if (isFocusMode) "Tập trung" else "Nghỉ ngơi",
+                        text = if (isFocusMode) (if (isVietnamese) "Tập trung" else "Focus") else (if (isVietnamese) "Nghỉ ngơi" else "Break"),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Medium
@@ -156,7 +158,7 @@ fun PomodoroScreen(
                                 )
                                 
                                 Text(
-                                    text = "Phút",
+                                    text = if (isVietnamese) "Phút" else "Mins",
                                     fontSize = 14.sp,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                                     fontWeight = FontWeight.Medium,
@@ -182,7 +184,7 @@ fun PomodoroScreen(
                                 
                                 if (!isRunning && timeLeft > 0 && timeLeft < (if (isFocusMode) focusTime else breakTime) * 60) {
                                     Text(
-                                        text = "Đã tạm dừng",
+                                        text = if (isVietnamese) "Đã tạm dừng" else "Paused",
                                         fontSize = 14.sp,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                         modifier = Modifier
@@ -242,7 +244,7 @@ fun PomodoroScreen(
                                     modifier = Modifier.size(32.dp)
                                 )
                             } else {
-                                Text("Bắt đầu", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text(if (isVietnamese) "Bắt đầu" else "Start", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             }
                         }
 
@@ -326,6 +328,8 @@ fun QuickTimeMenu(
     onTimeSelect: (Int) -> Unit,
     onOpenScroller: (Int, Boolean) -> Unit
 ) {
+    val locale = androidx.compose.ui.platform.LocalContext.current.resources.configuration.locales[0]
+    val isVietnamese = locale.language == "vi"
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {},
@@ -368,7 +372,7 @@ fun QuickTimeMenu(
                 }
                 
                 Text(
-                    text = "Nhấn và giữ thời lượng để thay đổi",
+                    text = if (isVietnamese) "Nhấn và giữ thời lượng để thay đổi" else "Long press to edit duration",
                     fontSize = 12.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(top = 20.dp)
@@ -433,8 +437,10 @@ fun ScrollerTimePopup(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                val locale = androidx.compose.ui.platform.LocalContext.current.resources.configuration.locales[0]
+                val isVietnamese = locale.language == "vi"
                 Text(
-                    "Pomo thường dùng của bạn",
+                    if (isVietnamese) "Pomo thường dùng của bạn" else "Your common Pomos",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -473,9 +479,11 @@ fun ScrollerTimePopup(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
+                    val locale = androidx.compose.ui.platform.LocalContext.current.resources.configuration.locales[0]
+                    val isVietnamese = locale.language == "vi"
                     TextButton(onClick = if (isEditMode) onDelete else onDismiss) {
                         Text(
-                            if (isEditMode) "Loại bỏ" else "Hủy bỏ", 
+                            if (isEditMode) (if (isVietnamese) "Loại bỏ" else "Remove") else (if (isVietnamese) "Hủy bỏ" else "Cancel"),
                             color = if (isEditMode) Color.Red else MaterialTheme.colorScheme.primary
                         )
                     }

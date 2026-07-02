@@ -263,4 +263,16 @@ class SocialViewModel @Inject constructor(
             socialRepository.revokeDirectMessage(friendshipId, messageId)
         }
     }
+
+    private val sharedPrefs = context.getSharedPreferences("deleted_messages_prefs", android.content.Context.MODE_PRIVATE)
+    private val _deletedLocalMessageIds = MutableStateFlow<Set<String>>(
+        sharedPrefs.getStringSet("deleted_ids", emptySet()) ?: emptySet()
+    )
+    val deletedLocalMessageIds = _deletedLocalMessageIds.asStateFlow()
+
+    fun deleteMessageLocally(messageId: String) {
+        val newSet = _deletedLocalMessageIds.value + messageId
+        _deletedLocalMessageIds.value = newSet
+        sharedPrefs.edit().putStringSet("deleted_ids", newSet).apply()
+    }
 }

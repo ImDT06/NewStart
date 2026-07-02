@@ -36,6 +36,18 @@ class HabitRepositoryImpl @Inject constructor(
 ) : HabitRepository {
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
+
+    private fun updateWidget() {
+        repositoryScope.launch {
+            kotlinx.coroutines.delay(100)
+            try {
+                com.example.newstart.widget.HabitWidget().updateAll(context)
+            } catch (e: Exception) {
+                android.util.Log.e("HabitRepository", "Error updating widget: ${e.message}")
+            }
+        }
+    }
+
     private val workManager = WorkManager.getInstance(context)
 
     private fun Habit.toDto() = HabitDto(
@@ -134,7 +146,7 @@ class HabitRepositoryImpl @Inject constructor(
                 HabitReminderManager.scheduleReminder(context, habitWithUserId)
             }
             
-            HabitWidget().updateAll(context)
+            updateWidget()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -154,7 +166,7 @@ class HabitRepositoryImpl @Inject constructor(
             }
 
             HabitReminderManager.cancelReminder(context, habitId)
-            HabitWidget().updateAll(context)
+            updateWidget()
             
             Result.success(Unit)
         } catch (e: Exception) {
@@ -182,7 +194,7 @@ class HabitRepositoryImpl @Inject constructor(
                 HabitReminderManager.scheduleReminder(context, habit.copy(isCompleted = false))
             }
 
-            HabitWidget().updateAll(context)
+            updateWidget()
 
             Result.success(Unit)
         } catch (e: Exception) {

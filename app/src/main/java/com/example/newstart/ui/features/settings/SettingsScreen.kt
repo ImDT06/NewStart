@@ -448,7 +448,7 @@ fun SettingsScreen(
             CenterAlignedTopAppBar(
                 title = { 
                     Text(
-                        text = "Thông tin cá nhân",
+                        text = if (isVietnamese) "Thông tin cá nhân" else "Profile",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 22.sp
                     ) 
@@ -639,14 +639,16 @@ fun SettingsScreen(
                 item { SectionTitle(title = stringResource(id = R.string.settings_danger_zone)) }
                 item {
                     SettingsCard {
-                        SettingsItem(
-                            icon = Icons.Default.DeleteForever,
-                            title = stringResource(id = R.string.settings_delete_account),
-                            subtitle = stringResource(id = R.string.settings_delete_account_desc),
-                            isDestructive = true,
-                            onClick = { showDeleteAccountDialog = true }
-                        )
-                        SettingsDivider()
+                        if (!isAdmin) {
+                            SettingsItem(
+                                icon = Icons.Default.DeleteForever,
+                                title = stringResource(id = R.string.settings_delete_account),
+                                subtitle = stringResource(id = R.string.settings_delete_account_desc),
+                                isDestructive = true,
+                                onClick = { showDeleteAccountDialog = true }
+                            )
+                            SettingsDivider()
+                        }
                         SettingsItem(
                             icon = Icons.AutoMirrored.Filled.Logout,
                             title = stringResource(id = R.string.settings_logout),

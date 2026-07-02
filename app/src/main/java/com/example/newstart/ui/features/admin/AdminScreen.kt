@@ -1,5 +1,6 @@
 package com.example.newstart.ui.features.admin
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,7 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -31,7 +31,8 @@ import com.example.newstart.domain.model.JournalEntry
 import com.example.newstart.domain.model.User
 import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.features.habits.SocialFeedItem
-import com.example.newstart.ui.theme.LocalDarkTheme
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -43,6 +44,7 @@ fun AdminScreen(
 ) {
     val allUsers by mainViewModel.allUsers.collectAsStateWithLifecycle()
     val blockedUsers by mainViewModel.blockedUsers.collectAsStateWithLifecycle()
+    val blockedReasons by mainViewModel.blockedReasons.collectAsStateWithLifecycle()
     val socialFeed by mainViewModel.adminSocialFeed.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
@@ -56,8 +58,19 @@ fun AdminScreen(
         if (isVi) "Bài đăng" else "Posts"
     )
 
+    var userFilter by remember { mutableIntStateOf(0) } // 0: Tất cả, 1: Đang hoạt động, 2: Bị khóa
+
+    val filteredUsers = remember(allUsers, blockedUsers, userFilter) {
+        when (userFilter) {
+            1 -> allUsers.filter { !blockedUsers.contains(it.id) }
+            2 -> allUsers.filter { blockedUsers.contains(it.id) }
+            else -> allUsers
+        }
+    }
+
     var showConfirmDeletePostId by remember { mutableStateOf<String?>(null) }
     var showConfirmBlockUser by remember { mutableStateOf<Pair<User, Boolean>?>(null) } // User to (true = block, false = unblock)
+    var blockReasonInput by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -112,28 +125,83 @@ fun AdminScreen(
             when (selectedTab) {
                 0 -> {
                     // Users Tab
-                    if (allUsers.isEmpty()) {
-                        EmptyStateView(
-                            icon = Icons.Default.Group,
-                            title = if (isVi) "Không có người dùng nào" else "No users found",
-                            subtitle = if (isVi) "Hệ thống chưa ghi nhận người dùng nào." else "No users registered yet."
-                        )
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // User Filter Chips Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(allUsers, key = { it.id }) { user ->
-                                val isBlocked = blockedUsers.contains(user.id)
-                                UserAdminItem(
-                                    user = user,
-                                    isBlocked = isBlocked,
-                                    isVi = isVi,
-                                    onBlockClick = { 
-                                        showConfirmBlockUser = user to !isBlocked
+                            val filters = listOf(
+                                if (isVi) "Tất cả" else "All",
+                                if (isVi) "Đang hoạt động" else "Active",
+                                if (isVi) "Bị khóa" else "Blocked"
+                            )
+                            filters.forEachIndexed { index, label ->
+                                val isSelected = userFilter == index
+                                Surface(
+                                    onClick = { userFilter = index },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(
+                                        width = 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                    ),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.padding(horizontal = 12.dp)
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
-                                )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        if (filteredUsers.isEmpty()) {
+                            val emptyTitle = when (userFilter) {
+                                1 -> if (isVi) "Không có người dùng hoạt động" else "No active users"
+                                2 -> if (isVi) "Không có người dùng bị khóa" else "No blocked users"
+                                else -> if (isVi) "Không có người dùng nào" else "No users found"
+                            }
+                            val emptySubtitle = when (userFilter) {
+                                1 -> if (isVi) "Hiện tại tất cả người dùng đều đã bị khóa." else "All users are currently blocked."
+                                2 -> if (isVi) "Hệ thống hiện tại không có người dùng nào bị khóa." else "No users are currently blocked."
+                                else -> if (isVi) "Hệ thống chưa ghi nhận người dùng nào." else "No users registered yet."
+                            }
+                            EmptyStateView(
+                                icon = if (userFilter == 2) Icons.Default.Block else Icons.Default.Group,
+                                title = emptyTitle,
+                                subtitle = emptySubtitle
+                            )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(filteredUsers, key = { it.id }) { user ->
+                                    val isBlocked = blockedUsers.contains(user.id)
+                                    val reason = blockedReasons[user.id]
+                                    UserAdminItem(
+                                        user = user,
+                                        isBlocked = isBlocked,
+                                        isVi = isVi,
+                                        blockedReason = reason,
+                                        onBlockClick = { 
+                                            showConfirmBlockUser = user to !isBlocked
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -231,7 +299,10 @@ fun AdminScreen(
     if (showConfirmBlockUser != null) {
         val (user, block) = showConfirmBlockUser!!
         AlertDialog(
-            onDismissRequest = { showConfirmBlockUser = null },
+            onDismissRequest = { 
+                showConfirmBlockUser = null
+                blockReasonInput = ""
+            },
             title = { 
                 Text(
                     if (isVi) {
@@ -242,32 +313,53 @@ fun AdminScreen(
                 ) 
             },
             text = { 
-                Text(
-                    if (isVi) {
-                        if (block) "Bạn có chắc chắn muốn khóa tài khoản ${user.name} (${user.email})? Họ sẽ không thể đăng tin lên cộng đồng."
-                        else "Bạn có muốn mở khóa tài khoản cho ${user.name}?"
-                    } else {
-                        if (block) "Are you sure you want to block user ${user.name} (${user.email})?"
-                        else "Do you want to unblock user ${user.name}?"
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (isVi) {
+                            if (block) "Bạn có chắc chắn muốn khóa tài khoản ${user.name} (${user.email})? Họ sẽ không thể đăng tin lên cộng đồng."
+                            else "Bạn có muốn mở khóa tài khoản cho ${user.name}?"
+                        } else {
+                            if (block) "Are you sure you want to block user ${user.name} (${user.email})?"
+                            else "Do you want to unblock user ${user.name}?"
+                        }
+                    ) 
+                    if (block) {
+                        OutlinedTextField(
+                            value = blockReasonInput,
+                            onValueChange = { blockReasonInput = it },
+                            label = { Text(if (isVi) "Lý do khóa" else "Reason for blocking") },
+                            placeholder = { Text(if (isVi) "Nhập lý do khóa tài khoản…" else "Enter reason…") },
+                            modifier = Modifier.fillMaxWidth(),
+                            maxLines = 3
+                        )
                     }
-                ) 
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        mainViewModel.blockUser(user.id, block)
+                        mainViewModel.blockUser(user.id, block, if (block) blockReasonInput else "")
                         showConfirmBlockUser = null
+                        blockReasonInput = ""
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (block) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                    )
+                    ),
+                    enabled = !block || blockReasonInput.isNotBlank()
                 ) {
                     Text(if (isVi) "Xác nhận" else "Confirm")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showConfirmBlockUser = null }) {
-                    Text(if (isVi) "Hủy" else "Cancel")
+                TextButton(onClick = { 
+                    showConfirmBlockUser = null
+                    blockReasonInput = ""
+                }) {
+                    Text(if (isVi) {
+                        "Hủy"
+                    } else {
+                        "Cancel"
+                    })
                 }
             }
         )
@@ -279,6 +371,7 @@ fun UserAdminItem(
     user: User,
     isBlocked: Boolean,
     isVi: Boolean,
+    blockedReason: String? = null,
     onBlockClick: () -> Unit
 ) {
     Card(
@@ -309,12 +402,21 @@ fun UserAdminItem(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = user.name.take(1).uppercase(Locale.ROOT),
-                        fontWeight = FontWeight.Bold,
-                        color = if (isBlocked) Color.Gray else Color(0xFFD32F2F),
-                        fontSize = 18.sp
-                    )
+                    if (!user.avatarUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = user.avatarUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Text(
+                            text = user.name.take(1).uppercase(Locale.ROOT),
+                            fontWeight = FontWeight.Bold,
+                            color = if (isBlocked) Color.Gray else Color(0xFFD32F2F),
+                            fontSize = 18.sp
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -333,18 +435,29 @@ fun UserAdminItem(
                     )
                     if (isBlocked) {
                         Spacer(modifier = Modifier.height(2.dp))
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            modifier = Modifier.wrapContentSize()
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Text(
-                                text = if (isVi) "Đã khóa" else "Blocked",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                fontWeight = FontWeight.Bold
-                            )
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.errorContainer,
+                                modifier = Modifier.wrapContentSize()
+                            ) {
+                                Text(
+                                    text = if (isVi) "Đã khóa" else "Blocked",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            if (!blockedReason.isNullOrBlank()) {
+                                Text(
+                                    text = if (isVi) "Lý do: $blockedReason" else "Reason: $blockedReason",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                 }

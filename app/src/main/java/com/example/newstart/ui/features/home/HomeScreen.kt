@@ -498,9 +498,9 @@ fun HomeContent(
                     ) 
                 }
                 if (isTimerRunning) {
-                    item { TimerCard(timerSeconds, onStopTimer) }
+                    item { TimerCard(timerSeconds, onStopTimer, isVietnamese) }
                 }
-                item { DailyOverviewCard(habits, todos) }
+                item { DailyOverviewCard(habits, todos, isVietnamese) }
                 
                 item {
                     HabitsHeader(
@@ -602,6 +602,7 @@ fun HomeContent(
                             onToggle = { handleToggleTodo(todo.id, it) },
                             onClick = { onEditTodo(todo) },
                             onDelete = { onDeleteTodo(todo) },
+                            isVietnamese = isVietnamese,
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -623,7 +624,12 @@ fun HomeContent(
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         Text(
-                                            text = if (isActiveTodosExpanded) "Thu gọn danh sách" else "Xem thêm ${activeTodos.size - 5} việc cần làm khác",
+                                            text = if (isActiveTodosExpanded) {
+                                                if (isVietnamese) "Thu gọn danh sách" else "Collapse list"
+                                            } else {
+                                                if (isVietnamese) "Xem thêm ${activeTodos.size - 5} việc cần làm khác" 
+                                                else "See ${activeTodos.size - 5} more todos"
+                                            },
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
@@ -653,7 +659,7 @@ fun HomeContent(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = "Đã hoàn thành (${completedTodos.size})",
+                                    text = (if (isVietnamese) "Đã hoàn thành" else "Completed") + " (${completedTodos.size})",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
@@ -678,9 +684,9 @@ fun HomeContent(
                                     val todayStr = sdfInput.format(Date())
                                     val yesterdayStr = sdfInput.format(Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000))
                                     when (dateStr) {
-                                        todayStr -> "Hôm nay"
-                                        yesterdayStr -> "Hôm qua"
-                                        else -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(date)
+                                        todayStr -> if (isVietnamese) "Hôm nay" else "Today"
+                                        yesterdayStr -> if (isVietnamese) "Hôm qua" else "Yesterday"
+                                        else -> SimpleDateFormat(if (isVietnamese) "dd/MM/yyyy" else "MM/dd/yyyy", locale).format(date)
                                     }
                                 } catch (e: Exception) {
                                     dateStr
@@ -702,6 +708,7 @@ fun HomeContent(
                                     onToggle = { handleToggleTodo(todo.id, it) },
                                     onClick = { onEditTodo(todo) },
                                     onDelete = { onDeleteTodo(todo) },
+                                    isVietnamese = isVietnamese,
                                     modifier = Modifier.animateItem()
                                 )
                             }
@@ -931,6 +938,7 @@ private fun TodoSwipeableItem(
     onToggle: (Boolean) -> Unit,
     onClick: () -> Unit,
     onDelete: () -> Unit,
+    isVietnamese: Boolean,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -1001,7 +1009,8 @@ private fun TodoSwipeableItem(
             HomeTodoItem(
                 todo = todo,
                 onToggle = onToggle,
-                onClick = onClick
+                onClick = onClick,
+                isVietnamese = isVietnamese
             )
         }
     }
@@ -1028,7 +1037,7 @@ private fun HomeHeaderSection(userName: String) {
 }
 
 @Composable
-private fun DailyOverviewCard(habits: List<Habit>, todos: List<Todo>) {
+private fun DailyOverviewCard(habits: List<Habit>, todos: List<Todo>, isVietnamese: Boolean) {
     val total = habits.size + todos.size
     val completed = habits.count { it.isCompleted } + todos.count { it.isCompleted }
     val progress = if (total > 0) completed.toFloat() / total else 0f
@@ -1042,15 +1051,20 @@ private fun DailyOverviewCard(habits: List<Habit>, todos: List<Todo>) {
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Text(text = "Tiến độ ngày", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(text = "Bạn đã hoàn thành $completed/$total mục tiêu.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                Text(text = if (isVietnamese) "Tiến độ ngày" else "Daily Progress", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(
+                    text = if (isVietnamese) "Bạn đã hoàn thành $completed/$total mục tiêu." 
+                           else "You've completed $completed/$total goals.", 
+                    fontSize = 12.sp, 
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                )
             }
         }
     }
 }
 
 @Composable
-private fun TimerCard(seconds: Int, onStop: () -> Unit) {
+private fun TimerCard(seconds: Int, onStop: () -> Unit, isVietnamese: Boolean) {
     val mins = seconds / 60
     val secs = seconds % 60
     val timeStr = String.format("%02d:%02d", mins, secs)
@@ -1066,7 +1080,7 @@ private fun TimerCard(seconds: Int, onStop: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text("Đang tập trung", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
+                Text(if (isVietnamese) "Đang tập trung" else "Focusing", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
                 Text(timeStr, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
             }
             Button(
@@ -1075,7 +1089,7 @@ private fun TimerCard(seconds: Int, onStop: () -> Unit) {
                 shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
             ) {
-                Text("Dừng", color = Color.White, fontSize = 13.sp)
+                Text(if (isVietnamese) "Dừng" else "Stop", color = Color.White, fontSize = 13.sp)
             }
         }
     }
@@ -1085,7 +1099,8 @@ private fun TimerCard(seconds: Int, onStop: () -> Unit) {
 private fun HomeTodoItem(
     todo: Todo, 
     onToggle: (Boolean) -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isVietnamese: Boolean
 ) {
     val priorityColor = when (todo.priority) {
         Priority.HIGH -> Color(0xFFFF4444)
@@ -1148,7 +1163,13 @@ private fun HomeTodoItem(
             if (todo.dueDate != null) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+                    val sdfDate = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+                    val sdfTime = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+                    
+                    val dateText = sdfDate.format(todo.dueDate)
+                    val timeText = sdfTime.format(todo.dueDate)
+                    val isTimeSet = timeText != "00:00"
+
                     Icon(
                         imageVector = Icons.Default.CalendarToday,
                         contentDescription = null,
@@ -1157,11 +1178,29 @@ private fun HomeTodoItem(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isOverdue) "Quá hạn: ${sdf.format(todo.dueDate)}" else sdf.format(todo.dueDate),
+                        text = if (isOverdue) {
+                            (if (isVietnamese) "Quá hạn: " else "Overdue: ") + dateText
+                        } else dateText,
                         fontSize = 11.sp,
                         fontWeight = if (isOverdue) FontWeight.Bold else FontWeight.Normal,
                         color = if (isOverdue) Color(0xFFFF4444) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
+                    
+                    if (isTimeSet) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.AccessTime,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = timeText,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
         }
@@ -1335,13 +1374,44 @@ fun TodoEditDialog(
                                 DatePickerDialog(
                                     context,
                                     { _, year, month, dayOfMonth ->
+                                        val currentCal = Calendar.getInstance()
+                                        dueDate?.let { currentCal.time = it }
+                                        
                                         val newCal = Calendar.getInstance()
-                                        newCal.set(year, month, dayOfMonth)
+                                        newCal.set(year, month, dayOfMonth, 
+                                            if (dueDate != null) currentCal.get(Calendar.HOUR_OF_DAY) else 0,
+                                            if (dueDate != null) currentCal.get(Calendar.MINUTE) else 0
+                                        )
                                         dueDate = newCal.time
                                     },
                                     calendar.get(Calendar.YEAR),
                                     calendar.get(Calendar.MONTH),
                                     calendar.get(Calendar.DAY_OF_MONTH)
+                                ).show()
+                            }
+                            
+                            val showTimePicker = {
+                                val calendar = Calendar.getInstance()
+                                dueDate?.let { calendar.time = it }
+                                android.app.TimePickerDialog(
+                                    context,
+                                    { _, hourOfDay, minute ->
+                                        val currentCal = Calendar.getInstance()
+                                        dueDate?.let { currentCal.time = it }
+                                        
+                                        val newCal = Calendar.getInstance()
+                                        newCal.set(
+                                            currentCal.get(Calendar.YEAR),
+                                            currentCal.get(Calendar.MONTH),
+                                            currentCal.get(Calendar.DAY_OF_MONTH),
+                                            hourOfDay,
+                                            minute
+                                        )
+                                        dueDate = newCal.time
+                                    },
+                                    calendar.get(Calendar.HOUR_OF_DAY),
+                                    calendar.get(Calendar.MINUTE),
+                                    true
                                 ).show()
                             }
 
@@ -1357,6 +1427,7 @@ fun TodoEditDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
+                                    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
                                     Icon(
                                         imageVector = Icons.Default.CalendarToday,
                                         contentDescription = null,
@@ -1364,10 +1435,38 @@ fun TodoEditDialog(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Text(
-                                        text = dateText,
+                                        text = dueDate?.let { sdf.format(it) } ?: "Ngày",
                                         fontSize = 13.sp,
                                         fontWeight = if (dueDate != null) FontWeight.Bold else FontWeight.Normal,
                                         color = if (dueDate != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                onClick = showTimePicker,
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (dueDate != null) MaterialTheme.colorScheme.secondary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                border = BorderStroke(1.dp, if (dueDate != null) MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f) else Color.Transparent),
+                                modifier = Modifier.weight(0.7f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val stf = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+                                    Icon(
+                                        imageVector = Icons.Default.AccessTime,
+                                        contentDescription = null,
+                                        tint = if (dueDate != null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = dueDate?.let { stf.format(it) } ?: "Giờ",
+                                        fontSize = 13.sp,
+                                        fontWeight = if (dueDate != null) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (dueDate != null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }

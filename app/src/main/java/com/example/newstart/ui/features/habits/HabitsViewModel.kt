@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -119,63 +120,106 @@ class HabitsViewModel @Inject constructor(
                 val draftHabits = mutableListOf<Habit>()
                 val draftTodos = mutableListOf<Todo>()
                 
+                // Lấy danh sách việc cần làm hiện tại để so khớp nếu cần dời lịch
+                val currentTodos = todoRepository.getTodos().firstOrNull() ?: emptyList<Todo>()
+                
                 val isTodoCommand = command.contains("todo", ignoreCase = true) ||
                         command.contains("việc", ignoreCase = true) ||
                         command.contains("task", ignoreCase = true) ||
-                        command.contains("cần làm", ignoreCase = true)
+                        command.contains("cần làm", ignoreCase = true) ||
+                        command.contains("deadline", ignoreCase = true) ||
+                        command.contains("hạn", ignoreCase = true) ||
+                        command.contains("báo cáo", ignoreCase = true) ||
+                        command.contains("nộp", ignoreCase = true) ||
+                        command.contains("mua", ignoreCase = true) ||
+                        command.contains("họp", ignoreCase = true) ||
+                        command.contains("đi ", ignoreCase = true) ||
+                        command.contains("gửi", ignoreCase = true)
                 
                 for (i in 0 until results.length()) {
                     val item = results.getJSONObject(i)
-                    val action = item.optString("action", "ADD")
-                    if (action == "ADD") {
-                        val isTodo = item.optString("type").lowercase() == "todo" ||
-                                item.has("task") ||
-                                isTodoCommand
-                                
-                        if (isTodo) {
-                            val taskName = item.optString("task").ifBlank {
-                                item.optString("name", "Việc cần làm mới")
-                            }.trim()
-                            val dateStr = item.optString("date").ifBlank {
-                                item.optString("dueDate")
-                            }
-                            val parsedDate = if (dateStr.isNotEmpty()) {
-                                try {
-                                    val localDate = LocalDate.parse(dateStr)
-                                    java.util.Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant())
-                                } catch (e: Exception) {
-                                    null
-                                }
-                            } else null
-                            
-                            val priorityStr = item.optString("priority").uppercase()
-                            val priority = try {
-                                Priority.valueOf(priorityStr)
-                            } catch (e: Exception) {
-                                Priority.MEDIUM
-                            }
-                            
-                            draftTodos.add(
-                                Todo(
-                                    id = "ai_${System.currentTimeMillis()}_$i",
-                                    task = taskName,
-                                    priority = priority,
-                                    dueDate = parsedDate,
-                                    createdAt = java.util.Date()
-                                )
-                            )
-                        } else {
-                            draftHabits.add(Habit(
-                                id = "ai_${System.currentTimeMillis()}_$i",
-                                name = item.optString("name", "Thói quen mới"),
-                                icon = item.optString("icon", "✨"),
-                                goal = "1",
-                                colorHex = "#000000", 
-                                reminderTime = item.optString("time", "08:00"),
-                                reminderMinutesBefore = item.optInt("minsBefore", 5),
-                                date = item.optString("date", LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))
-                            ))
+                    val action = item.optString("action", "ADD").uppercase()
+                    
+                    val isRepeatCommand = command.contains("mỗi ngày", ignoreCase = true) ||
+                            command.contains("hằng ngày", ignoreCase = true) ||
+                            command.contains("thói quen", ignoreCase = true) ||
+                            command.contains("lặp lại", ignoreCase = true) ||
+                            command.contains("mọi ngày", ignoreCase = true) ||
+                            item.optString("type").lowercase() == "habit"
+
+                    // Quy tắc: Nếu là lệnh lặp lại thì là thói quen, còn lại MẶC ĐỊNH là Todo
+                    val isTodo = !isRepeatCommand || isTodoCommand || item.optString("type").lowercase() == "todo"
+
+                    if (isTodo && !command.contains("thói quen", ignoreCase = true)) {
+                        val taskName = item.optString("task").ifBlank {
+                            item.optString("name", "Việc cần làm mới")
+                        }.trim()
+                        
+                        val dateStr = item.optString("date").ifBlank {
+                            item.optString("dueDate")
                         }
+                        val timeStr = item.optString("time")
+                        
+                        val parsedDate = try {
+                            val localDate = if (dateStr.isNotEmpty()) LocalDate.parse(dateStr) else LocalDate.now()
+                            val localDateTime = if (timeStr.isNotEmpty()) {
+                                try {
+                                    val time = java.time.LocalTime.parse(timeStr)
+                                    localDate.atTime(time)
+                                } catch (e: Exception) {
+                                    localDate.atStartOfDay()
+                                }
+                            } else {
+                                localDate.atStartOfDay()
+                            }
+                            java.util.Date.from(localDateTime.atZone(ZoneId.systemDefault()).toInstant())
+                        } catch (e: Exception) {
+                            // Mặc định là hôm nay nếu có lỗi parse hoặc không có ngày
+                            java.util.Date.from(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant())
+                        }
+
+                        if (action == "UPDATE" || action == "MOVE" || command.contains("dời") || command.contains("chuyển")) {
+                            // Tìm kiếm việc cần làm hiện tại trùng tên nhất
+                            val existingTodo = currentTodos.find { t ->
+                                t.task.contains(taskName, ignoreCase = true) || 
+                                taskName.contains(t.task, ignoreCase = true)
+                            }
+                            
+                            if (existingTodo != null) {
+                                draftTodos.add(existingTodo.copy(dueDate = parsedDate))
+                                continue
+                            }
+                        }
+
+                        // Mặc định là ADD nếu không tìm thấy để UPDATE
+                        val priorityStr = item.optString("priority").uppercase()
+                        val priority = try {
+                            Priority.valueOf(priorityStr)
+                        } catch (e: Exception) {
+                            Priority.MEDIUM
+                        }
+                        
+                        draftTodos.add(
+                            Todo(
+                                id = "ai_${System.currentTimeMillis()}_$i",
+                                task = taskName,
+                                priority = priority,
+                                dueDate = parsedDate,
+                                createdAt = java.util.Date()
+                            )
+                        )
+                    } else {
+                        // Xử lý Habit
+                        draftHabits.add(Habit(
+                            id = "ai_${System.currentTimeMillis()}_$i",
+                            name = item.optString("name", "Thói quen mới"),
+                            icon = item.optString("icon", "✨"),
+                            goal = "1",
+                            colorHex = "#000000", 
+                            reminderTime = item.optString("time", "08:00"),
+                            reminderMinutesBefore = item.optInt("minsBefore", 5),
+                            date = item.optString("date", LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))
+                        ))
                     }
                 }
 
@@ -199,7 +243,7 @@ class HabitsViewModel @Inject constructor(
             todos.forEach { todo ->
                 todoRepository.insertTodo(todo)
             }
-            _aiState.value = AiState.Success("Đã thêm thói quen & việc cần làm thành công!")
+            _aiState.value = AiState.Success("Cập nhật thành công!")
         }
     }
 

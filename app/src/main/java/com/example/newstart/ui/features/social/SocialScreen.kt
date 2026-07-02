@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,6 +83,9 @@ fun SocialScreen(
     var activeSquadDetail by remember { mutableStateOf<Squad?>(null) }
     val activeSquad = squads.find { it.id == activeSquadDetail?.id } ?: activeSquadDetail
     val isDark = LocalDarkTheme.current
+    val context = LocalContext.current
+    val locale = remember(context) { context.resources.configuration.locales[0] }
+    val isVietnamese = locale.language == "vi"
     
     var activeChatFriendship by remember { mutableStateOf<Friendship?>(null) }
     
@@ -130,7 +134,7 @@ fun SocialScreen(
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text("Cộng đồng", fontWeight = FontWeight.Bold) },
+                    title = { Text(if (isVietnamese) "Cộng đồng" else "Community", fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -146,7 +150,7 @@ fun SocialScreen(
             ) {
                 // Modern Segmented Control Style Tabs for Message list, Friends vs Squads
                 val tabs = listOf(
-                    "Tin nhắn",
+                    if (isVietnamese) "Tin nhắn" else "Messages",
                     stringResource(R.string.social_tab_friends),
                     stringResource(R.string.social_tab_squads)
                 )
@@ -1119,6 +1123,7 @@ fun SquadDetailView(
 
     var showAddMemberDialog by remember { mutableStateOf(false) }
     var showCreateHabitDialog by remember { mutableStateOf(false) }
+    var showLeaveConfirmDialog by remember { mutableStateOf(false) }
     val lazyListState = rememberLazyListState()
 
     LaunchedEffect(messages.size) {
@@ -1147,6 +1152,26 @@ fun SquadDetailView(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    var showActionsDropdown by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { showActionsDropdown = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Squad actions")
+                        }
+                        DropdownMenu(
+                            expanded = showActionsDropdown,
+                            onDismissRequest = { showActionsDropdown = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.social_btn_leave)) },
+                                onClick = {
+                                    showActionsDropdown = false
+                                    showLeaveConfirmDialog = true
+                                }
+                            )
+                        }
                     }
                 }
             )
@@ -1902,6 +1927,34 @@ fun SquadDetailView(
             }
         )
     }
+
+    if (showLeaveConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showLeaveConfirmDialog = false },
+            title = { Text(stringResource(R.string.social_leave_confirm_title)) },
+            text = { Text(stringResource(R.string.social_leave_confirm_msg, squad.name)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.leaveSquad(squad.id) {
+                            onBack()
+                        }
+                        showLeaveConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(stringResource(R.string.social_leave_confirm_btn))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLeaveConfirmDialog = false }) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -2632,13 +2685,16 @@ fun ChatsTabWrapper(
     viewModel: SocialViewModel,
     onFriendChatClick: (Friendship) -> Unit
 ) {
+    val locale = androidx.compose.ui.platform.LocalContext.current.resources.configuration.locales[0]
+    val isVietnamese = locale.language == "vi"
+
     if (friends.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize().padding(32.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Bạn chưa có bạn bè nào. Hãy kết bạn để nhắn tin!",
+                text = if (isVietnamese) "Bạn chưa có bạn bè nào. Hãy kết bạn để nhắn tin!" else "No friends yet. Add friends to start chatting!",
                 color = Color.Gray,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
@@ -2650,7 +2706,7 @@ fun ChatsTabWrapper(
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
             item {
-                SectionTitle("Đoạn hội thoại")
+                SectionTitle(if (isVietnamese) "Đoạn hội thoại" else "Conversations")
             }
             items(friends) { friendship ->
                 ChatItem(
@@ -2672,6 +2728,10 @@ fun ChatItem(
     onClick: () -> Unit
 ) {
     val isDark = LocalDarkTheme.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val locale = context.resources.configuration.locales[0]
+    val isVietnamese = locale.language == "vi"
+    
     val friendId = friendship.userIds.firstOrNull { it != currentUserId } ?: return
     val friendFlow = remember(friendId) { viewModel.getUserById(friendId) }
     val friendState by friendFlow.collectAsState(initial = User(name = stringResource(R.string.squad_loading)))
@@ -2734,10 +2794,16 @@ fun ChatItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 val messageText = if (lastMessage != null) {
-                    val prefix = if (lastMessage!!.senderId == currentUserId) "Bạn: " else ""
+                    val prefix = if (lastMessage!!.senderId == currentUserId) (if (isVietnamese) "Bạn: " else "You: ") else ""
                     if (!lastMessage!!.sharedJournalId.isNullOrEmpty()) {
                         if (lastMessage!!.text.isEmpty()) {
-                            "${prefix}[Bài viết chia sẻ]"
+                            "${prefix}[${if (isVietnamese) "Bài viết chia sẻ" else "Shared post"}]"
+                        } else {
+                            "${prefix}${lastMessage!!.text}"
+                        }
+                    } else if (!lastMessage!!.imageUrl.isNullOrEmpty() || lastMessage!!.imageUrls.isNotEmpty()) {
+                        if (lastMessage!!.text.isEmpty()) {
+                            "${prefix}[${if (isVietnamese) "Hình ảnh" else "Image"}]"
                         } else {
                             "${prefix}${lastMessage!!.text}"
                         }
@@ -2745,7 +2811,7 @@ fun ChatItem(
                         "${prefix}${lastMessage!!.text}"
                     }
                 } else {
-                    "Chưa có tin nhắn nào. Click để trò chuyện"
+                    if (isVietnamese) "Chưa có tin nhắn nào. Click để trò chuyện" else "No messages yet. Click to chat"
                 }
                 
                 Text(

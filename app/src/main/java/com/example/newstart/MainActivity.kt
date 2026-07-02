@@ -193,6 +193,11 @@ class MainActivity : AppCompatActivity() {
 
                 LaunchedEffect(authState) {
                     if (authState == AuthState.Authenticated) {
+                        val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                        if (currentUserId != null) {
+                            val sp = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                            sp.edit().putString("logged_in_user_id", currentUserId).apply()
+                        }
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             if (ContextCompat.checkSelfPermission(
                                     context,

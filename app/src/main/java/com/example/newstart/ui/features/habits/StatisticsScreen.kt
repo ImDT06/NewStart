@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -46,17 +47,21 @@ fun StatisticsScreen(
             .sortedByDescending { it.first }
     }
 
+    val context = LocalContext.current
+    val locale = remember(context) { context.resources.configuration.locales[0] }
+    val isVietnamese = locale.language == "vi"
+
     Scaffold(
         topBar = {
             if (isSelectionMode) {
                 TopAppBar(
-                    title = { Text("${selectedIds.size} đã chọn") },
+                    title = { Text("${selectedIds.size} ${if (isVietnamese) "đã chọn" else "selected"}") },
                     navigationIcon = {
                         IconButton(onClick = { 
                             isSelectionMode = false
                             selectedIds = emptySet()
                         }) {
-                            Icon(Icons.Default.Close, contentDescription = "Hủy")
+                            Icon(Icons.Default.Close, contentDescription = if (isVietnamese) "Hủy" else "Cancel")
                         }
                     },
                     actions = {
@@ -67,7 +72,7 @@ fun StatisticsScreen(
                                 selectedIds = allHabits.map { it.id }.toSet()
                             }
                         }) {
-                            Icon(Icons.Default.SelectAll, contentDescription = "Chọn tất cả")
+                            Icon(Icons.Default.SelectAll, contentDescription = if (isVietnamese) "Chọn tất cả" else "Select All")
                         }
                         IconButton(
                             onClick = {
@@ -77,13 +82,13 @@ fun StatisticsScreen(
                             },
                             enabled = selectedIds.isNotEmpty()
                         ) {
-                            Icon(Icons.Default.DeleteSweep, contentDescription = "Xóa đã chọn", tint = if (selectedIds.isNotEmpty()) Color.Red else Color.Gray)
+                            Icon(Icons.Default.DeleteSweep, contentDescription = if (isVietnamese) "Xóa đã chọn" else "Delete selected", tint = if (selectedIds.isNotEmpty()) Color.Red else Color.Gray)
                         }
                     }
                 )
             } else {
                 CenterAlignedTopAppBar(
-                    title = { Text("Danh sách thói quen", fontWeight = FontWeight.Bold) },
+                    title = { Text(if (isVietnamese) "Danh sách thói quen" else "Habit List", fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -91,7 +96,7 @@ fun StatisticsScreen(
                     },
                     actions = {
                         IconButton(onClick = { isSelectionMode = true }) {
-                            Icon(Icons.Default.Checklist, contentDescription = "Chọn nhiều")
+                            Icon(Icons.Default.Checklist, contentDescription = if (isVietnamese) "Chọn nhiều" else "Select multiple")
                         }
                     }
                 )
@@ -115,7 +120,8 @@ fun StatisticsScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Chưa có thói quen nào được tạo.\nHãy quay lại trang chủ và thêm thói quen mới!",
+                        text = if (isVietnamese) "Chưa có thói quen nào được tạo.\nHãy quay lại trang chủ và thêm thói quen mới!"
+                               else "No habits created yet.\nGo back to home and add a new habit!",
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.outline,
                         fontSize = 14.sp,

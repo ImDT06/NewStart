@@ -85,9 +85,20 @@ class MainViewModel @Inject constructor(
                         android.util.Log.d("MainViewModel", "Snapshot listener update: uid: ${firebaseUser.id}, exists: $exists, blockedVal: $blockedVal")
                         if (snapshot != null && snapshot.exists() && snapshot.getBoolean("blocked") == true) {
                             viewModelScope.launch {
+                                val reason = try {
+                                    val doc = firestore.collection("blocked_reasons").document(firebaseUser.id).get().await()
+                                    doc.getString("reason")
+                                } catch (e: Exception) {
+                                    null
+                                }
                                 logout()
                                 withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                    android.widget.Toast.makeText(context, "Tài khoản của bạn đã bị khóa.", android.widget.Toast.LENGTH_LONG).show()
+                                    val msg = if (!reason.isNullOrBlank()) {
+                                        "Tài khoản của bạn đã bị khóa. Lý do: $reason"
+                                    } else {
+                                        "Tài khoản của bạn đã bị khóa."
+                                    }
+                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
                                 }
                             }
                         }
@@ -210,7 +221,8 @@ class MainViewModel @Inject constructor(
             } else {
                 flow {
                     emit(AuthState.Loading)
-                    val isBlocked = try {
+                    val isAdmin = firebaseUser.email == "admin@gmail.com" || firebaseUser.email == "tdt2706@gmail.com"
+                    val isBlocked = if (isAdmin) false else try {
                         apiService.getUserById(firebaseUser.id)
                         false
                     } catch (e: retrofit2.HttpException) {
@@ -221,9 +233,20 @@ class MainViewModel @Inject constructor(
                         false
                     }
                     if (isBlocked) {
+                        val reason = try {
+                            val doc = firestore.collection("blocked_reasons").document(firebaseUser.id).get().await()
+                            doc.getString("reason")
+                        } catch (e: Exception) {
+                            null
+                        }
                         logout()
                         withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            android.widget.Toast.makeText(context, "Tài khoản của bạn đã bị khóa.", android.widget.Toast.LENGTH_LONG).show()
+                            val msg = if (!reason.isNullOrBlank()) {
+                                "Tài khoản của bạn đã bị khóa. Lý do: $reason"
+                            } else {
+                                "Tài khoản của bạn đã bị khóa."
+                            }
+                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
                         }
                         emit(AuthState.Unauthenticated)
                     } else {
@@ -658,11 +681,39 @@ class MainViewModel @Inject constructor(
     val blockedUsers: StateFlow<Set<String>> = userRepository.getBlockedUsers()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
-    fun blockUser(userId: String, block: Boolean) {
+    val blockedReasons: StateFlow<Map<String, String>> = callbackFlow {
+        val listener = firestore.collection("blocked_reasons")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("MainViewModel", "Error fetching blocked reasons: ${error.message}", error)
+                    trySend(emptyMap())
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val reasons = snapshot.documents.associate { doc ->
+                        doc.id to (doc.getString("reason") ?: "Không có lý do")
+                    }
+                    trySend(reasons)
+                }
+            }
+        awaitClose { listener.remove() }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    fun blockUser(userId: String, block: Boolean, reason: String = "") {
         viewModelScope.launch {
             val result = userRepository.blockUser(userId, block)
             result.onSuccess {
                 android.util.Log.d("MainViewModel", "blockUser success: userId: $userId, block: $block")
+                try {
+                    val docRef = firestore.collection("blocked_reasons").document(userId)
+                    if (block) {
+                        docRef.set(mapOf("reason" to reason, "blockedAt" to System.currentTimeMillis())).await()
+                    } else {
+                        docRef.delete().await()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MainViewModel", "Failed to update block reason in Firestore", e)
+                }
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     android.widget.Toast.makeText(context, if (block) "Đã khóa người dùng" else "Đã mở khóa người dùng", android.widget.Toast.LENGTH_SHORT).show()
                 }

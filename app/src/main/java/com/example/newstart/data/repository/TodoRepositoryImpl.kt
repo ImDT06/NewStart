@@ -34,6 +34,17 @@ class TodoRepositoryImpl @Inject constructor(
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
 
+    private fun updateWidget() {
+        repositoryScope.launch {
+            kotlinx.coroutines.delay(100)
+            try {
+                HabitWidget().updateAll(context)
+            } catch (e: Exception) {
+                android.util.Log.e("TodoRepository", "Error updating widget: ${e.message}")
+            }
+        }
+    }
+
     private fun Todo.toDto() = TodoDto(
         id = id.ifEmpty { null },
         task = task,
@@ -112,7 +123,7 @@ class TodoRepositoryImpl @Inject constructor(
                         for (todoDto in remoteTodos) {
                             todoDao.insertTodo(todoDto.toDomain().toEntity(isSynced = true))
                         }
-                        try { HabitWidget().updateAll(context) } catch (e: Exception) {}
+                        updateWidget()
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("TodoRepository", "Lỗi lấy Todo từ Spring Boot: ${e.message}", e)
@@ -141,7 +152,7 @@ class TodoRepositoryImpl @Inject constructor(
         
         // Local first
         todoDao.insertTodo(todoWithId.toEntity(isSynced = false))
-        try { HabitWidget().updateAll(context) } catch (e: Exception) {}
+        updateWidget()
         
         // Remote (Spring Boot)
         var springBootSynced = false
@@ -168,7 +179,7 @@ class TodoRepositoryImpl @Inject constructor(
 
     override suspend fun updateTodo(todo: Todo) {
         todoDao.updateTodo(todo.toEntity(isSynced = false))
-        try { HabitWidget().updateAll(context) } catch (e: Exception) {}
+        updateWidget()
         
         var springBootSynced = false
         try {
@@ -193,7 +204,7 @@ class TodoRepositoryImpl @Inject constructor(
 
     override suspend fun deleteTodo(todo: Todo) {
         todoDao.deleteTodo(todo.toEntity())
-        try { HabitWidget().updateAll(context) } catch (e: Exception) {}
+        updateWidget()
         
         try {
             apiService.deleteTodo(todo.id)
@@ -210,7 +221,7 @@ class TodoRepositoryImpl @Inject constructor(
 
     override suspend fun toggleTodoCompletion(id: String, isCompleted: Boolean) {
         todoDao.toggleTodoCompletion(id, isCompleted)
-        try { HabitWidget().updateAll(context) } catch (e: Exception) {}
+        updateWidget()
         
         val localTodo = todoDao.getTodoById(id)?.toDomain()
         localTodo?.let { todo ->
@@ -244,7 +255,7 @@ class TodoRepositoryImpl @Inject constructor(
                 for (todo in remoteTodos) {
                     todoDao.insertTodo(todo.toEntity(isSynced = true))
                 }
-                try { HabitWidget().updateAll(context) } catch (e: Exception) {}
+                updateWidget()
             }
         } catch (e: Exception) {
             android.util.Log.e("TodoRepository", "Sync failed: ${e.message}", e)

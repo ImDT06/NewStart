@@ -81,7 +81,8 @@ class AuthRepositoryImpl @Inject constructor(
             val firebaseUser = result.user ?: throw Exception("User is null")
             
             // Check if user is blocked in Firestore
-            val isBlocked = try {
+            val isAdmin = firebaseUser.email == "admin@gmail.com" || firebaseUser.email == "tdt2706@gmail.com"
+            val isBlocked = if (isAdmin) false else try {
                 apiService.getUserById(firebaseUser.uid)
                 false
             } catch (e: retrofit2.HttpException) {
@@ -92,8 +93,19 @@ class AuthRepositoryImpl @Inject constructor(
                 false
             }
             if (isBlocked) {
+                val reason = try {
+                    val doc = firestore.collection("blocked_reasons").document(firebaseUser.uid).get().await()
+                    doc.getString("reason")
+                } catch (e: Exception) {
+                    null
+                }
                 firebaseAuth.signOut()
-                throw Exception("Tài khoản của bạn đã bị khóa.")
+                val message = if (!reason.isNullOrBlank()) {
+                    "Tài khoản của bạn đã bị khóa. Lý do: $reason"
+                } else {
+                    "Tài khoản của bạn đã bị khóa."
+                }
+                throw Exception(message)
             }
 
             // Reload user to get latest verification status
@@ -168,7 +180,8 @@ class AuthRepositoryImpl @Inject constructor(
             val firebaseUser = result.user ?: throw Exception("Google sign in failed")
             
             // Check if user is blocked in Firestore
-            val isBlocked = try {
+            val isAdmin = firebaseUser.email == "admin@gmail.com" || firebaseUser.email == "tdt2706@gmail.com"
+            val isBlocked = if (isAdmin) false else try {
                 apiService.getUserById(firebaseUser.uid)
                 false
             } catch (e: retrofit2.HttpException) {
@@ -179,8 +192,19 @@ class AuthRepositoryImpl @Inject constructor(
                 false
             }
             if (isBlocked) {
+                val reason = try {
+                    val doc = firestore.collection("blocked_reasons").document(firebaseUser.uid).get().await()
+                    doc.getString("reason")
+                } catch (e: Exception) {
+                    null
+                }
                 firebaseAuth.signOut()
-                throw Exception("Tài khoản của bạn đã bị khóa.")
+                val message = if (!reason.isNullOrBlank()) {
+                    "Tài khoản của bạn đã bị khóa. Lý do: $reason"
+                } else {
+                    "Tài khoản của bạn đã bị khóa."
+                }
+                throw Exception(message)
             }
 
             Result.success(
