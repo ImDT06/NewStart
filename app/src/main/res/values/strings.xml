@@ -206,6 +206,8 @@
     <string name="squad_add_friends_label">Thêm thành viên (bạn bè):</string>
     <string name="squad_no_friends_to_add">Chưa có bạn bè nào để thêm</string>
     <string name="squad_edit_title">Chỉnh sửa nhóm</string>
+    <string name="social_menu_edit">Sửa</string>
+    <string name="social_menu_delete">Xóa</string>
     <string name="social_btn_save">Lưu</string>
     <string name="social_default_user_name">Người dùng</string>
     <string name="social_friend_request_from">Lời mời từ %1$s</string>

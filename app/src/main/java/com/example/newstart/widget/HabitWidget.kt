@@ -7,10 +7,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import android.content.Intent
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
+import androidx.glance.appwidget.action.actionSendBroadcast
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.action.ActionCallback
@@ -55,7 +57,7 @@ class HabitWidget : GlanceAppWidget() {
         val isStreakEnabled = sharedPrefs.getBoolean("is_streak_widget_enabled", true)
         
         provideContent {
-            HabitWidgetContent(habits, todos, overallStreak, isStreakEnabled)
+            HabitWidgetContent(context, habits, todos, overallStreak, isStreakEnabled)
         }
     }
 
@@ -70,7 +72,10 @@ class HabitWidget : GlanceAppWidget() {
     }
 
     private suspend fun fetchHabitsForToday(context: Context): List<com.example.newstart.domain.model.Habit> {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return emptyList()
+        val sharedPrefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+            ?: sharedPrefs.getString("logged_in_user_id", null)
+            ?: return emptyList()
         val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
         val db = getDatabase(context)
         return try {
@@ -85,11 +90,14 @@ class HabitWidget : GlanceAppWidget() {
     }
 
     private suspend fun fetchTodos(context: Context): List<com.example.newstart.domain.model.Todo> {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return emptyList()
+        val sharedPrefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+            ?: sharedPrefs.getString("logged_in_user_id", null)
+            ?: return emptyList()
         val db = getDatabase(context)
         return try {
-            val entities = db.todoDao().getAllTodosSync()
-            entities.map { it.toDomain() }.filter { !it.isCompleted && it.userId == userId }
+            val entities = db.todoDao().getAllTodosSync(userId)
+            entities.map { it.toDomain() }.filter { !it.isCompleted }
         } catch (e: Exception) {
             android.util.Log.e("HabitWidget", "Error fetching todos: ${e.message}", e)
             emptyList()
@@ -99,7 +107,10 @@ class HabitWidget : GlanceAppWidget() {
     }
 
     private suspend fun calculateOverallStreak(context: Context): Int {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return 0
+        val sharedPrefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+            ?: sharedPrefs.getString("logged_in_user_id", null)
+            ?: return 0
         val db = getDatabase(context)
         return try {
             val entities = db.habitDao().getAllHabitsSync(userId)
@@ -144,6 +155,7 @@ class HabitWidget : GlanceAppWidget() {
 
     @Composable
     private fun HabitWidgetContent(
+        context: Context,
         habits: List<com.example.newstart.domain.model.Habit>,
         todos: List<com.example.newstart.domain.model.Todo>,
         overallStreak: Int,
@@ -234,6 +246,10 @@ class HabitWidget : GlanceAppWidget() {
                         items(habits.sortedBy { it.reminderTime ?: "23:59" }) { habit ->
 
                             
+                            val intent = Intent(context, WidgetActionReceiver::class.java).apply {
+                                action = "com.example.newstart.ACTION_TOGGLE_HABIT"
+                                putExtra("item_id", habit.id)
+                            }
                             Row(
                                 modifier = GlanceModifier
                                     .fillMaxWidth()
@@ -245,13 +261,7 @@ class HabitWidget : GlanceAppWidget() {
                                 Box(
                                     modifier = GlanceModifier
                                         .size(32.dp)
-                                        .clickable(
-                                            actionRunCallback<ToggleHabitAction>(
-                                                actionParametersOf(
-                                                    HabitWidget.habitIdKey to habit.id
-                                                )
-                                            )
-                                        ),
+                                        .clickable(actionSendBroadcast(intent)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Image(
@@ -324,6 +334,10 @@ class HabitWidget : GlanceAppWidget() {
                                 com.example.newstart.domain.model.Priority.LOW -> "🟢"
                             }
                             
+                            val intentTodo = Intent(context, WidgetActionReceiver::class.java).apply {
+                                action = "com.example.newstart.ACTION_TOGGLE_TODO"
+                                putExtra("item_id", todo.id)
+                            }
                             Row(
                                 modifier = GlanceModifier
                                     .fillMaxWidth()
@@ -335,13 +349,7 @@ class HabitWidget : GlanceAppWidget() {
                                 Box(
                                     modifier = GlanceModifier
                                         .size(32.dp)
-                                        .clickable(
-                                            actionRunCallback<ToggleTodoAction>(
-                                                actionParametersOf(
-                                                    HabitWidget.todoIdKey to todo.id
-                                                )
-                                            )
-                                        ),
+                                        .clickable(actionSendBroadcast(intentTodo)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Image(
@@ -429,7 +437,9 @@ class ToggleHabitAction : ActionCallback {
                 
                 var targetIsCompleted = false
                 try {
-                    val habit = db.habitDao().getAllHabitsSync(FirebaseAuth.getInstance().currentUser?.uid ?: "").find { it.id == habitId }
+                    val sharedPrefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                    val userId = FirebaseAuth.getInstance().currentUser?.uid ?: sharedPrefs.getString("logged_in_user_id", "") ?: ""
+                    val habit = db.habitDao().getAllHabitsSync(userId).find { it.id == habitId }
                     if (habit != null) {
                         targetIsCompleted = !habit.isCompleted
                         db.habitDao().updateCompletion(habitId, targetIsCompleted, isSynced = false)

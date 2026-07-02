@@ -28,6 +28,13 @@ class AuthInterceptor @Inject constructor() : Interceptor {
             requestBuilder.addHeader("Authorization", "Bearer $it")
         }
 
-        return chain.proceed(requestBuilder.build())
+        val response = chain.proceed(requestBuilder.build())
+        if (response.code == 403) {
+            val email = user?.email
+            if (email != "admin@gmail.com" && email != "tdt2706@gmail.com") {
+                FirebaseAuth.getInstance().signOut()
+            }
+        }
+        return response
     }
 }

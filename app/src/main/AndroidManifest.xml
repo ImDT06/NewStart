@@ -52,6 +52,15 @@
             android:name=".widget.WidgetPinnedReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name="androidx.glance.appwidget.action.ActionCallbackBroadcastReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
+            android:name=".widget.WidgetActionReceiver"
+            android:exported="false" />
+
         <service
             android:name=".data.service.NewStartFirebaseMessagingService"
             android:exported="false">

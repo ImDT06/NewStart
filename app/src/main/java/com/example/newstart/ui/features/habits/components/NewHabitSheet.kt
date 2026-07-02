@@ -1,6 +1,7 @@
 package com.example.newstart.ui.features.habits.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -42,6 +43,7 @@ fun NewHabitSheet(
     initialDate: LocalDate,
     editingHabit: Habit? = null,
     squads: List<com.example.newstart.domain.model.Squad> = emptyList(),
+    isSaving: Boolean = false,
     onDismiss: () -> Unit,
     onHabitSelected: (String, String, String?, Int, Color, LocalDate, String?) -> Unit
 ) {
@@ -59,6 +61,7 @@ fun NewHabitSheet(
                 initialDate = initialDate, 
                 habit = editingHabit, 
                 squads = squads,
+                isSaving = isSaving,
                 onConfirm = onHabitSelected, 
                 onCancel = onDismiss
             )
@@ -84,6 +87,7 @@ fun NewHabitSheet(
             initialDate = initialDate,
             preset = selectedPreset,
             squads = squads,
+            isSaving = isSaving,
             onDismiss = { showConfigDialog = false; selectedPreset = null },
             onConfirm = { name, icon, time, mins, color, date, squadId ->
                 onHabitSelected(name, icon, time, mins, color, date, squadId)
@@ -97,7 +101,7 @@ fun NewHabitSheet(
         Row(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurface) }
             Text(text = stringResource(R.string.habits_new_title), color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            IconButton(onClick = { }) { Icon(Icons.Default.Storefront, null, tint = MaterialTheme.colorScheme.primary) }
+            Spacer(modifier = Modifier.size(48.dp))
         }
 
         LazyRow(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -128,6 +132,7 @@ fun HabitConfigContent(
     preset: HabitPreset? = null,
     habit: Habit? = null,
     squads: List<com.example.newstart.domain.model.Squad> = emptyList(),
+    isSaving: Boolean = false,
     onConfirm: (String, String, String?, Int, Color, LocalDate, String?) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -211,7 +216,19 @@ fun HabitConfigContent(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { if (name.isNotBlank() && selectedTime != null) onConfirm(name, icon, selectedTime, minsBefore, Color.Black, selectedDate, selectedSquadId) }, enabled = name.isNotBlank() && selectedTime != null, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(vertical = 12.dp)) { Text(stringResource(R.string.habits_btn_create), fontWeight = FontWeight.Bold) }
+        Button(
+            onClick = { if (name.isNotBlank() && selectedTime != null) onConfirm(name, icon, selectedTime, minsBefore, Color.Black, selectedDate, selectedSquadId) }, 
+            enabled = name.isNotBlank() && selectedTime != null && !isSaving, 
+            modifier = Modifier.fillMaxWidth(), 
+            shape = RoundedCornerShape(12.dp), 
+            contentPadding = PaddingValues(vertical = 12.dp)
+        ) { 
+            if (isSaving) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+            } else {
+                Text(stringResource(R.string.habits_btn_create), fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 
@@ -221,6 +238,7 @@ fun HabitConfigDialog(
     initialDate: LocalDate, 
     preset: HabitPreset? = null, 
     squads: List<com.example.newstart.domain.model.Squad> = emptyList(),
+    isSaving: Boolean = false,
     onDismiss: () -> Unit, 
     onConfirm: (String, String, String?, Int, Color, LocalDate, String?) -> Unit
 ) {
@@ -228,7 +246,7 @@ fun HabitConfigDialog(
         onDismissRequest = onDismiss, 
         title = { Text(text = stringResource(R.string.habits_custom_dialog_title), color = MaterialTheme.colorScheme.onSurface) }, 
         containerColor = MaterialTheme.colorScheme.surface, 
-        text = { HabitConfigContent(initialDate = initialDate, preset = preset, squads = squads, onConfirm = onConfirm, onCancel = onDismiss) }, 
+        text = { HabitConfigContent(initialDate = initialDate, preset = preset, squads = squads, isSaving = isSaving, onConfirm = onConfirm, onCancel = onDismiss) },
         confirmButton = {}, 
         dismissButton = {}
     )
@@ -247,8 +265,6 @@ fun PresetItem(preset: HabitPreset, onClick: () -> Unit) {
             Text(preset.icon, fontSize = 20.sp)
             Spacer(modifier = Modifier.width(12.dp))
             Text(preset.name, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.FavoriteBorder, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
             Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
         }
     }

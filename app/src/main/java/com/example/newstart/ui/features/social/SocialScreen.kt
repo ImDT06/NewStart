@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,6 +38,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.newstart.domain.model.Squad
 import com.example.newstart.domain.model.User
+import com.example.newstart.domain.model.Friendship
+import com.example.newstart.domain.model.DirectMessage
+import com.example.newstart.domain.model.SquadMessage
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -51,6 +55,14 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SocialScreen(
@@ -63,6 +75,7 @@ fun SocialScreen(
     val incomingRequests by viewModel.incomingRequests.collectAsStateWithLifecycle()
     val squads by viewModel.squads.collectAsStateWithLifecycle()
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
+    val isCreatingSquad by viewModel.isCreatingSquad.collectAsStateWithLifecycle()
     val friends by viewModel.friends.collectAsStateWithLifecycle()
     val sentRequests by viewModel.sentRequests.collectAsStateWithLifecycle()
     val currentUserId = viewModel.currentUserId
@@ -70,6 +83,36 @@ fun SocialScreen(
     var activeSquadDetail by remember { mutableStateOf<Squad?>(null) }
     val activeSquad = squads.find { it.id == activeSquadDetail?.id } ?: activeSquadDetail
     val isDark = LocalDarkTheme.current
+    val context = LocalContext.current
+    val locale = remember(context) { context.resources.configuration.locales[0] }
+    val isVietnamese = locale.language == "vi"
+    
+    var activeChatFriendship by remember { mutableStateOf<Friendship?>(null) }
+    
+    LaunchedEffect(activeChatFriendship, activeSquad) {
+        val shouldHide = activeChatFriendship != null || activeSquad != null
+        mainViewModel.setBottomBarVisible(!shouldHide)
+    }
+    
+    LaunchedEffect(mainViewModel.pendingChatUserId) {
+        val pendingUserId = mainViewModel.pendingChatUserId
+        if (pendingUserId != null) {
+            val friendship = friends.find { it.userIds.contains(pendingUserId) }
+            if (friendship != null) {
+                activeChatFriendship = friendship
+                val pendingJournal = mainViewModel.pendingSharedJournal
+                if (pendingJournal != null) {
+                    viewModel.sendDirectMessage(
+                        friendshipId = friendship.id,
+                        text = "",
+                        sharedJournal = pendingJournal
+                    )
+                }
+            }
+            mainViewModel.pendingChatUserId = null
+            mainViewModel.pendingSharedJournal = null
+        }
+    }
     
     if (activeSquad != null) {
         SquadDetailView(
@@ -80,11 +123,18 @@ fun SocialScreen(
             mainViewModel = mainViewModel,
             onBack = { activeSquadDetail = null }
         )
+    } else if (activeChatFriendship != null) {
+        DirectChatView(
+            friendship = activeChatFriendship!!,
+            currentUserId = currentUserId ?: "",
+            viewModel = viewModel,
+            onBack = { activeChatFriendship = null }
+        )
     } else {
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text("Cộng đồng", fontWeight = FontWeight.Bold) },
+                    title = { Text(if (isVietnamese) "Cộng đồng" else "Community", fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -98,8 +148,9 @@ fun SocialScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                // Modern Segmented Control Style Tabs for Friends vs Squads
+                // Modern Segmented Control Style Tabs for Message list, Friends vs Squads
                 val tabs = listOf(
+                    if (isVietnamese) "Tin nhắn" else "Messages",
                     stringResource(R.string.social_tab_friends),
                     stringResource(R.string.social_tab_squads)
                 )
@@ -171,34 +222,47 @@ fun SocialScreen(
                 }
 
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    if (selectedTab == 0) {
-                        FriendsTabWrapper(
-                            searchQuery = searchQuery,
-                            onSearchQueryChange = { 
-                                viewModel.onSearchQueryChange(it)
-                            },
-                            isSearching = isSearching,
-                            searchResults = searchResults,
-                            incomingRequests = incomingRequests,
-                            sentRequests = sentRequests,
-                            friends = friends,
-                            currentUserId = currentUserId ?: "",
-                            onSendRequest = { viewModel.sendRequest(it) },
-                            onAcceptRequest = { viewModel.acceptRequest(it) },
-                            onDeclineRequest = { viewModel.declineRequest(it) },
-                            onRemoveFriend = { viewModel.removeFriend(it) },
-                            getUserFlow = { viewModel.getUserById(it) }
-                        )
-                    } else {
-                        SquadsTabWrapper(
-                            squads = squads,
-                            friends = friends,
-                            currentUserId = currentUserId ?: "",
-                            getUserFlow = { id -> viewModel.getUserById(id) },
-                            onCreateSquad = { n, d, m -> viewModel.createSquad(n, d, m) },
-                            onUpdateSquad = { id, n, d -> viewModel.updateSquad(id, n, d) },
-                            onSquadClick = { activeSquadDetail = it }
-                        )
+                    when (selectedTab) {
+                        0 -> {
+                            ChatsTabWrapper(
+                                friends = friends,
+                                currentUserId = currentUserId ?: "",
+                                viewModel = viewModel,
+                                onFriendChatClick = { activeChatFriendship = it }
+                            )
+                        }
+                        1 -> {
+                            FriendsTabWrapper(
+                                searchQuery = searchQuery,
+                                onSearchQueryChange = { 
+                                    viewModel.onSearchQueryChange(it)
+                                },
+                                isSearching = isSearching,
+                                searchResults = searchResults,
+                                incomingRequests = incomingRequests,
+                                sentRequests = sentRequests,
+                                friends = friends,
+                                currentUserId = currentUserId ?: "",
+                                onSendRequest = { viewModel.sendRequest(it) },
+                                onAcceptRequest = { viewModel.acceptRequest(it) },
+                                onDeclineRequest = { viewModel.declineRequest(it) },
+                                onRemoveFriend = { viewModel.removeFriend(it) },
+                                getUserFlow = { viewModel.getUserById(it) },
+                                onFriendChatClick = { activeChatFriendship = it }
+                            )
+                        }
+                        2 -> {
+                            SquadsTabWrapper(
+                                squads = squads,
+                                friends = friends,
+                                currentUserId = currentUserId ?: "",
+                                isCreating = isCreatingSquad,
+                                getUserFlow = { id -> viewModel.getUserById(id) },
+                                onCreateSquad = { n, d, m -> viewModel.createSquad(n, d, m) },
+                                onUpdateSquad = { id, n, d -> viewModel.updateSquad(id, n, d) },
+                                onSquadClick = { activeSquadDetail = it }
+                            )
+                        }
                     }
                 }
             }
@@ -220,7 +284,8 @@ fun FriendsTabWrapper(
     onAcceptRequest: (String) -> Unit,
     onDeclineRequest: (String) -> Unit,
     onRemoveFriend: (String) -> Unit,
-    getUserFlow: (String) -> Flow<User>
+    getUserFlow: (String) -> Flow<User>,
+    onFriendChatClick: (com.example.newstart.domain.model.Friendship) -> Unit
 ) {
     Column {
         android.util.Log.d("SocialScreen", "FriendsTabWrapper recomposed with searchQuery = '$searchQuery'")
@@ -351,7 +416,8 @@ fun FriendsTabWrapper(
                             friendship = friendship,
                             currentUserId = currentUserId,
                             getUserFlow = getUserFlow,
-                            onRemoveFriend = onRemoveFriend
+                            onRemoveFriend = onRemoveFriend,
+                            onChatClick = { onFriendChatClick(friendship) }
                         )
                     }
                 } else {
@@ -371,6 +437,7 @@ fun SquadsTabWrapper(
     squads: List<Squad>,
     friends: List<com.example.newstart.domain.model.Friendship>,
     currentUserId: String,
+    isCreating: Boolean = false,
     getUserFlow: (String) -> Flow<User>,
     onCreateSquad: (String, String, List<String>) -> Unit,
     onUpdateSquad: (String, String, String) -> Unit,
@@ -559,9 +626,13 @@ fun SquadsTabWrapper(
                             selectedMembers = emptySet()
                         }
                     },
-                    enabled = squadName.isNotBlank()
+                    enabled = squadName.isNotBlank() && !isCreating
                 ) {
-                    Text(stringResource(R.string.squad_btn_create))
+                    if (isCreating) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                    } else {
+                        Text(stringResource(R.string.squad_btn_create))
+                    }
                 }
             },
             dismissButton = {
@@ -625,10 +696,12 @@ fun SquadsTabWrapper(
 }
 
 @Composable
-fun UserItem(user: User, action: @Composable () -> Unit) {
+fun UserItem(user: User, onClick: (() -> Unit)? = null, action: @Composable () -> Unit) {
     val isDark = LocalDarkTheme.current
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface
@@ -791,7 +864,8 @@ fun FriendItem(
     friendship: com.example.newstart.domain.model.Friendship,
     currentUserId: String,
     getUserFlow: (String) -> Flow<User>,
-    onRemoveFriend: (String) -> Unit
+    onRemoveFriend: (String) -> Unit,
+    onChatClick: () -> Unit
 ) {
     val friendId = friendship.userIds.firstOrNull { it != currentUserId } ?: return
     val userState by remember(friendId) {
@@ -827,6 +901,7 @@ fun FriendItem(
 
     UserItem(
         user = userState,
+        onClick = onChatClick,
         action = {
             IconButton(
                 onClick = { showConfirmDialog = true },
@@ -1031,10 +1106,24 @@ fun SquadDetailView(
     var selectedTab by remember { mutableStateOf(0) } // 0: Chat, 1: Members & Habits
     val messages by viewModel.getSquadMessages(squad.id).collectAsState(initial = emptyList())
     var messageText by remember { mutableStateOf("") }
+    var selectedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var activeFullScreenImageUrls by remember { mutableStateOf<List<String>?>(null) }
+    var activeFullScreenImageIndex by remember { mutableStateOf(0) }
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            selectedImageUris = (selectedImageUris + uris).distinct()
+        }
+    }
+    val isImageUploading by viewModel.isImageUploading.collectAsStateWithLifecycle()
     var activeTimestampMessageId by remember { mutableStateOf<String?>(null) }
+    var showReactionPickerMessageId by remember { mutableStateOf<String?>(null) }
+    var showSquadMessageOptionsDialog by remember { mutableStateOf<com.example.newstart.domain.model.SquadMessage?>(null) }
 
     var showAddMemberDialog by remember { mutableStateOf(false) }
     var showCreateHabitDialog by remember { mutableStateOf(false) }
+    var showLeaveConfirmDialog by remember { mutableStateOf(false) }
     val lazyListState = rememberLazyListState()
 
     LaunchedEffect(messages.size) {
@@ -1064,12 +1153,31 @@ fun SquadDetailView(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
+                },
+                actions = {
+                    var showActionsDropdown by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { showActionsDropdown = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Squad actions")
+                        }
+                        DropdownMenu(
+                            expanded = showActionsDropdown,
+                            onDismissRequest = { showActionsDropdown = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.social_btn_leave)) },
+                                onClick = {
+                                    showActionsDropdown = false
+                                    showLeaveConfirmDialog = true
+                                }
+                            )
+                        }
+                    }
                 }
             )
         },
         bottomBar = {
             if (selectedTab == 0) {
-                // Floating input capsule aligned at the bottom using Scaffold's bottomBar
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1077,81 +1185,145 @@ fun SquadDetailView(
                         .imePadding()
                         .padding(bottom = if (hasBottomBar) 64.dp else 8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .shadow(8.dp, shape = RoundedCornerShape(24.dp))
-                            .background(
-                                color = if (isDark) Color(0xFF1E1E22) else Color.White,
-                                shape = RoundedCornerShape(24.dp)
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                                shape = RoundedCornerShape(24.dp)
-                            )
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.foundation.text.BasicTextField(
-                            value = messageText,
-                            onValueChange = { messageText = it },
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            maxLines = 4,
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
-                            decorationBox = { innerTextField ->
-                                Box(contentAlignment = Alignment.CenterStart) {
-                                    if (messageText.isEmpty()) {
-                                        Text(
-                                            text = stringResource(R.string.squad_chat_placeholder),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        if (selectedImageUris.isNotEmpty()) {
+                            androidx.compose.foundation.lazy.LazyRow(
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(vertical = 4.dp)
+                            ) {
+                                items(selectedImageUris) { uri ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(80.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                    ) {
+                                        AsyncImage(
+                                            model = uri,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
                                         )
+                                        Surface(
+                                            color = Color.Black.copy(alpha = 0.6f),
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(4.dp)
+                                                .size(20.dp)
+                                                .clickable { selectedImageUris = selectedImageUris.filter { it != uri } },
+                                            shape = CircleShape
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Remove",
+                                                tint = Color.White,
+                                                modifier = Modifier.padding(2.dp)
+                                            )
+                                        }
                                     }
-                                    innerTextField()
                                 }
                             }
-                        )
-                        
-                        val sendButtonScale by animateFloatAsState(
-                            targetValue = if (messageText.isNotBlank()) 1f else 0.85f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            ),
-                            label = "SendButtonScale"
-                        )
-                        
-                        IconButton(
-                            onClick = {
-                                if (messageText.isNotBlank()) {
-                                    viewModel.sendSquadMessage(squad.id, messageText.trim())
-                                    messageText = ""
-                                }
-                            },
-                            enabled = messageText.isNotBlank(),
+                        }
+
+                        Row(
                             modifier = Modifier
-                                .scale(sendButtonScale)
-                                .size(40.dp)
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .shadow(8.dp, shape = RoundedCornerShape(24.dp))
                                 .background(
-                                    color = if (messageText.isNotBlank()) MaterialTheme.colorScheme.primary 
-                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                    shape = CircleShape
+                                    color = if (isDark) Color(0xFF1E1E22) else Color.White,
+                                    shape = RoundedCornerShape(24.dp)
                                 )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                    shape = RoundedCornerShape(24.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Send, 
-                                contentDescription = "Send", 
-                                tint = if (messageText.isNotBlank()) MaterialTheme.colorScheme.onPrimary 
-                                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
-                                modifier = Modifier.size(18.dp)
+                            IconButton(
+                                onClick = { galleryLauncher.launch("image/*") },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AddPhotoAlternate,
+                                    contentDescription = "Select Photo",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            androidx.compose.foundation.text.BasicTextField(
+                                value = messageText,
+                                onValueChange = { messageText = it },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                maxLines = 4,
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                    color = MaterialTheme.colorScheme.onSurface
+                                ),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                                decorationBox = { innerTextField ->
+                                    Box(contentAlignment = Alignment.CenterStart) {
+                                        if (messageText.isEmpty()) {
+                                            Text(
+                                                text = stringResource(R.string.squad_chat_placeholder),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                }
                             )
+                            
+                            val isSendEnabled = messageText.isNotBlank() || selectedImageUris.isNotEmpty()
+                            val sendButtonScale by animateFloatAsState(
+                                targetValue = if (isSendEnabled) 1f else 0.85f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                ),
+                                label = "SendButtonScale"
+                            )
+                            
+                            if (isImageUploading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp).padding(4.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                IconButton(
+                                    onClick = {
+                                        if (messageText.isNotBlank() || selectedImageUris.isNotEmpty()) {
+                                            viewModel.sendSquadMessage(squad.id, messageText.trim(), selectedImageUris)
+                                            messageText = ""
+                                            selectedImageUris = emptyList()
+                                        }
+                                    },
+                                    enabled = isSendEnabled,
+                                    modifier = Modifier
+                                        .scale(sendButtonScale)
+                                        .size(40.dp)
+                                        .background(
+                                            color = if (isSendEnabled) MaterialTheme.colorScheme.primary 
+                                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                            shape = CircleShape
+                                        )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Send,
+                                        contentDescription = "Send", 
+                                        tint = if (isSendEnabled) MaterialTheme.colorScheme.onPrimary 
+                                               else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1337,30 +1509,185 @@ fun SquadDetailView(
                                         }
                                         
                                         val isTimestampVisible = activeTimestampMessageId == message.id
-                                        Surface(
-                                            color = if (isMe) MaterialTheme.colorScheme.primary else {
-                                                if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                                            },
-                                            shape = RoundedCornerShape(
-                                                topStart = 16.dp,
-                                                topEnd = 16.dp,
-                                                bottomStart = if (isMe) 16.dp else 4.dp,
-                                                bottomEnd = if (isMe) 4.dp else 16.dp
-                                            ),
-                                            modifier = Modifier.clickable(
-                                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                                                indication = null,
-                                                onClick = {
-                                                    activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                        val isReactionPickerVisible = showReactionPickerMessageId == message.id
+
+                                        if (message.isRevoked) {
+                                            Surface(
+                                                color = if (isDark) Color(0xFF1E1E22) else Color(0xFFF2F2F7),
+                                                shape = RoundedCornerShape(16.dp),
+                                                modifier = Modifier.padding(vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Tin nhắn đã bị thu hồi",
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                                    ),
+                                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                                                )
+                                            }
+                                        } else {
+                                            Column(
+                                                horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+                                                modifier = Modifier.pointerInput(Unit) {
+                                                    detectTapGestures(
+                                                        onTap = {
+                                                            activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                                        },
+                                                        onLongPress = {
+                                                            activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                                            showReactionPickerMessageId = if (isReactionPickerVisible) null else message.id
+                                                        }
+                                                    )
                                                 }
-                                            )
-                                        ) {
-                                            Text(
-                                                text = message.text,
-                                                color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
-                                            )
+                                            ) {
+                                                if (message.imageUrls.isNotEmpty()) {
+                                                    ChatImageGrid(
+                                                        imageUrls = message.imageUrls,
+                                                        onImageClick = { index ->
+                                                            activeFullScreenImageUrls = message.imageUrls
+                                                            activeFullScreenImageIndex = index
+                                                        },
+                                                        modifier = Modifier.padding(bottom = if (message.text.isNotEmpty()) 6.dp else 0.dp)
+                                                    )
+                                                }
+                                                
+                                                if (message.text.isNotEmpty()) {
+                                                    Surface(
+                                                        color = if (isMe) MaterialTheme.colorScheme.primary else {
+                                                            if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                                        },
+                                                        shape = RoundedCornerShape(
+                                                            topStart = 16.dp,
+                                                            topEnd = 16.dp,
+                                                            bottomStart = if (isMe) 16.dp else 4.dp,
+                                                            bottomEnd = if (isMe) 4.dp else 16.dp
+                                                        )
+                                                    ) {
+                                                        Text(
+                                                            text = message.text,
+                                                            color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if (isReactionPickerVisible) {
+                                                androidx.compose.ui.window.Popup(
+                                                    alignment = if (isMe) Alignment.TopEnd else Alignment.TopStart,
+                                                    offset = androidx.compose.ui.unit.IntOffset(x = if (isMe) -10 else 10, y = -110),
+                                                    onDismissRequest = { showReactionPickerMessageId = null },
+                                                    properties = androidx.compose.ui.window.PopupProperties(focusable = true)
+                                                ) {
+                                                    Card(
+                                                        shape = RoundedCornerShape(24.dp),
+                                                        colors = CardDefaults.cardColors(
+                                                            containerColor = if (isDark) Color(0xFF252528) else Color.White
+                                                        ),
+                                                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                                                        modifier = Modifier
+                                                            .padding(horizontal = 8.dp)
+                                                            .border(
+                                                                width = 1.5.dp,
+                                                                color = if (isDark) Color(0xFF35353A) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                                                shape = RoundedCornerShape(24.dp)
+                                                            )
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            val emojis = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
+                                                            emojis.forEach { emoji ->
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .clip(CircleShape)
+                                                                        .clickable {
+                                                                            viewModel.reactToSquadMessage(squad.id, message.id, emoji)
+                                                                            showReactionPickerMessageId = null
+                                                                        }
+                                                                        .padding(4.dp)
+                                                                ) {
+                                                                    Text(text = emoji, fontSize = 22.sp)
+                                                                }
+                                                            }
+                                                            
+                                                            if (isMe) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .width(1.dp)
+                                                                        .height(20.dp)
+                                                                        .background(
+                                                                            if (isDark) Color(0xFF45454A) 
+                                                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                                                                        )
+                                                                )
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .clip(CircleShape)
+                                                                        .clickable {
+                                                                            showSquadMessageOptionsDialog = message
+                                                                            showReactionPickerMessageId = null
+                                                                        }
+                                                                        .padding(4.dp),
+                                                                    contentAlignment = Alignment.Center
+                                                                ) {
+                                                                    Icon(
+                                                                        imageVector = Icons.Default.Delete,
+                                                                        contentDescription = "Thu hồi",
+                                                                        tint = MaterialTheme.colorScheme.error,
+                                                                        modifier = Modifier.size(22.dp)
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if (message.reactions.isNotEmpty()) {
+                                                val reactionGroups = message.reactions.entries
+                                                    .groupBy { it.value }
+                                                    .mapValues { it.value.map { entry -> entry.key } }
+                                                
+                                                androidx.compose.foundation.layout.FlowRow(
+                                                    modifier = Modifier.padding(top = 4.dp),
+                                                    horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    reactionGroups.forEach { (emoji, userIds) ->
+                                                        val hasReacted = userIds.contains(currentUserId)
+                                                        val chipColor = if (hasReacted) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) 
+                                                                        else if (isDark) Color(0xFF2D2D32) 
+                                                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                        val borderColor = if (hasReacted) MaterialTheme.colorScheme.primary else Color.Transparent
+                                                        
+                                                        Surface(
+                                                            color = chipColor,
+                                                            border = BorderStroke(1.dp, borderColor),
+                                                            shape = RoundedCornerShape(12.dp),
+                                                            modifier = Modifier
+                                                                .clickable {
+                                                                    viewModel.reactToSquadMessage(squad.id, message.id, emoji)
+                                                                }
+                                                        ) {
+                                                            Row(
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            ) {
+                                                                Text(text = emoji, fontSize = 11.sp)
+                                                                if (userIds.size > 1) {
+                                                                    Text(text = userIds.size.toString(), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                         
                                         androidx.compose.animation.AnimatedVisibility(
@@ -1566,6 +1893,68 @@ fun SquadDetailView(
             }
         )
     }
+
+    if (activeFullScreenImageUrls != null) {
+        FullScreenImageViewer(
+            imageUrls = activeFullScreenImageUrls!!,
+            initialIndex = activeFullScreenImageIndex,
+            onDismiss = { activeFullScreenImageUrls = null }
+        )
+    }
+
+    if (showSquadMessageOptionsDialog != null) {
+        AlertDialog(
+            onDismissRequest = { showSquadMessageOptionsDialog = null },
+            title = { Text("Thu hồi tin nhắn") },
+            text = { Text("Bạn có chắc chắn muốn thu hồi tin nhắn này không?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val msg = showSquadMessageOptionsDialog
+                        if (msg != null) {
+                            viewModel.revokeSquadMessage(squad.id, msg.id)
+                        }
+                        showSquadMessageOptionsDialog = null
+                    }
+                ) {
+                    Text("Thu hồi", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSquadMessageOptionsDialog = null }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
+    if (showLeaveConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showLeaveConfirmDialog = false },
+            title = { Text(stringResource(R.string.social_leave_confirm_title)) },
+            text = { Text(stringResource(R.string.social_leave_confirm_msg, squad.name)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.leaveSquad(squad.id) {
+                            onBack()
+                        }
+                        showLeaveConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(stringResource(R.string.social_leave_confirm_btn))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLeaveConfirmDialog = false }) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -1646,4 +2035,1058 @@ fun SquadDetailViewWrapper(
         onBack = onBack,
         hasBottomBar = hasBottomBar
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun DirectChatView(
+    friendship: Friendship,
+    currentUserId: String,
+    viewModel: SocialViewModel,
+    onBack: () -> Unit
+) {
+    val isDark = LocalDarkTheme.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    
+    // Lấy thông tin người bạn
+    val friendId = friendship.userIds.firstOrNull { it != currentUserId } ?: ""
+    val friendFlow = remember(friendId) { viewModel.getUserById(friendId) }
+    val friendState by friendFlow.collectAsState(initial = User(name = stringResource(R.string.squad_loading)))
+    val displayName = friendState.name.ifBlank { stringResource(R.string.social_default_user_name) }
+    
+    // Danh sách tin nhắn
+    val messagesFlow = remember(friendship.id) { viewModel.getDirectMessages(friendship.id) }
+    val messages by messagesFlow.collectAsState(initial = emptyList())
+    
+    var messageText by remember { mutableStateOf("") }
+    var selectedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var activeFullScreenImageUrls by remember { mutableStateOf<List<String>?>(null) }
+    var activeFullScreenImageIndex by remember { mutableStateOf(0) }
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            selectedImageUris = (selectedImageUris + uris).distinct()
+        }
+    }
+    val isImageUploading by viewModel.isImageUploading.collectAsStateWithLifecycle()
+    var activeTimestampMessageId by remember { mutableStateOf<String?>(null) }
+    var showReactionPickerMessageId by remember { mutableStateOf<String?>(null) }
+    var showDirectMessageOptionsDialog by remember { mutableStateOf<com.example.newstart.domain.model.DirectMessage?>(null) }
+    val lazyListState = rememberLazyListState()
+    
+    // Tự động cuộn xuống tin nhắn mới nhất
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            lazyListState.animateScrollToItem(0)
+        }
+    }
+    
+    val isKeyboardVisible = WindowInsets.isImeVisible
+    LaunchedEffect(isKeyboardVisible) {
+        if (isKeyboardVisible && messages.isNotEmpty()) {
+            lazyListState.animateScrollToItem(0)
+        }
+    }
+    
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(32.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        ) {
+                            if (!friendState.avatarUrl.isNullOrEmpty()) {
+                                AsyncImage(
+                                    model = friendState.avatarUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(displayName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        },
+        bottomBar = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(bottom = 8.dp)
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                        if (selectedImageUris.isNotEmpty()) {
+                            androidx.compose.foundation.lazy.LazyRow(
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(vertical = 4.dp)
+                            ) {
+                                items(selectedImageUris) { uri ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(80.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                    ) {
+                                        AsyncImage(
+                                            model = uri,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                        Surface(
+                                            color = Color.Black.copy(alpha = 0.6f),
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(4.dp)
+                                                .size(20.dp)
+                                                .clickable { selectedImageUris = selectedImageUris.filter { it != uri } },
+                                            shape = CircleShape
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Remove",
+                                                tint = Color.White,
+                                                modifier = Modifier.padding(2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .shadow(8.dp, shape = RoundedCornerShape(24.dp))
+                            .background(
+                                color = if (isDark) Color(0xFF1E1E22) else Color.White,
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isDark) Color(0xFF2D2D32) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { galleryLauncher.launch("image/*") },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AddPhotoAlternate,
+                                contentDescription = "Select Photo",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = messageText,
+                            onValueChange = { messageText = it },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            maxLines = 4,
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                            decorationBox = { innerTextField ->
+                                Box(contentAlignment = Alignment.CenterStart) {
+                                    if (messageText.isEmpty()) {
+                                        Text(
+                                            text = stringResource(R.string.squad_chat_placeholder),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
+                        )
+                        
+                        val isSendEnabled = messageText.isNotBlank() || selectedImageUris.isNotEmpty()
+                        val sendButtonScale by animateFloatAsState(
+                            targetValue = if (isSendEnabled) 1f else 0.85f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            label = "SendButtonScale"
+                        )
+                        
+                        if (isImageUploading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp).padding(4.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            IconButton(
+                                onClick = {
+                                    if (messageText.isNotBlank() || selectedImageUris.isNotEmpty()) {
+                                        viewModel.sendDirectMessage(friendship.id, messageText.trim(), imageUris = selectedImageUris)
+                                        messageText = ""
+                                        selectedImageUris = emptyList()
+                                    }
+                                },
+                                enabled = isSendEnabled,
+                                modifier = Modifier
+                                    .scale(sendButtonScale)
+                                    .size(40.dp)
+                                    .background(
+                                        color = if (isSendEnabled) MaterialTheme.colorScheme.primary 
+                                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                        shape = CircleShape
+                                    )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Send,
+                                    contentDescription = "Send", 
+                                    tint = if (isSendEnabled) MaterialTheme.colorScheme.onPrimary 
+                                           else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), 
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ) { padding ->
+        val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+        
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = { focusManager.clearFocus() })
+                }
+        ) {
+            if (messages.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Chưa có tin nhắn nào. Gửi lời chào với người bạn này!", color = Color.Gray, fontSize = 13.sp)
+                }
+            } else {
+                val reversedMessages = remember(messages) { messages.asReversed() }
+                LazyColumn(
+                    state = lazyListState,
+                    reverseLayout = true,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 12.dp,
+                        bottom = 8.dp
+                    )
+                ) {
+                    itemsIndexed(reversedMessages) { indexInReversed, message ->
+                        val originalIndex = messages.size - 1 - indexInReversed
+                        val isMe = message.senderId == currentUserId
+                        val timeString = remember(message.timestamp) { timeFormatter.format(message.timestamp ?: java.util.Date()) }
+                        
+                        val prevMessage = if (originalIndex > 0) messages[originalIndex - 1] else null
+                        val isPrevSameSenderAndClose = prevMessage != null && 
+                                prevMessage.senderId == message.senderId && 
+                                (message.timestamp != null && prevMessage.timestamp != null && message.timestamp.time - prevMessage.timestamp.time < 3 * 60 * 1000)
+                        
+                        val nextMessage = if (originalIndex < messages.size - 1) messages[originalIndex + 1] else null
+                        val isNextSameSender = nextMessage != null && nextMessage.senderId == message.senderId
+                        
+                        val bottomSpacing = if (isNextSameSender) 8.dp else 16.dp
+                        val isTimestampVisible = activeTimestampMessageId == message.id
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = bottomSpacing),
+                            horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            if (!isMe && !isNextSameSender) {
+                                Surface(
+                                    modifier = Modifier.size(28.dp),
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                ) {
+                                    if (!friendState.avatarUrl.isNullOrEmpty()) {
+                                        AsyncImage(
+                                            model = friendState.avatarUrl,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Icon(Icons.Default.Person, null, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                            } else if (!isMe) {
+                                Spacer(modifier = Modifier.width(36.dp))
+                            }
+
+                            Column(
+                                horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
+                            ) {
+                                if (!isMe && !isPrevSameSenderAndClose) {
+                                    Text(
+                                        text = message.senderName, 
+                                        style = MaterialTheme.typography.labelSmall, 
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                }
+
+                                val isReactionPickerVisible = showReactionPickerMessageId == message.id
+
+                                 if (message.isRevoked) {
+                                     Surface(
+                                         color = if (isDark) Color(0xFF1E1E22) else Color(0xFFF2F2F7),
+                                         shape = RoundedCornerShape(16.dp),
+                                         modifier = Modifier.padding(vertical = 4.dp)
+                                     ) {
+                                         Text(
+                                             text = "Tin nhắn đã bị thu hồi",
+                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                             style = MaterialTheme.typography.bodyMedium.copy(
+                                                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                             ),
+                                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                                         )
+                                     }
+                                 } else {
+                                     Column(
+                                         horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+                                         modifier = Modifier.pointerInput(Unit) {
+                                             detectTapGestures(
+                                                 onTap = {
+                                                     activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                                 },
+                                                 onLongPress = {
+                                                     activeTimestampMessageId = if (isTimestampVisible) null else message.id
+                                                     showReactionPickerMessageId = if (isReactionPickerVisible) null else message.id
+                                                 }
+                                             )
+                                         }
+                                     ) {
+                                         if (message.imageUrls.isNotEmpty()) {
+                                             ChatImageGrid(
+                                                 imageUrls = message.imageUrls,
+                                                 onImageClick = { index ->
+                                                     activeFullScreenImageUrls = message.imageUrls
+                                                     activeFullScreenImageIndex = index
+                                                 },
+                                                 modifier = Modifier.padding(bottom = if (message.text.isNotEmpty() || !message.sharedJournalId.isNullOrEmpty()) 6.dp else 0.dp)
+                                             )
+                                         }
+
+                                         if (message.text.isNotEmpty() || !message.sharedJournalId.isNullOrEmpty()) {
+                                             Surface(
+                                                 color = if (isMe) MaterialTheme.colorScheme.primary else {
+                                                     if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                                 },
+                                                 shape = RoundedCornerShape(
+                                                     topStart = 16.dp,
+                                                     topEnd = 16.dp,
+                                                     bottomStart = if (isMe) 16.dp else 4.dp,
+                                                     bottomEnd = if (isMe) 4.dp else 16.dp
+                                                 )
+                                             ) {
+                                                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                                     if (!message.sharedJournalId.isNullOrEmpty()) {
+                                                         SharedJournalCard(
+                                                             authorName = message.sharedJournalAuthorName ?: "",
+                                                             text = message.sharedJournalText ?: "",
+                                                             imageUrl = message.sharedJournalImageUrl,
+                                                             emoji = message.sharedJournalEmoji ?: "",
+                                                             isMe = isMe
+                                                         )
+                                                         if (message.text.isNotEmpty()) {
+                                                             Spacer(modifier = Modifier.height(8.dp))
+                                                         }
+                                                     }
+                                                     
+                                                     if (message.text.isNotEmpty()) {
+                                                         Text(
+                                                             text = message.text,
+                                                             color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                                             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
+                                                         )
+                                                     }
+                                                 }
+                                             }
+                                         }
+                                     }
+
+                                     if (isReactionPickerVisible) {
+                                         androidx.compose.ui.window.Popup(
+                                             alignment = if (isMe) Alignment.TopEnd else Alignment.TopStart,
+                                             offset = androidx.compose.ui.unit.IntOffset(x = if (isMe) -10 else 10, y = -110),
+                                             onDismissRequest = { showReactionPickerMessageId = null },
+                                             properties = androidx.compose.ui.window.PopupProperties(focusable = true)
+                                         ) {
+                                             Card(
+                                                 shape = RoundedCornerShape(24.dp),
+                                                 colors = CardDefaults.cardColors(
+                                                     containerColor = if (isDark) Color(0xFF252528) else Color.White
+                                                 ),
+                                                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                                                 modifier = Modifier
+                                                     .padding(horizontal = 8.dp)
+                                                     .border(
+                                                         width = 1.5.dp,
+                                                         color = if (isDark) Color(0xFF35353A) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                                         shape = RoundedCornerShape(24.dp)
+                                                     )
+                                             ) {
+                                                 Row(
+                                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                     verticalAlignment = Alignment.CenterVertically
+                                                 ) {
+                                                     val emojis = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
+                                                     emojis.forEach { emoji ->
+                                                         Box(
+                                                             modifier = Modifier
+                                                                 .clip(CircleShape)
+                                                                 .clickable {
+                                                                     viewModel.reactToDirectMessage(friendship.id, message.id, emoji)
+                                                                     showReactionPickerMessageId = null
+                                                                 }
+                                                                 .padding(4.dp)
+                                                         ) {
+                                                             Text(text = emoji, fontSize = 22.sp)
+                                                         }
+                                                     }
+                                                     
+                                                     if (isMe) {
+                                                         Box(
+                                                             modifier = Modifier
+                                                                 .width(1.dp)
+                                                                 .height(20.dp)
+                                                                 .background(
+                                                                     if (isDark) Color(0xFF45454A) 
+                                                                     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                                                                 )
+                                                         )
+                                                         Box(
+                                                             modifier = Modifier
+                                                                 .clip(CircleShape)
+                                                                 .clickable {
+                                                                     showDirectMessageOptionsDialog = message
+                                                                     showReactionPickerMessageId = null
+                                                                 }
+                                                                 .padding(4.dp),
+                                                             contentAlignment = Alignment.Center
+                                                         ) {
+                                                             Icon(
+                                                                 imageVector = Icons.Default.Delete,
+                                                                 contentDescription = "Thu hồi",
+                                                                 tint = MaterialTheme.colorScheme.error,
+                                                                 modifier = Modifier.size(22.dp)
+                                                             )
+                                                         }
+                                                     }
+                                                 }
+                                             }
+                                         }
+                                     }
+
+                                     if (message.reactions.isNotEmpty()) {
+                                         val reactionGroups = message.reactions.entries
+                                             .groupBy { it.value }
+                                             .mapValues { it.value.map { entry -> entry.key } }
+                                         
+                                         androidx.compose.foundation.layout.FlowRow(
+                                             modifier = Modifier.padding(top = 4.dp),
+                                             horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+                                             verticalArrangement = Arrangement.spacedBy(4.dp)
+                                         ) {
+                                             reactionGroups.forEach { (emoji, userIds) ->
+                                                 val hasReacted = userIds.contains(currentUserId)
+                                                 val chipColor = if (hasReacted) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) 
+                                                                 else if (isDark) Color(0xFF2D2D32) 
+                                                                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                 val borderColor = if (hasReacted) MaterialTheme.colorScheme.primary else Color.Transparent
+                                                 
+                                                 Surface(
+                                                     color = chipColor,
+                                                     border = BorderStroke(1.dp, borderColor),
+                                                     shape = RoundedCornerShape(12.dp),
+                                                     modifier = Modifier
+                                                         .clickable {
+                                                             viewModel.reactToDirectMessage(friendship.id, message.id, emoji)
+                                                         }
+                                                 ) {
+                                                     Row(
+                                                         verticalAlignment = Alignment.CenterVertically,
+                                                         horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                     ) {
+                                                         Text(text = emoji, fontSize = 11.sp)
+                                                         if (userIds.size > 1) {
+                                                             Text(text = userIds.size.toString(), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                         }
+                                                     }
+                                                 }
+                                             }
+                                         }
+                                     }
+                                 }
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = isTimestampVisible,
+                                    enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                                    exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                                ) {
+                                    Text(
+                                        text = timeString,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.padding(top = 2.dp, start = if (isMe) 0.dp else 4.dp, end = if (isMe) 4.dp else 0.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (activeFullScreenImageUrls != null) {
+        FullScreenImageViewer(
+            imageUrls = activeFullScreenImageUrls!!,
+            initialIndex = activeFullScreenImageIndex,
+            onDismiss = { activeFullScreenImageUrls = null }
+        )
+    }
+
+    if (showDirectMessageOptionsDialog != null) {
+        AlertDialog(
+            onDismissRequest = { showDirectMessageOptionsDialog = null },
+            title = { Text("Thu hồi tin nhắn") },
+            text = { Text("Bạn có chắc chắn muốn thu hồi tin nhắn này không?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val msg = showDirectMessageOptionsDialog
+                        if (msg != null) {
+                            viewModel.revokeDirectMessage(friendship.id, msg.id)
+                        }
+                        showDirectMessageOptionsDialog = null
+                    }
+                ) {
+                    Text("Thu hồi", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDirectMessageOptionsDialog = null }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun SharedJournalCard(
+    authorName: String,
+    text: String,
+    imageUrl: String?,
+    emoji: String,
+    isMe: Boolean
+) {
+    Surface(
+        color = if (isMe) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) 
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isMe) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f)
+                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        ),
+        modifier = Modifier.width(220.dp)
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (authorName == "Bạn") "Bài đăng của bạn" else "Bài đăng của $authorName",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isMe) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary
+                )
+                Text(emoji, fontSize = 14.sp)
+            }
+            
+            if (text.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                )
+            }
+            
+            if (!imageUrl.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatsTabWrapper(
+    friends: List<Friendship>,
+    currentUserId: String,
+    viewModel: SocialViewModel,
+    onFriendChatClick: (Friendship) -> Unit
+) {
+    val locale = androidx.compose.ui.platform.LocalContext.current.resources.configuration.locales[0]
+    val isVietnamese = locale.language == "vi"
+
+    if (friends.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (isVietnamese) "Bạn chưa có bạn bè nào. Hãy kết bạn để nhắn tin!" else "No friends yet. Add friends to start chatting!",
+                color = Color.Gray,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(bottom = 20.dp)
+        ) {
+            item {
+                SectionTitle(if (isVietnamese) "Đoạn hội thoại" else "Conversations")
+            }
+            items(friends) { friendship ->
+                ChatItem(
+                    friendship = friendship,
+                    currentUserId = currentUserId,
+                    viewModel = viewModel,
+                    onClick = { onFriendChatClick(friendship) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatItem(
+    friendship: Friendship,
+    currentUserId: String,
+    viewModel: SocialViewModel,
+    onClick: () -> Unit
+) {
+    val isDark = LocalDarkTheme.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val locale = context.resources.configuration.locales[0]
+    val isVietnamese = locale.language == "vi"
+    
+    val friendId = friendship.userIds.firstOrNull { it != currentUserId } ?: return
+    val friendFlow = remember(friendId) { viewModel.getUserById(friendId) }
+    val friendState by friendFlow.collectAsState(initial = User(name = stringResource(R.string.squad_loading)))
+    
+    val lastMessageFlow = remember(friendship.id) { viewModel.getLastMessage(friendship.id) }
+    val lastMessage by lastMessageFlow.collectAsState(initial = null)
+    
+    val displayName = friendState.name.ifBlank { stringResource(R.string.social_default_user_name) }
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (!friendState.avatarUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = friendState.avatarUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = displayName,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                val messageText = if (lastMessage != null) {
+                    val prefix = if (lastMessage!!.senderId == currentUserId) (if (isVietnamese) "Bạn: " else "You: ") else ""
+                    if (!lastMessage!!.sharedJournalId.isNullOrEmpty()) {
+                        if (lastMessage!!.text.isEmpty()) {
+                            "${prefix}[${if (isVietnamese) "Bài viết chia sẻ" else "Shared post"}]"
+                        } else {
+                            "${prefix}${lastMessage!!.text}"
+                        }
+                    } else if (!lastMessage!!.imageUrl.isNullOrEmpty() || lastMessage!!.imageUrls.isNotEmpty()) {
+                        if (lastMessage!!.text.isEmpty()) {
+                            "${prefix}[${if (isVietnamese) "Hình ảnh" else "Image"}]"
+                        } else {
+                            "${prefix}${lastMessage!!.text}"
+                        }
+                    } else {
+                        "${prefix}${lastMessage!!.text}"
+                    }
+                } else {
+                    if (isVietnamese) "Chưa có tin nhắn nào. Click để trò chuyện" else "No messages yet. Click to chat"
+                }
+                
+                Text(
+                    text = messageText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (lastMessage != null) MaterialTheme.colorScheme.onSurfaceVariant 
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
+            
+            if (lastMessage != null) {
+                val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+                val timeString = remember(lastMessage!!.timestamp) {
+                    timeFormatter.format(lastMessage!!.timestamp ?: java.util.Date())
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = timeString,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatImageGrid(
+    imageUrls: List<String>,
+    onImageClick: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (imageUrls.isEmpty()) return
+    
+    val shape = RoundedCornerShape(16.dp)
+    
+    when (imageUrls.size) {
+        1 -> {
+            AsyncImage(
+                model = imageUrls[0],
+                contentDescription = "Image message",
+                modifier = modifier
+                    .widthIn(max = 240.dp)
+                    .heightIn(max = 240.dp)
+                    .clip(shape)
+                    .clickable { onImageClick(0) },
+                contentScale = ContentScale.Fit
+            )
+        }
+        2 -> {
+            Row(
+                modifier = modifier.width(240.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                imageUrls.forEachIndexed { index, url ->
+                    AsyncImage(
+                        model = url,
+                        contentDescription = "Image message",
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .clip(shape)
+                            .clickable { onImageClick(index) },
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
+        }
+        3 -> {
+            Column(
+                modifier = modifier.width(240.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    AsyncImage(
+                        model = imageUrls[0],
+                        contentDescription = "Image message",
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .clip(shape)
+                            .clickable { onImageClick(0) },
+                        contentScale = ContentScale.Crop
+                    )
+                    AsyncImage(
+                        model = imageUrls[1],
+                        contentDescription = "Image message",
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .clip(shape)
+                            .clickable { onImageClick(1) },
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                AsyncImage(
+                    model = imageUrls[2],
+                    contentDescription = "Image message",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(2f)
+                        .clip(shape)
+                        .clickable { onImageClick(2) },
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+        else -> {
+            Column(
+                modifier = modifier.width(240.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    AsyncImage(
+                        model = imageUrls[0],
+                        contentDescription = "Image message",
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .clip(shape)
+                            .clickable { onImageClick(0) },
+                        contentScale = ContentScale.Crop
+                    )
+                    AsyncImage(
+                        model = imageUrls[1],
+                        contentDescription = "Image message",
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .clip(shape)
+                            .clickable { onImageClick(1) },
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    AsyncImage(
+                        model = imageUrls[2],
+                        contentDescription = "Image message",
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .clip(shape)
+                            .clickable { onImageClick(2) },
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .clip(shape)
+                            .clickable { onImageClick(3) }
+                    ) {
+                        AsyncImage(
+                            model = imageUrls[3],
+                            contentDescription = "Image message",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "+${imageUrls.size - 3}",
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FullScreenImageViewer(
+    imageUrls: List<String>,
+    initialIndex: Int,
+    onDismiss: () -> Unit
+) {
+    var currentIndex by remember { mutableStateOf(initialIndex) }
+    val pagerState = rememberPagerState(
+        initialPage = initialIndex,
+        pageCount = { imageUrls.size }
+    )
+    
+    LaunchedEffect(pagerState.currentPage) {
+        currentIndex = pagerState.currentPage
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AsyncImage(
+                        model = imageUrls[page],
+                        contentDescription = "Zoomed Image",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.85f),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .align(Alignment.TopCenter),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = Color.White
+                    )
+                }
+
+                if (imageUrls.size > 1) {
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = "${currentIndex + 1} / ${imageUrls.size}",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.width(44.dp))
+            }
+        }
+    }
 }

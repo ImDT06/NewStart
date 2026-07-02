@@ -1,6 +1,7 @@
 package com.example.newstart.ui.features.habits
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -37,12 +39,16 @@ import com.example.newstart.domain.model.Squad
 import com.example.newstart.domain.model.User
 import com.example.newstart.ui.MainViewModel
 import com.example.newstart.ui.components.RatingBar
+import com.example.newstart.ui.navigation.Screen
 import com.example.newstart.ui.features.journal.JournalViewModel
 import com.example.newstart.ui.features.social.SocialViewModel
 import com.example.newstart.ui.theme.LocalDarkTheme
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,28 +59,37 @@ fun HabitsScreen(
     socialViewModel: SocialViewModel = hiltViewModel(),
     journalViewModel: JournalViewModel = hiltViewModel()
 ) {
-    val socialFeed by journalViewModel.socialFeed.collectAsStateWithLifecycle()
+    val socialFeed by journalViewModel.socialFeed.collectAsState()
     val searchQuery by socialViewModel.searchQuery.collectAsStateWithLifecycle()
     val searchResults by socialViewModel.searchResults.collectAsStateWithLifecycle()
     val incomingRequests by socialViewModel.incomingRequests.collectAsStateWithLifecycle()
     val squads by socialViewModel.squads.collectAsStateWithLifecycle()
     val isSearching by socialViewModel.isSearching.collectAsStateWithLifecycle()
-    val friends by socialViewModel.friends.collectAsStateWithLifecycle()
+    val friends by mainViewModel.friends.collectAsState()
     val sentRequests by socialViewModel.sentRequests.collectAsStateWithLifecycle()
+    val isRefreshingFeed by journalViewModel.isRefreshingFeed.collectAsState()
+    val isCreatingSquad by socialViewModel.isCreatingSquad.collectAsStateWithLifecycle()
     val currentUserId = socialViewModel.currentUserId
     
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Bảng tin, 1: Bạn bè, 2: Nhóm
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Bảng tin, 1: Tin nhắn, 2: Bạn bè, 3: Nhóm
     var activeSquadDetail by remember { mutableStateOf<Squad?>(null) }
     val activeSquad = squads.find { it.id == activeSquadDetail?.id } ?: activeSquadDetail
+    var activeReplyJournal by remember { mutableStateOf<JournalEntry?>(null) }
+    var activeChatFriendship by remember { mutableStateOf<com.example.newstart.domain.model.Friendship?>(null) }
 
     val context = LocalContext.current
+    val isDark = LocalDarkTheme.current
+    
+    LaunchedEffect(Unit) {
+        journalViewModel.refreshSocialFeed()
+    }
+
     val locale = remember(context) { context.resources.configuration.locales[0] }
     val isVietnamese = locale.language == "vi"
     val dateTimeFormatter = remember { SimpleDateFormat("HH:mm - dd/MM/yyyy", locale) }
-    val isDark = LocalDarkTheme.current
 
-    DisposableEffect(activeSquad) {
-        if (activeSquad != null) {
+    DisposableEffect(activeSquad, activeChatFriendship) {
+        if (activeSquad != null || activeChatFriendship != null) {
             mainViewModel.setBottomBarVisible(false)
         } else {
             mainViewModel.setBottomBarVisible(true)
@@ -93,6 +108,13 @@ fun HabitsScreen(
             mainViewModel = mainViewModel,
             onBack = { activeSquadDetail = null },
             hasBottomBar = false
+        )
+    } else if (activeChatFriendship != null) {
+        com.example.newstart.ui.features.social.DirectChatView(
+            friendship = activeChatFriendship!!,
+            currentUserId = currentUserId ?: "",
+            viewModel = socialViewModel,
+            onBack = { activeChatFriendship = null }
         )
     } else {
         val backgroundColor = MaterialTheme.colorScheme.background
@@ -132,6 +154,7 @@ fun HabitsScreen(
                     // Modern Segmented Control Style Tabs with smooth sliding animation
                     val tabs = listOf(
                         if (isVietnamese) "Bảng tin" else "Feed",
+                        if (isVietnamese) "Tin nhắn" else "Messages",
                         stringResource(R.string.social_tab_friends),
                         stringResource(R.string.social_tab_squads)
                     )
@@ -191,7 +214,15 @@ fun HabitsScreen(
                                         .clickable(
                                             interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                             indication = null,
-                                            onClick = { selectedTab = index }
+                                            onClick = { 
+                                                selectedTab = index 
+                                                when (index) {
+                                                    0 -> journalViewModel.refreshSocialFeed()
+                                                    1 -> socialViewModel.refreshFriends()
+                                                    2 -> socialViewModel.refreshFriends()
+                                                    3 -> socialViewModel.refreshSquads()
+                                                }
+                                            }
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -213,14 +244,27 @@ fun HabitsScreen(
                         when (selectedTab) {
                             0 -> SocialFeedList(
                                 socialFeed = socialFeed,
+                                isRefreshing = isRefreshingFeed,
+                                onRefresh = { journalViewModel.refreshSocialFeed() },
                                 isVietnamese = isVietnamese,
                                 isDark = isDark,
                                 dateTimeFormatter = dateTimeFormatter,
                                 onImageClick = { /* Full screen photo logic */ },
                                 getUserFlow = { journalViewModel.getUserById(it) },
-                                onReactToPost = { postId, emoji -> journalViewModel.reactToPost(postId, emoji) }
+                                onReactToPost = { postId, emoji -> journalViewModel.reactToPost(postId, emoji) },
+                                onReplyToPost = { entry ->
+                                    activeReplyJournal = entry
+                                }
                             )
                             1 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                com.example.newstart.ui.features.social.ChatsTabWrapper(
+                                    friends = friends,
+                                    currentUserId = currentUserId ?: "",
+                                    viewModel = socialViewModel,
+                                    onFriendChatClick = { activeChatFriendship = it }
+                                )
+                            }
+                            2 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 com.example.newstart.ui.features.social.FriendsTabWrapper(
                                     searchQuery = searchQuery,
                                     onSearchQueryChange = { socialViewModel.onSearchQueryChange(it) },
@@ -234,14 +278,18 @@ fun HabitsScreen(
                                     onAcceptRequest = { socialViewModel.acceptRequest(it) },
                                     onDeclineRequest = { socialViewModel.declineRequest(it) },
                                     onRemoveFriend = { socialViewModel.removeFriend(it) },
-                                    getUserFlow = { socialViewModel.getUserById(it) }
+                                    getUserFlow = { socialViewModel.getUserById(it) },
+                                    onFriendChatClick = { friendship ->
+                                        activeChatFriendship = friendship
+                                    }
                                 )
                             }
-                            2 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            3 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 com.example.newstart.ui.features.social.SquadsTabWrapper(
                                     squads = squads,
                                     friends = friends,
                                     currentUserId = currentUserId ?: "",
+                                    isCreating = isCreatingSquad,
                                     getUserFlow = { id -> socialViewModel.getUserById(id) },
                                     onCreateSquad = { n, d, m -> socialViewModel.createSquad(n, d, m) },
                                     onUpdateSquad = { id, n, d -> socialViewModel.updateSquad(id, n, d) },
@@ -252,60 +300,168 @@ fun HabitsScreen(
                     }
                 }
             }
+
+    if (activeReplyJournal != null) {
+        val replyJournal = activeReplyJournal!!
+        var replyText by remember { mutableStateOf("") }
+        val authorState by remember(replyJournal.userId) {
+            journalViewModel.getUserById(replyJournal.userId)
+        }.collectAsState(initial = User(name = if (isVietnamese) "Đang tải..." else "Loading..."))
+        
+        ModalBottomSheet(
+            onDismissRequest = { activeReplyJournal = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = if (isDark) Color(0xFF161618) else MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 36.dp)
+            ) {
+                Text(
+                    text = if (isVietnamese) "Phản hồi bài viết" else "Reply to post",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                
+                // Message Input field (Capsule style)
+                val authorName = authorState.name.ifBlank { "Người dùng" }
+                OutlinedTextField(
+                    value = replyText,
+                    onValueChange = { replyText = it },
+                    placeholder = { 
+                        Text(
+                            text = "Trả lời $authorName...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        ) 
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    maxLines = 4,
+                    shape = RoundedCornerShape(28.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedContainerColor = if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                        unfocusedContainerColor = if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        unfocusedBorderColor = Color.Transparent
+                    ),
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                val friendship = friends.find { it.userIds.contains(replyJournal.userId) }
+                                if (friendship != null) {
+                                    socialViewModel.sendDirectMessage(
+                                        friendshipId = friendship.id,
+                                        text = replyText.trim(),
+                                        sharedJournal = replyJournal
+                                    )
+                                    android.widget.Toast.makeText(context, if (isVietnamese) "Đã gửi phản hồi!" else "Reply sent!", android.widget.Toast.LENGTH_SHORT).show()
+                                    activeReplyJournal = null
+                                } else {
+                                    android.widget.Toast.makeText(context, if (isVietnamese) "Bạn chỉ có thể phản hồi bài viết của bạn bè!" else "You can only reply to friends' posts!", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            enabled = replyText.isNotBlank(),
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .size(32.dp)
+                                .background(
+                                    color = if (replyText.isNotBlank()) MaterialTheme.colorScheme.primary 
+                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                    shape = CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowUpward,
+                                contentDescription = "Send",
+                                modifier = Modifier.size(18.dp),
+                                tint = if (replyText.isNotBlank()) MaterialTheme.colorScheme.onPrimary 
+                                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                        }
+                    }
+                )
+            }
+        }
     }
 }
+}
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SocialFeedList(
     socialFeed: List<JournalEntry>,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
     isVietnamese: Boolean,
     isDark: Boolean,
     dateTimeFormatter: SimpleDateFormat,
     onImageClick: (String) -> Unit,
     getUserFlow: (String) -> Flow<User>,
-    onReactToPost: (String, String) -> Unit
+    onReactToPost: (String, String) -> Unit,
+    onReplyToPost: (JournalEntry) -> Unit
 ) {
-    if (socialFeed.isEmpty()) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                Icons.Default.Diversity3, 
-                null, 
-                modifier = Modifier.size(90.dp), 
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-            )
-            Spacer(Modifier.height(32.dp))
-            Text(
-                if (isVietnamese) "Bảng tin cộng đồng" else "Community Feed",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                if (isVietnamese) "Kết nối với bạn bè để cùng nhau kỷ luật" else "Connect with friends to stay disciplined together",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp, start = 16.dp, end = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(items = socialFeed, key = { it.id }) { entry ->
-                SocialFeedItem(
-                    entry = entry,
-                    timeFormatted = remember(entry.timestamp) { entry.timestamp?.let { dateTimeFormatter.format(it) } ?: "--:--" },
-                    onImageClick = onImageClick,
-                    getUserFlow = getUserFlow,
-                    onReactToPost = onReactToPost
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        if (socialFeed.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    Icons.Default.Diversity3, 
+                    null, 
+                    modifier = Modifier.size(90.dp), 
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                 )
+                Spacer(Modifier.height(32.dp))
+                Text(
+                    if (isVietnamese) "Bảng tin cộng đồng" else "Community Feed",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (isVietnamese) "Kết nối với bạn bè để cùng nhau kỷ luật" else "Connect with friends to stay disciplined together",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp, start = 16.dp, end = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(items = socialFeed, key = { it.id }) { entry ->
+                    SocialFeedItem(
+                        entry = entry,
+                        timeFormatted = remember(entry.timestamp) { entry.timestamp?.let { dateTimeFormatter.format(it) } ?: "--:--" },
+                        onImageClick = onImageClick,
+                        getUserFlow = getUserFlow,
+                        onReactToPost = onReactToPost,
+                        onReplyToPost = onReplyToPost
+                    )
+                }
             }
         }
     }
@@ -318,7 +474,8 @@ fun SocialFeedItem(
     timeFormatted: String,
     onImageClick: (String) -> Unit,
     getUserFlow: (String) -> Flow<User>,
-    onReactToPost: (String, String) -> Unit
+    onReactToPost: (String, String) -> Unit,
+    onReplyToPost: (JournalEntry) -> Unit
 ) {
     val isDark = LocalDarkTheme.current
     val currentUserId = remember {
@@ -366,7 +523,7 @@ fun SocialFeedItem(
                                     contentDescription = null,
                                     modifier = Modifier.fillMaxSize().clip(CircleShape),
                                     contentScale = ContentScale.Crop
-                                )
+                               )
                             } else {
                                 Icon(Icons.Default.Person, null, modifier = Modifier.size(26.dp), tint = MaterialTheme.colorScheme.primary)
                             }
@@ -459,60 +616,87 @@ fun SocialFeedItem(
 
             Spacer(modifier = Modifier.height(20.dp))
             
+            // Reactions and Comments Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                val commonEmojis = listOf("❤️", "👍", "🔥", "😂", "👏")
-                commonEmojis.forEach { emoji ->
-                    val count = entry.reactions.values.count { it == emoji }
-                    val hasReacted = entry.reactions[currentUserId] == emoji
-                    
-                    val scale by androidx.compose.animation.core.animateFloatAsState(
-                        targetValue = if (hasReacted) 1.08f else 1f,
-                        animationSpec = androidx.compose.animation.core.spring(
-                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
-                        ),
-                        label = "ReactionScale"
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    val commonEmojis = listOf("❤️", "👍", "🔥")
+                    commonEmojis.forEach { emoji ->
+                        val count = entry.reactions.values.count { it == emoji }
+                        val hasReacted = entry.reactions[currentUserId] == emoji
+                        
+                        val scale by androidx.compose.animation.core.animateFloatAsState(
+                            targetValue = if (hasReacted) 1.08f else 1f,
+                            animationSpec = androidx.compose.animation.core.spring(
+                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+                            ),
+                            label = "ReactionScale"
+                        )
 
-                    val buttonColor = if (hasReacted) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                    }
-                    
-                    val contentColor = if (hasReacted) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                    
-                    Surface(
-                        onClick = { onReactToPost(entry.id, emoji) },
-                        shape = RoundedCornerShape(18.dp),
-                        color = buttonColor,
-                        border = if (hasReacted) null else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                        modifier = Modifier
-                            .height(36.dp)
-                            .scale(scale)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        val buttonColor = if (hasReacted) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        }
+                        
+                        val contentColor = if (hasReacted) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        
+                        Surface(
+                            onClick = { onReactToPost(entry.id, emoji) },
+                            shape = RoundedCornerShape(18.dp),
+                            color = buttonColor,
+                            border = if (hasReacted) null else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .height(36.dp)
+                                .scale(scale)
                         ) {
-                            Text(emoji, fontSize = 16.sp)
-                            if (count > 0) {
-                                Text(
-                                    text = count.toString(),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = contentColor,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(emoji, fontSize = 16.sp)
+                                if (count > 0) {
+                                    Text(
+                                        text = count.toString(),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = contentColor,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
                             }
+                        }
+                    }
+                }
+                
+                // Reply/Chat button on the right side of the row!
+                if (entry.userId != currentUserId) {
+                    Surface(
+                        onClick = { onReplyToPost(entry) },
+                        shape = CircleShape,
+                        color = if (isDark) Color(0xFF252528) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Chat,
+                                contentDescription = "Phản hồi",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }

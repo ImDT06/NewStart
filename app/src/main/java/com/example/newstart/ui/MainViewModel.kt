@@ -14,20 +14,28 @@ import com.example.newstart.ui.theme.AppThemeColor
 import com.example.newstart.ui.theme.ThemeMode
 import com.example.newstart.domain.model.JournalType
 import com.example.newstart.domain.model.JournalPrivacy
+import com.example.newstart.domain.model.JournalEntry
 import com.example.newstart.domain.model.MovieDetails
 import com.example.newstart.domain.model.BookDetails
 import com.example.newstart.domain.model.SubjectDetails
 import com.example.newstart.domain.usecase.SaveJournalEntryUseCase
 import com.example.newstart.domain.usecase.SuggestEmojiUseCase
 import com.example.newstart.domain.usecase.SaveHabitUseCase
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.*
 
 enum class AuthState {
     Loading, Authenticated, Unauthenticated
@@ -42,9 +50,12 @@ class MainViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val socialRepository: com.example.newstart.domain.repository.SocialRepository,
     private val database: com.example.newstart.data.local.NewStartDatabase,
+    private val firestore: FirebaseFirestore,
     private val saveJournalEntryUseCase: SaveJournalEntryUseCase,
     private val suggestEmojiUseCase: SuggestEmojiUseCase,
-    private val saveHabitUseCase: SaveHabitUseCase
+    private val saveHabitUseCase: SaveHabitUseCase,
+    private val apiService: com.example.newstart.data.remote.NewStartApiService,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _selectedHabitDate = MutableStateFlow(LocalDate.now())
@@ -58,6 +69,44 @@ class MainViewModel @Inject constructor(
 
     private val _isBottomBarVisible = MutableStateFlow(true)
     val isBottomBarVisible: StateFlow<Boolean> = _isBottomBarVisible.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            authRepository.currentUser.collectLatest { firebaseUser ->
+                if (firebaseUser != null) {
+                    val docRef = firestore.collection("blocked_users").document(firebaseUser.id)
+                    docRef.addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            android.util.Log.e("MainViewModel", "Snapshot listener error for uid: ${firebaseUser.id}", error)
+                            return@addSnapshotListener
+                        }
+                        val exists = snapshot?.exists() == true
+                        val blockedVal = snapshot?.getBoolean("blocked")
+                        android.util.Log.d("MainViewModel", "Snapshot listener update: uid: ${firebaseUser.id}, exists: $exists, blockedVal: $blockedVal")
+                        if (snapshot != null && snapshot.exists() && snapshot.getBoolean("blocked") == true) {
+                            viewModelScope.launch {
+                                val reason = try {
+                                    val doc = firestore.collection("blocked_reasons").document(firebaseUser.id).get().await()
+                                    doc.getString("reason")
+                                } catch (e: Exception) {
+                                    null
+                                }
+                                logout()
+                                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    val msg = if (!reason.isNullOrBlank()) {
+                                        "Tài khoản của bạn đã bị khóa. Lý do: $reason"
+                                    } else {
+                                        "Tài khoản của bạn đã bị khóa."
+                                    }
+                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     fun setBottomBarVisible(visible: Boolean) {
         _isBottomBarVisible.value = visible
@@ -77,6 +126,9 @@ class MainViewModel @Inject constructor(
 
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
+
+    private val _isSavingHabit = MutableStateFlow(false)
+    val isSavingHabit: StateFlow<Boolean> = _isSavingHabit.asStateFlow()
 
     private val _aiSuggestedEmojis = MutableStateFlow<List<String>>(emptyList())
     val aiSuggestedEmojis: StateFlow<List<String>> = _aiSuggestedEmojis.asStateFlow()
@@ -161,9 +213,47 @@ class MainViewModel @Inject constructor(
             initialValue = null
         )
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val authState: StateFlow<AuthState> = authRepository.currentUser
-        .map { user ->
-            if (user != null) AuthState.Authenticated else AuthState.Unauthenticated
+        .flatMapLatest { firebaseUser ->
+            if (firebaseUser == null) {
+                flowOf(AuthState.Unauthenticated)
+            } else {
+                flow {
+                    emit(AuthState.Loading)
+                    val isAdmin = firebaseUser.email == "admin@gmail.com" || firebaseUser.email == "tdt2706@gmail.com"
+                    val isBlocked = if (isAdmin) false else try {
+                        apiService.getUserById(firebaseUser.id)
+                        false
+                    } catch (e: retrofit2.HttpException) {
+                        android.util.Log.d("MainViewModel", "authState flatMapLatest check: uid: ${firebaseUser.id}, code: ${e.code()}")
+                        e.code() == 403
+                    } catch (e: Exception) {
+                        android.util.Log.e("MainViewModel", "authState flatMapLatest error for uid: ${firebaseUser.id}", e)
+                        false
+                    }
+                    if (isBlocked) {
+                        val reason = try {
+                            val doc = firestore.collection("blocked_reasons").document(firebaseUser.id).get().await()
+                            doc.getString("reason")
+                        } catch (e: Exception) {
+                            null
+                        }
+                        logout()
+                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            val msg = if (!reason.isNullOrBlank()) {
+                                "Tài khoản của bạn đã bị khóa. Lý do: $reason"
+                            } else {
+                                "Tài khoản của bạn đã bị khóa."
+                            }
+                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                        }
+                        emit(AuthState.Unauthenticated)
+                    } else {
+                        emit(AuthState.Authenticated)
+                    }
+                }
+            }
         }
         .stateIn(
             scope = viewModelScope,
@@ -231,6 +321,13 @@ class MainViewModel @Inject constructor(
         )
 
     val squads: StateFlow<List<com.example.newstart.domain.model.Squad>> = socialRepository.getSquads()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val friends: StateFlow<List<com.example.newstart.domain.model.Friendship>> = socialRepository.getFriends()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -389,6 +486,11 @@ class MainViewModel @Inject constructor(
                 if (result.isSuccess) {
                     socialRepository.refreshSocialFeed()
                     onSuccess()
+                } else {
+                    val errorMsg = result.exceptionOrNull()?.message ?: "Lưu nhật ký thất bại"
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }
             } finally {
                 _isUploading.value = false
@@ -413,25 +515,30 @@ class MainViewModel @Inject constructor(
         squadId: String? = null,
         onSuccess: () -> Unit
     ) {
+        if (_isSavingHabit.value) return
         viewModelScope.launch {
-            val finalDate = date ?: _selectedHabitDate.value
-            val newHabit = Habit(
-                id = id,
-                name = name,
-                icon = icon,
-                goal = goal,
-                colorHex = colorHex,
-                date = finalDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                reminderTime = reminderTime,
-                reminderMinutesBefore = reminderMinutesBefore,
-                squadId = squadId
-            )
-            val result = saveHabitUseCase(newHabit)
-            if (result.isSuccess) {
-                onSuccess()
-            } else {
-                // In lỗi ra Logcat để kiểm tra
-                android.util.Log.e("MainViewModel", "Lưu thói quen thất bại: ${result.exceptionOrNull()?.message}")
+            try {
+                _isSavingHabit.value = true
+                val finalDate = date ?: _selectedHabitDate.value
+                val newHabit = Habit(
+                    id = id,
+                    name = name,
+                    icon = icon,
+                    goal = goal,
+                    colorHex = colorHex,
+                    date = finalDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                    reminderTime = reminderTime,
+                    reminderMinutesBefore = reminderMinutesBefore,
+                    squadId = squadId
+                )
+                val result = saveHabitUseCase(newHabit)
+                if (result.isSuccess) {
+                    onSuccess()
+                } else {
+                    android.util.Log.e("MainViewModel", "Lưu thói quen thất bại: ${result.exceptionOrNull()?.message}")
+                }
+            } finally {
+                _isSavingHabit.value = false
             }
         }
     }
@@ -559,4 +666,209 @@ class MainViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = 0 to 0
         )
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val isAdmin: StateFlow<Boolean> = authRepository.currentUser
+        .flatMapLatest { user ->
+            if (user == null) kotlinx.coroutines.flow.flowOf(false)
+            else kotlinx.coroutines.flow.flow { emit(authRepository.checkIsAdmin()) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val allUsers: StateFlow<List<User>> = userRepository.getAllUsers()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val blockedUsers: StateFlow<Set<String>> = userRepository.getBlockedUsers()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    val blockedReasons: StateFlow<Map<String, String>> = callbackFlow {
+        val listener = firestore.collection("blocked_reasons")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("MainViewModel", "Error fetching blocked reasons: ${error.message}", error)
+                    trySend(emptyMap())
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val reasons = snapshot.documents.associate { doc ->
+                        doc.id to (doc.getString("reason") ?: "Không có lý do")
+                    }
+                    trySend(reasons)
+                }
+            }
+        awaitClose { listener.remove() }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    fun blockUser(userId: String, block: Boolean, reason: String = "") {
+        viewModelScope.launch {
+            val result = userRepository.blockUser(userId, block)
+            result.onSuccess {
+                android.util.Log.d("MainViewModel", "blockUser success: userId: $userId, block: $block")
+                try {
+                    val docRef = firestore.collection("blocked_reasons").document(userId)
+                    if (block) {
+                        docRef.set(mapOf("reason" to reason, "blockedAt" to System.currentTimeMillis())).await()
+                    } else {
+                        docRef.delete().await()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MainViewModel", "Failed to update block reason in Firestore", e)
+                }
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, if (block) "Đã khóa người dùng" else "Đã mở khóa người dùng", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }.onFailure { e ->
+                android.util.Log.e("MainViewModel", "blockUser failed: userId: $userId, block: $block", e)
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Lỗi: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    fun adminDeletePost(postId: String) {
+        viewModelScope.launch {
+            try {
+                apiService.deleteJournalEntry(postId)
+                socialRepository.refreshSocialFeed()
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Admin delete post failed: ${e.message}")
+            }
+        }
+    }
+
+    val socialFeed: StateFlow<List<JournalEntry>> = socialRepository.getSocialFeed()
+        .map { entries ->
+            entries.filter { it.privacy != JournalPrivacy.PRIVATE }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val adminSocialFeed: StateFlow<List<JournalEntry>> = callbackFlow {
+        val listener = firestore.collection("journals")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("MainViewModel", "Error fetching admin feed: ${error.message}", error)
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val entries = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            val id = doc.id
+                            val userId = doc.getString("userId") ?: ""
+                            val emoji = doc.getString("emoji") ?: ""
+                            val text = doc.getString("text") ?: ""
+                            val imageUrl = doc.getString("imageUrl")
+                            val imageSource = doc.getString("imageSource")
+                            val privacyStr = doc.getString("privacy") ?: "FRIENDS"
+                            val privacy = try { JournalPrivacy.valueOf(privacyStr) } catch(e: Exception) { JournalPrivacy.FRIENDS }
+                            
+                            val timestampVal = doc.get("timestamp")
+                            val timestamp = when (timestampVal) {
+                                is com.google.firebase.Timestamp -> timestampVal.toDate()
+                                is Long -> java.util.Date(timestampVal)
+                                else -> null
+                            }
+                            
+                            val reactions = doc.get("reactions") as? Map<String, String> ?: emptyMap()
+                            
+                            JournalEntry(
+                                id = id,
+                                userId = userId,
+                                emoji = emoji,
+                                text = text,
+                                imageUrl = imageUrl,
+                                imageSource = imageSource,
+                                privacy = privacy,
+                                reactions = reactions,
+                                timestamp = timestamp
+                            )
+                        } catch (e: Exception) {
+                            android.util.Log.e("MainViewModel", "Error mapping admin journal: ${e.message}")
+                            null
+                        }
+                    }
+                    trySend(entries)
+                }
+            }
+        awaitClose { listener.remove() }
+    }
+    .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    fun getUserById(userId: String) = userRepository.getUserById(userId)
+
+    var pendingChatUserId by mutableStateOf<String?>(null)
+    var pendingSharedJournal by mutableStateOf<JournalEntry?>(null)
+    var isImageUploading by mutableStateOf(false)
+        private set
+
+    fun getDirectMessages(friendshipId: String): Flow<List<com.example.newstart.domain.model.DirectMessage>> {
+        return socialRepository.getDirectMessages(friendshipId)
+    }
+
+    fun sendDirectMessage(
+        friendshipId: String,
+        text: String,
+        sharedJournal: JournalEntry? = null,
+        imageUris: List<android.net.Uri> = emptyList(),
+        imageUri: android.net.Uri? = null
+    ) {
+        viewModelScope.launch {
+            val urisToUpload = if (imageUris.isNotEmpty()) imageUris else if (imageUri != null) listOf(imageUri) else emptyList()
+            var imageUrls: List<String> = emptyList()
+            if (urisToUpload.isNotEmpty()) {
+                isImageUploading = true
+                try {
+                    val uploadedUrls = mutableListOf<String>()
+                    urisToUpload.forEach { uri ->
+                        socialRepository.uploadImage(uri).onSuccess { url ->
+                            uploadedUrls.add(url)
+                        }.onFailure { e ->
+                            android.util.Log.e("MainViewModel", "Failed to upload DM image: ${e.message}", e)
+                        }
+                    }
+                    imageUrls = uploadedUrls
+                } finally {
+                    isImageUploading = false
+                }
+            }
+            val firstImageUrl = imageUrls.firstOrNull()
+            val result = socialRepository.sendDirectMessage(friendshipId, text, sharedJournal, imageUrls, firstImageUrl)
+            result.onFailure { e ->
+                android.util.Log.e("MainViewModel", "Failed to send direct message: ${e.message}", e)
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "Lỗi gửi tin: ${e.localizedMessage}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    fun getLastMessage(friendshipId: String): Flow<com.example.newstart.domain.model.DirectMessage?> {
+        return socialRepository.getLastMessage(friendshipId)
+    }
+
+    fun reactToDirectMessage(friendshipId: String, messageId: String, emoji: String) {
+        viewModelScope.launch {
+            socialRepository.reactToDirectMessage(friendshipId, messageId, emoji)
+        }
+    }
+
+    fun revokeDirectMessage(friendshipId: String, messageId: String) {
+        viewModelScope.launch {
+            socialRepository.revokeDirectMessage(friendshipId, messageId)
+        }
+    }
 }

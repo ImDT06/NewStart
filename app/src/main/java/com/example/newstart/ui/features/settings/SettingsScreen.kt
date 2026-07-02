@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 fun SettingsScreen(
     onNavigateToSocial: () -> Unit,
     onNavigateToHome: () -> Unit,
+    onNavigateToAdmin: () -> Unit = {},
     modifier: Modifier = Modifier,
     mainViewModel: MainViewModel = hiltViewModel()
 ) {
@@ -75,8 +76,6 @@ fun SettingsScreen(
     var countdownSeconds by remember { mutableStateOf(3) }
     var deleteAccountPasswordText by remember { mutableStateOf("") }
 
-    val sharedPrefs = remember(context) { context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE) }
-    var isStreakWidgetEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("is_streak_widget_enabled", true)) }
     val scope = rememberCoroutineScope()
     var showChangeEmailDialog by remember { mutableStateOf(false) }
     var showBirthdayDialog by remember { mutableStateOf(false) }
@@ -96,6 +95,7 @@ fun SettingsScreen(
     val isSearchable by mainViewModel.isSearchable.collectAsStateWithLifecycle()
     val isHabitNotifEnabled by mainViewModel.isHabitNotificationsEnabled.collectAsStateWithLifecycle()
     val isCommunityNotifEnabled by mainViewModel.isCommunityNotificationsEnabled.collectAsStateWithLifecycle()
+    val isAdmin by mainViewModel.isAdmin.collectAsStateWithLifecycle()
 
     var userEmailText by remember(currentUser) { mutableStateOf(currentUser?.email ?: "") }
     
@@ -448,7 +448,7 @@ fun SettingsScreen(
             CenterAlignedTopAppBar(
                 title = { 
                     Text(
-                        text = "Thông tin cá nhân",
+                        text = if (isVietnamese) "Thông tin cá nhân" else "Profile",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 22.sp
                     ) 
@@ -512,24 +512,6 @@ fun SettingsScreen(
                             title = stringResource(id = R.string.settings_add_widget),
                             subtitle = stringResource(id = R.string.settings_add_widget_desc),
                             onClick = { requestPinWidget() }
-                        )
-
-                        SettingsDivider()
-                        SettingsToggleItem(
-                            icon = Icons.Default.Whatshot,
-                            title = stringResource(id = R.string.settings_widget_streak),
-                            checked = isStreakWidgetEnabled,
-                            onCheckedChange = {
-                                isStreakWidgetEnabled = it
-                                sharedPrefs.edit().putBoolean("is_streak_widget_enabled", it).apply()
-                                scope.launch {
-                                    try {
-                                        HabitWidget().updateAll(context)
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("SettingsScreen", "Error updating widget: ${e.message}")
-                                    }
-                                }
-                            }
                         )
                     }
                 }
@@ -638,18 +620,35 @@ fun SettingsScreen(
                     }
                 }
 
+                // 4.5. Admin Section
+                if (isAdmin) {
+                    item { SectionTitle(title = if (isVi) "Quản trị hệ thống" else "Administration") }
+                    item {
+                        SettingsCard {
+                            SettingsItem(
+                                icon = Icons.Default.AdminPanelSettings,
+                                title = if (isVi) "Bảng quản trị" else "Admin Dashboard",
+                                subtitle = if (isVi) "Quản lý bài đăng và tài khoản người dùng" else "Manage community posts and user accounts",
+                                onClick = onNavigateToAdmin
+                            )
+                        }
+                    }
+                }
+
                 // 5. Vùng nguy hiểm (Danger Zone)
                 item { SectionTitle(title = stringResource(id = R.string.settings_danger_zone)) }
                 item {
                     SettingsCard {
-                        SettingsItem(
-                            icon = Icons.Default.DeleteForever,
-                            title = stringResource(id = R.string.settings_delete_account),
-                            subtitle = stringResource(id = R.string.settings_delete_account_desc),
-                            isDestructive = true,
-                            onClick = { showDeleteAccountDialog = true }
-                        )
-                        SettingsDivider()
+                        if (!isAdmin) {
+                            SettingsItem(
+                                icon = Icons.Default.DeleteForever,
+                                title = stringResource(id = R.string.settings_delete_account),
+                                subtitle = stringResource(id = R.string.settings_delete_account_desc),
+                                isDestructive = true,
+                                onClick = { showDeleteAccountDialog = true }
+                            )
+                            SettingsDivider()
+                        }
                         SettingsItem(
                             icon = Icons.AutoMirrored.Filled.Logout,
                             title = stringResource(id = R.string.settings_logout),

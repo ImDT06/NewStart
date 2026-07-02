@@ -7,6 +7,7 @@ import com.example.newstart.data.local.dao.HabitDao
 import com.example.newstart.data.local.toDomain
 import com.example.newstart.data.local.toEntity
 import com.example.newstart.data.remote.NewStartApiService
+import com.example.newstart.data.remote.dto.HabitDto
 import com.example.newstart.data.worker.SyncWorker
 import com.example.newstart.domain.model.Habit
 import com.example.newstart.domain.repository.HabitRepository
@@ -35,7 +36,43 @@ class HabitRepositoryImpl @Inject constructor(
 ) : HabitRepository {
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
+
+    private fun updateWidget() {
+        repositoryScope.launch {
+            kotlinx.coroutines.delay(100)
+            try {
+                com.example.newstart.widget.HabitWidget().updateAll(context)
+            } catch (e: Exception) {
+                android.util.Log.e("HabitRepository", "Error updating widget: ${e.message}")
+            }
+        }
+    }
+
     private val workManager = WorkManager.getInstance(context)
+
+    private fun Habit.toDto() = HabitDto(
+        id = id,
+        name = name,
+        icon = icon,
+        colorHex = colorHex,
+        reminderTime = reminderTime,
+        isCompleted = isCompleted,
+        date = date,
+        userId = userId,
+        squadId = squadId
+    )
+
+    private fun HabitDto.toDomain() = Habit(
+        id = id,
+        userId = userId,
+        name = name,
+        icon = icon,
+        colorHex = colorHex ?: "#1D5FE2",
+        isCompleted = isCompleted,
+        date = date,
+        reminderTime = reminderTime,
+        squadId = squadId
+    )
 
     private fun scheduleSync() {
         val constraints = Constraints.Builder()
@@ -92,6 +129,14 @@ class HabitRepositoryImpl @Inject constructor(
                 val habitWithUserId = habit.copy(id = docRef.id, userId = userId)
                 
                 habitDao.insertHabit(habitWithUserId.toEntity(isSynced = false))
+                
+                // Save to Spring Boot Server
+                try {
+                    apiService.createHabit(habitWithUserId.toDto())
+                } catch (e: Exception) {
+                    android.util.Log.e("HabitRepository", "Spring Boot save failed: ${e.message}", e)
+                }
+
                 try {
                     docRef.set(habitWithUserId).await()
                     habitDao.insertHabit(habitWithUserId.toEntity(isSynced = true))
@@ -101,7 +146,7 @@ class HabitRepositoryImpl @Inject constructor(
                 HabitReminderManager.scheduleReminder(context, habitWithUserId)
             }
             
-            HabitWidget().updateAll(context)
+            updateWidget()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -121,7 +166,7 @@ class HabitRepositoryImpl @Inject constructor(
             }
 
             HabitReminderManager.cancelReminder(context, habitId)
-            HabitWidget().updateAll(context)
+            updateWidget()
             
             Result.success(Unit)
         } catch (e: Exception) {
@@ -149,7 +194,7 @@ class HabitRepositoryImpl @Inject constructor(
                 HabitReminderManager.scheduleReminder(context, habit.copy(isCompleted = false))
             }
 
-            HabitWidget().updateAll(context)
+            updateWidget()
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -167,10 +212,32 @@ class HabitRepositoryImpl @Inject constructor(
                     println(">>> Đang gọi API lấy dữ liệu từ Spring Boot...")
                     val remoteHabits = apiService.getHabits(date)
                     println(">>> Đã nhận được ${remoteHabits.size} thói quen từ Server!")
+                    if (remoteHabits.isNotEmpty()) {
+                        val currentLocalHabits = habitDao.getHabitsSync(userId, date)
+                        val entitiesToInsert = remoteHabits.map { dto ->
+                            val domain = dto.toDomain()
+                            
+                            // Kiểm tra xem có thói quen nào ở local trùng lặp (cùng tên, icon, ngày) nhưng khác ID không
+                            val duplicate = currentLocalHabits.find { h ->
+                                h.name == domain.name && 
+                                h.icon == domain.icon && 
+                                h.date == domain.date && 
+                                h.id != domain.id
+                            }
+                            
+                            if (duplicate != null) {
+                                // Nếu tìm thấy trùng lặp, xóa cái cũ ở local đi để dùng cái từ server (có ID server)
+                                habitDao.deleteHabit(duplicate.id)
+                            }
+                            
+                            domain.toEntity(isSynced = true)
+                        }
+                        habitDao.insertHabits(entitiesToInsert)
+                    }
                 } catch (e: Exception) {
-                    println(">>> Lỗi gọi API: ${e.message}")
+                    println(">>> Lỗi gọi API Spring Boot: ${e.message}")
                 }
-                syncHabitsFromNetwork(userId, date)
+                syncHabitsFromNetwork(userId)
             }
         }
 
@@ -186,45 +253,28 @@ class HabitRepositoryImpl @Inject constructor(
         }
     }
 
-    private suspend fun syncHabitsFromNetwork(userId: String, date: String) {
+    private suspend fun syncHabitsFromNetwork(userId: String) {
         try {
-            // 1. Fetch personal habits
-            val personalSnapshot = firestore.collection("habits")
+            // Fetch all habits for this user (includes both personal and their copy of squad habits)
+            val snapshot = firestore.collection("habits")
                 .whereEqualTo("userId", userId)
-                .whereEqualTo("date", date)
                 .get()
                 .await()
             
-            val personalHabits = personalSnapshot.documents.mapNotNull { doc ->
-                doc.toObject(Habit::class.java)?.copy(id = doc.id)
+            val remoteHabits = snapshot.documents.mapNotNull { doc ->
+                try {
+                    doc.toObject(Habit::class.java)?.copy(id = doc.id)
+                } catch (e: Exception) {
+                    android.util.Log.e("HabitRepository", "Error deserializing habit: ${e.message}", e)
+                    null
+                }
             }
 
-            // 2. Fetch squad habits (shared)
-            val squadSnapshot = firestore.collection("habits")
-                .whereEqualTo("date", date)
-                .whereNotEqualTo("squadId", null)
-                .get()
-                .await()
-            
-            // Lọc lại những squad mà user tham gia (Firestore query whereIn có giới hạn, nên có thể lọc client-side nếu số lượng ít)
-            val userSquads = firestore.collection("squads")
-                .whereArrayContains("members", userId)
-                .get()
-                .await()
-                .documents.map { it.id }
-
-            val squadHabits = squadSnapshot.documents.mapNotNull { doc ->
-                val habit = doc.toObject(Habit::class.java)?.copy(id = doc.id)
-                if (habit?.squadId != null && userSquads.contains(habit.squadId)) habit else null
-            }
-
-            val allRemoteHabits = personalHabits + squadHabits
-
-            if (allRemoteHabits.isNotEmpty()) {
-                habitDao.insertHabits(allRemoteHabits.map { it.toEntity(isSynced = true) })
+            if (remoteHabits.isNotEmpty()) {
+                habitDao.insertHabits(remoteHabits.map { it.toEntity(isSynced = true) })
             }
         } catch (e: Exception) {
-            android.util.Log.e("HabitRepository", "Sync failed: ${e.message}")
+            android.util.Log.e("HabitRepository", "Sync failed: ${e.message}", e)
         }
     }
 }

@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -192,6 +193,11 @@ class MainActivity : AppCompatActivity() {
 
                 LaunchedEffect(authState) {
                     if (authState == AuthState.Authenticated) {
+                        val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                        if (currentUserId != null) {
+                            val sp = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                            sp.edit().putString("logged_in_user_id", currentUserId).apply()
+                        }
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             if (ContextCompat.checkSelfPermission(
                                     context,
@@ -469,20 +475,19 @@ class MainActivity : AppCompatActivity() {
                                             val selectedHabitDate by mainViewModel.selectedHabitDate.collectAsStateWithLifecycle()
                                             val editingHabitData by mainViewModel.editingHabit.collectAsStateWithLifecycle()
                                             val squads by mainViewModel.squads.collectAsStateWithLifecycle()
+                                            val isSavingHabit by mainViewModel.isSavingHabit.collectAsStateWithLifecycle()
                                             
                                             NewHabitSheet(
                                                 initialDate = selectedHabitDate,
                                                 editingHabit = editingHabitData,
                                                 squads = squads,
+                                                isSaving = isSavingHabit,
                                                 onDismiss = { 
                                                     showBottomSheet = false
                                                     mainViewModel.startEditingHabit(null)
                                                 },
                                                 onHabitSelected = { name, icon, time, mins, color, date, squadId ->
-                                                    val colorInt = (color.red * 255).toInt() shl 16 or
-                                                                  (color.green * 255).toInt() shl 8 or
-                                                                  (color.blue * 255).toInt()
-                                                    val colorHex = String.format("#%06X", colorInt)
+                                                    val colorHex = String.format("#%06X", 0xFFFFFF and color.toArgb())
 
                                                     mainViewModel.saveHabit(
                                                         id = editingHabitData?.id ?: "",
@@ -497,6 +502,12 @@ class MainActivity : AppCompatActivity() {
                                                     ) {
                                                         showBottomSheet = false
                                                         mainViewModel.startEditingHabit(null)
+                                                        // Chuyển về màn hình Home sau khi tạo/sửa thói quen
+                                                        if (navController.currentDestination?.route != Screen.Home.route) {
+                                                            navController.navigate(Screen.Home.route) {
+                                                                popUpTo(Screen.Home.route) { inclusive = false }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             )

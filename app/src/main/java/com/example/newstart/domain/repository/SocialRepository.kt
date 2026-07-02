@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 interface SocialRepository {
     // Friends
     fun getFriends(): Flow<List<Friendship>>
+    suspend fun refreshFriends()
     suspend fun sendFriendRequest(toUserId: String)
     fun getIncomingRequests(): Flow<List<FriendRequest>>
     fun getSentRequests(): Flow<List<FriendRequest>>
@@ -16,6 +17,7 @@ interface SocialRepository {
     
     // Squads
     fun getSquads(): Flow<List<Squad>>
+    suspend fun refreshSquads()
     suspend fun createSquad(squad: Squad)
     suspend fun joinSquad(squadId: String)
     suspend fun leaveSquad(squadId: String)
@@ -23,7 +25,7 @@ interface SocialRepository {
     suspend fun addMemberToSquad(squadId: String, memberId: String)
     suspend fun removeMemberFromSquad(squadId: String, memberId: String)
     fun getSquadMessages(squadId: String): Flow<List<com.example.newstart.domain.model.SquadMessage>>
-    suspend fun sendSquadMessage(squadId: String, text: String)
+    suspend fun sendSquadMessage(squadId: String, text: String, imageUrls: List<String> = emptyList(), imageUrl: String? = null)
     
     // Feed
     fun getSocialFeed(): Flow<List<JournalEntry>>
@@ -31,4 +33,20 @@ interface SocialRepository {
     suspend fun reactToPost(postId: String, emoji: String)
     suspend fun removeFriend(friendshipId: String)
     suspend fun declineFriendRequest(requestId: String)
+    
+    // Direct Messages
+    fun getDirectMessages(friendshipId: String): Flow<List<com.example.newstart.domain.model.DirectMessage>>
+    suspend fun sendDirectMessage(
+        friendshipId: String,
+        text: String,
+        sharedJournal: JournalEntry? = null,
+        imageUrls: List<String> = emptyList(),
+        imageUrl: String? = null
+    ): Result<Unit>
+    fun getLastMessage(friendshipId: String): Flow<com.example.newstart.domain.model.DirectMessage?>
+    suspend fun uploadImage(uri: android.net.Uri): Result<String>
+    suspend fun reactToSquadMessage(squadId: String, messageId: String, emoji: String)
+    suspend fun reactToDirectMessage(friendshipId: String, messageId: String, emoji: String)
+    suspend fun revokeSquadMessage(squadId: String, messageId: String)
+    suspend fun revokeDirectMessage(friendshipId: String, messageId: String)
 }

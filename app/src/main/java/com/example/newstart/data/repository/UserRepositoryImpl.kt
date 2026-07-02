@@ -33,6 +33,8 @@ import com.example.newstart.data.local.toDomain
 import com.example.newstart.data.local.toEntity
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 
 
 @Singleton
@@ -66,7 +68,7 @@ class UserRepositoryImpl @Inject constructor(
         launch(Dispatchers.IO) {
             try {
                 val dto = apiService.getUserById(id)
-                val user = User(
+                var user = User(
                     id = dto.id ?: "",
                     userId = dto.userId ?: "",
                     name = dto.name,
@@ -74,6 +76,36 @@ class UserRepositoryImpl @Inject constructor(
                     avatarUrl = dto.avatarUrl,
                     birthday = dto.birthday
                 )
+                
+                // Đồng bộ tên và email từ Firebase Auth lên Spring Boot nếu server trả về trống
+                val firebaseUser = auth.currentUser
+                if (firebaseUser != null && firebaseUser.uid == id) {
+                    var needsUpdate = false
+                    val updates = mutableMapOf<String, String>()
+                    
+                    val fbName = firebaseUser.displayName ?: ""
+                    val fbEmail = firebaseUser.email ?: ""
+                    
+                    if (user.name.isBlank() && fbName.isNotBlank()) {
+                        user = user.copy(name = fbName)
+                        updates["name"] = fbName
+                        needsUpdate = true
+                    }
+                    if (user.email.isBlank() && fbEmail.isNotBlank()) {
+                        user = user.copy(email = fbEmail)
+                        updates["email"] = fbEmail
+                        needsUpdate = true
+                    }
+                    
+                    if (needsUpdate) {
+                        try {
+                            apiService.updateProfile(updates)
+                        } catch (updateEx: Exception) {
+                            android.util.Log.e("UserRepository", "Auto-sync profile to server failed: ${updateEx.message}")
+                        }
+                    }
+                }
+                
                 userDao.insertUser(user.toEntity())
             } catch (e: Exception) {
                 android.util.Log.e("UserRepository", "API getUserById error: ${e.message}")
@@ -267,6 +299,61 @@ class UserRepositoryImpl @Inject constructor(
             outputStream.toByteArray()
         } catch (e: Exception) {
             null
+        }
+    }
+
+    override fun getAllUsers(): Flow<List<User>> = callbackFlow {
+        val listener = firestore.collection("users")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("UserRepository", "Error listing users: ${error.message}", error)
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val users = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            doc.toObject(User::class.java)?.copy(id = doc.id)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    trySend(users)
+                }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    private val blockedUsersRefreshTrigger = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(replay = 1).apply {
+        tryEmit(Unit)
+    }
+
+    override suspend fun blockUser(userId: String, block: Boolean): Result<Unit> {
+        return try {
+            val response = apiService.blockUser(userId, block)
+            if (response.isSuccessful) {
+                blockedUsersRefreshTrigger.tryEmit(Unit)
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Lỗi từ server: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    override fun getBlockedUsers(): Flow<Set<String>> {
+        return blockedUsersRefreshTrigger.flatMapLatest {
+            kotlinx.coroutines.flow.flow {
+                try {
+                    val blocked = apiService.getBlockedUsers()
+                    emit(blocked)
+                } catch (e: Exception) {
+                    android.util.Log.e("UserRepository", "Error getting blocked users", e)
+                    emit(emptySet())
+                }
+            }
         }
     }
 }

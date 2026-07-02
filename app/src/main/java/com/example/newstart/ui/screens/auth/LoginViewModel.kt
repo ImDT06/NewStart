@@ -50,10 +50,21 @@ class LoginViewModel @Inject constructor(
             val result = authRepository.loginWithEmail(_uiState.value.email, _uiState.value.password)
             
             _uiState.update { state ->
+                val error = result.exceptionOrNull()?.message
                 state.copy(
                     isLoading = false,
-                    loginResult = if (result.isSuccess) Resource.Success(Unit) 
-                                 else Resource.Error(result.exceptionOrNull()?.message ?: "Đăng nhập thất bại")
+                    emailError = if (error == "Email này chưa được đăng ký tài khoản.") error else null,
+                    passwordError = if (error == "Mật khẩu không chính xác.") error else null,
+                    loginResult = if (result.isSuccess) {
+                        Resource.Success(Unit)
+                    } else {
+                        // Nếu là lỗi cụ thể ở field thì không cần show Toast to đùng nữa
+                        if (error == "Email này chưa được đăng ký tài khoản." || error == "Mật khẩu không chính xác.") {
+                            null 
+                        } else {
+                            Resource.Error(error ?: "Đăng nhập thất bại")
+                        }
+                    }
                 )
             }
         }

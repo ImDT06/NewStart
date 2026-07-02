@@ -26,6 +26,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
@@ -38,6 +39,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -65,6 +67,7 @@ import com.example.newstart.ui.features.habits.AiState
 import com.example.newstart.ui.features.habits.HabitFilter
 import com.example.newstart.ui.features.habits.HabitsViewModel
 import com.example.newstart.ui.features.habits.components.HabitItem
+import com.example.newstart.ui.features.habits.components.HabitSwipeableItem
 import com.example.newstart.ui.navigation.Screen
 import com.example.newstart.ui.theme.NewStartTheme
 import com.example.newstart.ui.util.AppCombinedPreviews
@@ -291,6 +294,7 @@ fun HomeScreen(
                 scope.launch { pagerState.animateScrollToPage(500) }
             },
             onShowMonthPicker = { showMonthPicker = true },
+            onShowHabitList = { navController.navigate(Screen.Statistics.route) },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -319,7 +323,7 @@ fun HomeScreen(
                     habitsViewModel.clearAiState()
                 },
                 onProcessCommand = { habitsViewModel.processAiCommand(it) },
-                onConfirmHabits = { habitsViewModel.confirmAiHabits(it) },
+                onConfirmHabits = { habits, todos -> habitsViewModel.confirmAiDrafts(habits, todos) },
                 onClearState = { habitsViewModel.clearAiState() },
                 isListening = isListening,
                 onToggleListening = {
@@ -447,6 +451,7 @@ fun HomeContent(
     onDateSelected: (LocalDate) -> Unit,
     onTodayClick: () -> Unit,
     onShowMonthPicker: () -> Unit,
+    onShowHabitList: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val activeTodos = remember(todos) {
@@ -487,11 +492,15 @@ fun HomeContent(
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 100.dp)) {
-                item { HomeHeaderSection(userName = user?.name ?: "Guest") }
-                if (isTimerRunning) {
-                    item { TimerCard(timerSeconds, onStopTimer) }
+                item { 
+                    HomeHeaderSection(
+                        userName = user?.name ?: "Guest"
+                    ) 
                 }
-                item { DailyOverviewCard(habits, todos) }
+                if (isTimerRunning) {
+                    item { TimerCard(timerSeconds, onStopTimer, isVietnamese) }
+                }
+                item { DailyOverviewCard(habits, todos, isVietnamese) }
                 
                 item {
                     HabitsHeader(
@@ -502,7 +511,8 @@ fun HomeContent(
                         isVietnamese = isVietnamese,
                         locale = locale,
                         onTodayClick = onTodayClick,
-                        onShowMonthPicker = onShowMonthPicker
+                        onShowMonthPicker = onShowMonthPicker,
+                        onShowHabitList = onShowHabitList
                     )
                 }
 
@@ -592,6 +602,7 @@ fun HomeContent(
                             onToggle = { handleToggleTodo(todo.id, it) },
                             onClick = { onEditTodo(todo) },
                             onDelete = { onDeleteTodo(todo) },
+                            isVietnamese = isVietnamese,
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -613,7 +624,12 @@ fun HomeContent(
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         Text(
-                                            text = if (isActiveTodosExpanded) "Thu gọn danh sách" else "Xem thêm ${activeTodos.size - 5} việc cần làm khác",
+                                            text = if (isActiveTodosExpanded) {
+                                                if (isVietnamese) "Thu gọn danh sách" else "Collapse list"
+                                            } else {
+                                                if (isVietnamese) "Xem thêm ${activeTodos.size - 5} việc cần làm khác" 
+                                                else "See ${activeTodos.size - 5} more todos"
+                                            },
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
@@ -643,7 +659,7 @@ fun HomeContent(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = "Đã hoàn thành (${completedTodos.size})",
+                                    text = (if (isVietnamese) "Đã hoàn thành" else "Completed") + " (${completedTodos.size})",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
@@ -668,9 +684,9 @@ fun HomeContent(
                                     val todayStr = sdfInput.format(Date())
                                     val yesterdayStr = sdfInput.format(Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000))
                                     when (dateStr) {
-                                        todayStr -> "Hôm nay"
-                                        yesterdayStr -> "Hôm qua"
-                                        else -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(date)
+                                        todayStr -> if (isVietnamese) "Hôm nay" else "Today"
+                                        yesterdayStr -> if (isVietnamese) "Hôm qua" else "Yesterday"
+                                        else -> SimpleDateFormat(if (isVietnamese) "dd/MM/yyyy" else "MM/dd/yyyy", locale).format(date)
                                     }
                                 } catch (e: Exception) {
                                     dateStr
@@ -692,6 +708,7 @@ fun HomeContent(
                                     onToggle = { handleToggleTodo(todo.id, it) },
                                     onClick = { onEditTodo(todo) },
                                     onDelete = { onDeleteTodo(todo) },
+                                    isVietnamese = isVietnamese,
                                     modifier = Modifier.animateItem()
                                 )
                             }
@@ -732,87 +749,6 @@ private fun List<Habit>.groupByTimeOfDay(): List<Pair<String, List<Habit>>> {
 }
 
 @Composable
-private fun HabitSwipeableItem(
-    modifier: Modifier = Modifier,
-    habit: Habit,
-    onDelete: () -> Unit,
-    onToggle: (Habit, Boolean) -> Unit,
-    onEdit: (Habit) -> Unit
-) {
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    val anchorWidth = with(density) { 80.dp.toPx() }
-    val dismissThreshold = with(density) { 180.dp.toPx() }
-    
-    val offsetX = remember { Animatable(0f) }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFFFF4444))
-                .clickable { 
-                    scope.launch {
-                        offsetX.animateTo(-1500f, spring(stiffness = Spring.StiffnessMedium))
-                        onDelete()
-                    }
-                },
-            contentAlignment = Alignment.CenterEnd
-        ) {
-            Box(
-                modifier = Modifier.width(80.dp).fillMaxHeight(),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
-                .fillMaxWidth()
-                .pointerInput(habit.id) {
-                    detectHorizontalDragGestures(
-                        onHorizontalDrag = { change, dragAmount ->
-                            val newOffset = (offsetX.value + dragAmount).coerceAtMost(0f)
-                            scope.launch { offsetX.snapTo(newOffset) }
-                            change.consume()
-                        },
-                        onDragEnd = {
-                            scope.launch {
-                                if (offsetX.value < -dismissThreshold) {
-                                    offsetX.animateTo(-1500f, spring(stiffness = Spring.StiffnessMedium))
-                                    onDelete()
-                                } else if (offsetX.value < -anchorWidth / 2) {
-                                    offsetX.animateTo(-anchorWidth, spring(dampingRatio = Spring.DampingRatioNoBouncy))
-                                } else {
-                                    offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy))
-                                }
-                            }
-                        }
-                    )
-                }
-        ) {
-            HabitItem(
-                habit = habit, 
-                onToggle = { onToggle(habit, !habit.isCompleted) }, 
-                onEdit = { onEdit(habit) }
-            )
-        }
-    }
-}
-
-@Composable
 private fun HabitsHeader(
     selectedDate: LocalDate,
     currentFilter: HabitFilter,
@@ -822,6 +758,7 @@ private fun HabitsHeader(
     locale: Locale,
     onTodayClick: () -> Unit,
     onShowMonthPicker: () -> Unit,
+    onShowHabitList: () -> Unit,
 ) {
     var showFilterMenu by remember { mutableStateOf(false) }
 
@@ -917,16 +854,27 @@ private fun HabitsHeader(
             textAlign = TextAlign.Center
         )
 
-        IconButton(
-            onClick = onShowMonthPicker,
-            modifier = Modifier.align(Alignment.CenterEnd)
+        Row(
+            modifier = Modifier.align(Alignment.CenterEnd),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.CalendarMonth,
-                null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onBackground
-            )
+            IconButton(onClick = onShowHabitList) {
+                Icon(
+                    Icons.AutoMirrored.Filled.FormatListBulleted,
+                    null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
+            
+            IconButton(onClick = onShowMonthPicker) {
+                Icon(
+                    Icons.Default.CalendarMonth,
+                    null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
         }
     }
 }
@@ -990,6 +938,7 @@ private fun TodoSwipeableItem(
     onToggle: (Boolean) -> Unit,
     onClick: () -> Unit,
     onDelete: () -> Unit,
+    isVietnamese: Boolean,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -1060,7 +1009,8 @@ private fun TodoSwipeableItem(
             HomeTodoItem(
                 todo = todo,
                 onToggle = onToggle,
-                onClick = onClick
+                onClick = onClick,
+                isVietnamese = isVietnamese
             )
         }
     }
@@ -1068,20 +1018,26 @@ private fun TodoSwipeableItem(
 
 @Composable
 private fun HomeHeaderSection(userName: String) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        val greetingRes = when (hour) {
-            in 5..10 -> R.string.home_hello_morning
-            in 11..13 -> R.string.home_hello_noon
-            in 14..17 -> R.string.home_hello_afternoon
-            else -> R.string.home_hello_evening
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            val greetingRes = when (hour) {
+                in 5..10 -> R.string.home_hello_morning
+                in 11..13 -> R.string.home_hello_noon
+                in 14..17 -> R.string.home_hello_afternoon
+                else -> R.string.home_hello_evening
+            }
+            Text(text = stringResource(id = greetingRes, userName), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
         }
-        Text(text = stringResource(id = greetingRes, userName), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
     }
 }
 
 @Composable
-private fun DailyOverviewCard(habits: List<Habit>, todos: List<Todo>) {
+private fun DailyOverviewCard(habits: List<Habit>, todos: List<Todo>, isVietnamese: Boolean) {
     val total = habits.size + todos.size
     val completed = habits.count { it.isCompleted } + todos.count { it.isCompleted }
     val progress = if (total > 0) completed.toFloat() / total else 0f
@@ -1095,15 +1051,20 @@ private fun DailyOverviewCard(habits: List<Habit>, todos: List<Todo>) {
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Text(text = "Tiến độ ngày", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(text = "Bạn đã hoàn thành $completed/$total mục tiêu.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                Text(text = if (isVietnamese) "Tiến độ ngày" else "Daily Progress", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(
+                    text = if (isVietnamese) "Bạn đã hoàn thành $completed/$total mục tiêu." 
+                           else "You've completed $completed/$total goals.", 
+                    fontSize = 12.sp, 
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                )
             }
         }
     }
 }
 
 @Composable
-private fun TimerCard(seconds: Int, onStop: () -> Unit) {
+private fun TimerCard(seconds: Int, onStop: () -> Unit, isVietnamese: Boolean) {
     val mins = seconds / 60
     val secs = seconds % 60
     val timeStr = String.format("%02d:%02d", mins, secs)
@@ -1119,7 +1080,7 @@ private fun TimerCard(seconds: Int, onStop: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text("Đang tập trung", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
+                Text(if (isVietnamese) "Đang tập trung" else "Focusing", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
                 Text(timeStr, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
             }
             Button(
@@ -1128,7 +1089,7 @@ private fun TimerCard(seconds: Int, onStop: () -> Unit) {
                 shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
             ) {
-                Text("Dừng", color = Color.White, fontSize = 13.sp)
+                Text(if (isVietnamese) "Dừng" else "Stop", color = Color.White, fontSize = 13.sp)
             }
         }
     }
@@ -1138,7 +1099,8 @@ private fun TimerCard(seconds: Int, onStop: () -> Unit) {
 private fun HomeTodoItem(
     todo: Todo, 
     onToggle: (Boolean) -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isVietnamese: Boolean
 ) {
     val priorityColor = when (todo.priority) {
         Priority.HIGH -> Color(0xFFFF4444)
@@ -1201,7 +1163,13 @@ private fun HomeTodoItem(
             if (todo.dueDate != null) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+                    val sdfDate = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+                    val sdfTime = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+                    
+                    val dateText = sdfDate.format(todo.dueDate)
+                    val timeText = sdfTime.format(todo.dueDate)
+                    val isTimeSet = timeText != "00:00"
+
                     Icon(
                         imageVector = Icons.Default.CalendarToday,
                         contentDescription = null,
@@ -1210,11 +1178,29 @@ private fun HomeTodoItem(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isOverdue) "Quá hạn: ${sdf.format(todo.dueDate)}" else sdf.format(todo.dueDate),
+                        text = if (isOverdue) {
+                            (if (isVietnamese) "Quá hạn: " else "Overdue: ") + dateText
+                        } else dateText,
                         fontSize = 11.sp,
                         fontWeight = if (isOverdue) FontWeight.Bold else FontWeight.Normal,
                         color = if (isOverdue) Color(0xFFFF4444) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
+                    
+                    if (isTimeSet) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.AccessTime,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = timeText,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
         }
@@ -1388,13 +1374,44 @@ fun TodoEditDialog(
                                 DatePickerDialog(
                                     context,
                                     { _, year, month, dayOfMonth ->
+                                        val currentCal = Calendar.getInstance()
+                                        dueDate?.let { currentCal.time = it }
+                                        
                                         val newCal = Calendar.getInstance()
-                                        newCal.set(year, month, dayOfMonth)
+                                        newCal.set(year, month, dayOfMonth, 
+                                            if (dueDate != null) currentCal.get(Calendar.HOUR_OF_DAY) else 0,
+                                            if (dueDate != null) currentCal.get(Calendar.MINUTE) else 0
+                                        )
                                         dueDate = newCal.time
                                     },
                                     calendar.get(Calendar.YEAR),
                                     calendar.get(Calendar.MONTH),
                                     calendar.get(Calendar.DAY_OF_MONTH)
+                                ).show()
+                            }
+                            
+                            val showTimePicker = {
+                                val calendar = Calendar.getInstance()
+                                dueDate?.let { calendar.time = it }
+                                android.app.TimePickerDialog(
+                                    context,
+                                    { _, hourOfDay, minute ->
+                                        val currentCal = Calendar.getInstance()
+                                        dueDate?.let { currentCal.time = it }
+                                        
+                                        val newCal = Calendar.getInstance()
+                                        newCal.set(
+                                            currentCal.get(Calendar.YEAR),
+                                            currentCal.get(Calendar.MONTH),
+                                            currentCal.get(Calendar.DAY_OF_MONTH),
+                                            hourOfDay,
+                                            minute
+                                        )
+                                        dueDate = newCal.time
+                                    },
+                                    calendar.get(Calendar.HOUR_OF_DAY),
+                                    calendar.get(Calendar.MINUTE),
+                                    true
                                 ).show()
                             }
 
@@ -1410,6 +1427,7 @@ fun TodoEditDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
+                                    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
                                     Icon(
                                         imageVector = Icons.Default.CalendarToday,
                                         contentDescription = null,
@@ -1417,10 +1435,38 @@ fun TodoEditDialog(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Text(
-                                        text = dateText,
+                                        text = dueDate?.let { sdf.format(it) } ?: "Ngày",
                                         fontSize = 13.sp,
                                         fontWeight = if (dueDate != null) FontWeight.Bold else FontWeight.Normal,
                                         color = if (dueDate != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                onClick = showTimePicker,
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (dueDate != null) MaterialTheme.colorScheme.secondary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                border = BorderStroke(1.dp, if (dueDate != null) MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f) else Color.Transparent),
+                                modifier = Modifier.weight(0.7f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val stf = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+                                    Icon(
+                                        imageVector = Icons.Default.AccessTime,
+                                        contentDescription = null,
+                                        tint = if (dueDate != null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = dueDate?.let { stf.format(it) } ?: "Giờ",
+                                        fontSize = 13.sp,
+                                        fontWeight = if (dueDate != null) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (dueDate != null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -1541,7 +1587,7 @@ private fun AiInteractionSheet(
     onAiCommandChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onProcessCommand: (String) -> Unit,
-    onConfirmHabits: (List<Habit>) -> Unit,
+    onConfirmHabits: (List<Habit>, List<Todo>) -> Unit,
     onClearState: () -> Unit,
     isListening: Boolean,
     onToggleListening: () -> Unit,
@@ -1560,7 +1606,7 @@ private fun AiInteractionSheet(
     ) {
         AnimatedContent(targetState = aiState, label = "ai_content_anim") { state ->
             when (state) {
-                is AiState.Drafting -> AiDraftingView(state.habits, squads, onConfirmHabits, onClearState)
+                is AiState.Drafting -> AiDraftingView(state.habits, state.todos, squads, onConfirmHabits, onClearState)
                 else -> AiInputView(state, aiCommand, onAiCommandChange, onProcessCommand, isListening, onToggleListening, aiGradient)
             }
         }
@@ -1570,11 +1616,13 @@ private fun AiInteractionSheet(
 @Composable
 private fun AiDraftingView(
     initialHabits: List<Habit>,
+    initialTodos: List<Todo>,
     squads: List<com.example.newstart.domain.model.Squad> = emptyList(),
-    onConfirm: (List<Habit>) -> Unit,
+    onConfirm: (List<Habit>, List<Todo>) -> Unit,
     onCancel: () -> Unit
 ) {
     var draftHabits by remember(initialHabits) { mutableStateOf(initialHabits) }
+    var draftTodos by remember(initialTodos) { mutableStateOf(initialTodos) }
     var editingHabit by remember { mutableStateOf<Habit?>(null) }
     var editingIndex by remember { mutableStateOf(-1) }
 
@@ -1606,10 +1654,7 @@ private fun AiDraftingView(
                 habit = editingHabit!!,
                 squads = squads,
                 onConfirm = { name, icon, time, mins, color, date, squadId ->
-                    val colorInt = (color.red * 255).toInt() shl 16 or
-                                  (color.green * 255).toInt() shl 8 or
-                                  (color.blue * 255).toInt()
-                    val colorHex = String.format("#%06X", colorInt)
+                    val colorHex = String.format("#%06X", 0xFFFFFF and color.toArgb())
                     val updatedHabit = editingHabit!!.copy(
                         name = name,
                         icon = icon,
@@ -1641,55 +1686,112 @@ private fun AiDraftingView(
             .padding(start = 24.dp, end = 24.dp, bottom = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Xác nhận thói quen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text("AI đề xuất các thói quen sau (Bấm để chỉnh sửa)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Đề xuất từ AI", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text("AI đề xuất các mục sau", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
-        draftHabits.forEachIndexed { index, habit ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-                    .clickable {
-                        editingHabit = habit
-                        editingIndex = index
-                    },
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+        
+        if (draftHabits.isNotEmpty()) {
+            Text(
+                text = "Thói quen đề xuất (Bấm để sửa)", 
+                style = MaterialTheme.typography.titleSmall, 
+                fontWeight = FontWeight.Bold, 
+                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
+            )
+            draftHabits.forEachIndexed { index, habit ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                        .clickable {
+                            editingHabit = habit
+                            editingIndex = index
+                        },
+                    shape = RoundedCornerShape(20.dp)
                 ) {
-                    Surface(
-                        modifier = Modifier.size(48.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(habit.icon, fontSize = 24.sp)
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(habit.icon, fontSize = 24.sp)
+                            }
                         }
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(habit.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        habit.reminderTime?.let { time ->
-                            Text(time, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(16.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(habit.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            habit.reminderTime?.let { time ->
+                                Text(time, color = MaterialTheme.colorScheme.primary)
+                            }
                         }
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
                 }
             }
         }
+        
+        if (draftTodos.isNotEmpty()) {
+            Text(
+                text = "Việc cần làm đề xuất", 
+                style = MaterialTheme.typography.titleSmall, 
+                fontWeight = FontWeight.Bold, 
+                modifier = Modifier.align(Alignment.Start).padding(top = 12.dp, bottom = 8.dp)
+            )
+            draftTodos.forEachIndexed { index, todo ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle, 
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(todo.task, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "Độ ưu tiên: ${todo.priority.name}", 
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        
+        Spacer(Modifier.height(16.dp))
         Button(
-            onClick = { onConfirm(draftHabits) },
+            onClick = { onConfirm(draftHabits, draftTodos) },
             modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = RoundedCornerShape(16.dp)
         ) {
-            Text("Thêm tất cả vào lịch trình", fontWeight = FontWeight.Bold)
+            Text("Thêm tất cả vào ứng dụng", fontWeight = FontWeight.Bold)
         }
         TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
             Text("Hủy bỏ", color = MaterialTheme.colorScheme.onSurfaceVariant)

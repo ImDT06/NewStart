@@ -1,19 +1,20 @@
 package com.example.newstart.domain.model
 
-import com.google.firebase.firestore.DocumentId
-import com.google.firebase.firestore.IgnoreExtraProperties
 import java.util.Date
 
-@IgnoreExtraProperties
-data class SquadMessage(
-    @DocumentId
+data class DirectMessage(
     val id: String = "",
     val senderId: String = "",
     val senderName: String = "",
     val text: String = "",
     val imageUrl: String? = null,
     val imageUrls: List<String> = emptyList(),
-    val timestamp: Date = Date(),
+    val timestamp: Date? = null,
+    val sharedJournalId: String? = null,
+    val sharedJournalText: String? = null,
+    val sharedJournalImageUrl: String? = null,
+    val sharedJournalEmoji: String? = null,
+    val sharedJournalAuthorName: String? = null,
     val reactions: Map<String, String> = emptyMap(),
     val isRevoked: Boolean = false
 )
