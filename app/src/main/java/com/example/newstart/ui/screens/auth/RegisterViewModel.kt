@@ -88,9 +88,15 @@ class RegisterViewModel @Inject constructor(
                 authRepository.logout() // Đăng xuất để tránh race condition tự động đăng nhập
                 _uiState.update { it.copy(isLoading = false, registerResult = Resource.Success(Unit)) }
             } else {
+                val error = result.exceptionOrNull()?.message
                 _uiState.update { it.copy(
-                    isLoading = false, 
-                    registerResult = Resource.Error(result.exceptionOrNull()?.message ?: "Đăng ký thất bại")
+                    isLoading = false,
+                    emailError = if (error == "Email này đã được sử dụng bởi một tài khoản khác.") error else null,
+                    registerResult = if (error == "Email này đã được sử dụng bởi một tài khoản khác.") {
+                        null
+                    } else {
+                        Resource.Error(error ?: "Đăng ký thất bại")
+                    }
                 ) }
             }
         }
