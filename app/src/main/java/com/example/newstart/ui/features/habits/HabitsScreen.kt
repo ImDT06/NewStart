@@ -87,8 +87,8 @@ fun HabitsScreen(
     val isVietnamese = locale.language == "vi"
     val dateTimeFormatter = remember { SimpleDateFormat("HH:mm - dd/MM/yyyy", locale) }
 
-    DisposableEffect(activeSquad) {
-        if (activeSquad != null) {
+    DisposableEffect(activeSquad, activeChatFriendship) {
+        if (activeSquad != null || activeChatFriendship != null) {
             mainViewModel.setBottomBarVisible(false)
         } else {
             mainViewModel.setBottomBarVisible(true)
@@ -112,7 +112,7 @@ fun HabitsScreen(
         com.example.newstart.ui.features.social.DirectChatView(
             friendship = activeChatFriendship!!,
             currentUserId = currentUserId ?: "",
-            mainViewModel = mainViewModel,
+            viewModel = socialViewModel,
             onBack = { activeChatFriendship = null }
         )
     } else {
@@ -258,7 +258,7 @@ fun HabitsScreen(
                             1 -> com.example.newstart.ui.features.social.ChatsTabWrapper(
                                 friends = friends,
                                 currentUserId = currentUserId ?: "",
-                                mainViewModel = mainViewModel,
+                                viewModel = socialViewModel,
                                 onFriendChatClick = { activeChatFriendship = it }
                             )
                             2 -> Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -357,7 +357,7 @@ fun HabitsScreen(
                             onClick = {
                                 val friendship = friends.find { it.userIds.contains(replyJournal.userId) }
                                 if (friendship != null) {
-                                    mainViewModel.sendDirectMessage(
+                                    socialViewModel.sendDirectMessage(
                                         friendshipId = friendship.id,
                                         text = replyText.trim(),
                                         sharedJournal = replyJournal

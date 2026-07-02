@@ -85,6 +85,11 @@ fun SocialScreen(
     
     var activeChatFriendship by remember { mutableStateOf<Friendship?>(null) }
     
+    LaunchedEffect(activeChatFriendship, activeSquad) {
+        val shouldHide = activeChatFriendship != null || activeSquad != null
+        mainViewModel.setBottomBarVisible(!shouldHide)
+    }
+    
     LaunchedEffect(mainViewModel.pendingChatUserId) {
         val pendingUserId = mainViewModel.pendingChatUserId
         if (pendingUserId != null) {
@@ -93,7 +98,7 @@ fun SocialScreen(
                 activeChatFriendship = friendship
                 val pendingJournal = mainViewModel.pendingSharedJournal
                 if (pendingJournal != null) {
-                    mainViewModel.sendDirectMessage(
+                    viewModel.sendDirectMessage(
                         friendshipId = friendship.id,
                         text = "",
                         sharedJournal = pendingJournal
@@ -118,7 +123,7 @@ fun SocialScreen(
         DirectChatView(
             friendship = activeChatFriendship!!,
             currentUserId = currentUserId ?: "",
-            mainViewModel = mainViewModel,
+            viewModel = viewModel,
             onBack = { activeChatFriendship = null }
         )
     } else {
@@ -218,7 +223,7 @@ fun SocialScreen(
                             ChatsTabWrapper(
                                 friends = friends,
                                 currentUserId = currentUserId ?: "",
-                                mainViewModel = mainViewModel,
+                                viewModel = viewModel,
                                 onFriendChatClick = { activeChatFriendship = it }
                             )
                         }
@@ -1984,7 +1989,7 @@ fun SquadDetailViewWrapper(
 fun DirectChatView(
     friendship: Friendship,
     currentUserId: String,
-    mainViewModel: MainViewModel,
+    viewModel: SocialViewModel,
     onBack: () -> Unit
 ) {
     val isDark = LocalDarkTheme.current
@@ -1992,12 +1997,12 @@ fun DirectChatView(
     
     // Lấy thông tin người bạn
     val friendId = friendship.userIds.firstOrNull { it != currentUserId } ?: ""
-    val friendFlow = remember(friendId) { mainViewModel.getUserById(friendId) }
+    val friendFlow = remember(friendId) { viewModel.getUserById(friendId) }
     val friendState by friendFlow.collectAsState(initial = User(name = stringResource(R.string.squad_loading)))
     val displayName = friendState.name.ifBlank { stringResource(R.string.social_default_user_name) }
     
     // Danh sách tin nhắn
-    val messagesFlow = remember(friendship.id) { mainViewModel.getDirectMessages(friendship.id) }
+    val messagesFlow = remember(friendship.id) { viewModel.getDirectMessages(friendship.id) }
     val messages by messagesFlow.collectAsState(initial = emptyList())
     
     var messageText by remember { mutableStateOf("") }
@@ -2011,7 +2016,7 @@ fun DirectChatView(
             selectedImageUris = (selectedImageUris + uris).distinct()
         }
     }
-    val isImageUploading = mainViewModel.isImageUploading
+    val isImageUploading by viewModel.isImageUploading.collectAsStateWithLifecycle()
     var activeTimestampMessageId by remember { mutableStateOf<String?>(null) }
     var showReactionPickerMessageId by remember { mutableStateOf<String?>(null) }
     var showDirectMessageOptionsDialog by remember { mutableStateOf<com.example.newstart.domain.model.DirectMessage?>(null) }
@@ -2194,7 +2199,7 @@ fun DirectChatView(
                             IconButton(
                                 onClick = {
                                     if (messageText.isNotBlank() || selectedImageUris.isNotEmpty()) {
-                                        mainViewModel.sendDirectMessage(friendship.id, messageText.trim(), imageUris = selectedImageUris)
+                                        viewModel.sendDirectMessage(friendship.id, messageText.trim(), imageUris = selectedImageUris)
                                         messageText = ""
                                         selectedImageUris = emptyList()
                                     }
@@ -2421,7 +2426,7 @@ fun DirectChatView(
                                                              modifier = Modifier
                                                                  .clip(CircleShape)
                                                                  .clickable {
-                                                                     mainViewModel.reactToDirectMessage(friendship.id, message.id, emoji)
+                                                                     viewModel.reactToDirectMessage(friendship.id, message.id, emoji)
                                                                      showReactionPickerMessageId = null
                                                                  }
                                                                  .padding(4.dp)
@@ -2486,7 +2491,7 @@ fun DirectChatView(
                                                      shape = RoundedCornerShape(12.dp),
                                                      modifier = Modifier
                                                          .clickable {
-                                                             mainViewModel.reactToDirectMessage(friendship.id, message.id, emoji)
+                                                             viewModel.reactToDirectMessage(friendship.id, message.id, emoji)
                                                          }
                                                  ) {
                                                      Row(
@@ -2542,7 +2547,7 @@ fun DirectChatView(
                     onClick = {
                         val msg = showDirectMessageOptionsDialog
                         if (msg != null) {
-                            mainViewModel.revokeDirectMessage(friendship.id, msg.id)
+                            viewModel.revokeDirectMessage(friendship.id, msg.id)
                         }
                         showDirectMessageOptionsDialog = null
                     }
@@ -2624,7 +2629,7 @@ fun SharedJournalCard(
 fun ChatsTabWrapper(
     friends: List<Friendship>,
     currentUserId: String,
-    mainViewModel: MainViewModel,
+    viewModel: SocialViewModel,
     onFriendChatClick: (Friendship) -> Unit
 ) {
     if (friends.isEmpty()) {
@@ -2651,7 +2656,7 @@ fun ChatsTabWrapper(
                 ChatItem(
                     friendship = friendship,
                     currentUserId = currentUserId,
-                    mainViewModel = mainViewModel,
+                    viewModel = viewModel,
                     onClick = { onFriendChatClick(friendship) }
                 )
             }
@@ -2663,15 +2668,15 @@ fun ChatsTabWrapper(
 fun ChatItem(
     friendship: Friendship,
     currentUserId: String,
-    mainViewModel: MainViewModel,
+    viewModel: SocialViewModel,
     onClick: () -> Unit
 ) {
     val isDark = LocalDarkTheme.current
     val friendId = friendship.userIds.firstOrNull { it != currentUserId } ?: return
-    val friendFlow = remember(friendId) { mainViewModel.getUserById(friendId) }
+    val friendFlow = remember(friendId) { viewModel.getUserById(friendId) }
     val friendState by friendFlow.collectAsState(initial = User(name = stringResource(R.string.squad_loading)))
     
-    val lastMessageFlow = remember(friendship.id) { mainViewModel.getLastMessage(friendship.id) }
+    val lastMessageFlow = remember(friendship.id) { viewModel.getLastMessage(friendship.id) }
     val lastMessage by lastMessageFlow.collectAsState(initial = null)
     
     val displayName = friendState.name.ifBlank { stringResource(R.string.social_default_user_name) }

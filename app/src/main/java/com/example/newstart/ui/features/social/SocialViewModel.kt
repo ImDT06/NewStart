@@ -19,6 +19,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 import com.example.newstart.domain.model.SquadMessage
+import com.example.newstart.domain.model.DirectMessage
+import com.example.newstart.domain.model.JournalEntry
 import kotlinx.coroutines.flow.Flow
 
 import android.net.Uri
@@ -28,7 +30,8 @@ import kotlinx.coroutines.flow.asStateFlow
 class SocialViewModel @Inject constructor(
     private val socialRepository: SocialRepository,
     private val userRepository: UserRepository,
-    private val auth: FirebaseAuth
+    private val auth: FirebaseAuth,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
 
     val friends: StateFlow<List<Friendship>> = socialRepository.getFriends()
@@ -199,4 +202,65 @@ class SocialViewModel @Inject constructor(
     }
 
     fun getUserById(userId: String) = userRepository.getUserById(userId)
+
+    fun getDirectMessages(friendshipId: String): Flow<List<DirectMessage>> {
+        return socialRepository.getDirectMessages(friendshipId)
+    }
+
+    fun sendDirectMessage(
+        friendshipId: String,
+        text: String,
+        sharedJournal: JournalEntry? = null,
+        imageUris: List<Uri> = emptyList(),
+        imageUri: Uri? = null
+    ) {
+        viewModelScope.launch {
+            val urisToUpload = if (imageUris.isNotEmpty()) imageUris else if (imageUri != null) listOf(imageUri) else emptyList()
+            var imageUrls: List<String> = emptyList()
+            if (urisToUpload.isNotEmpty()) {
+                _isImageUploading.value = true
+                try {
+                    val uploadedUrls = mutableListOf<String>()
+                    urisToUpload.forEach { uri ->
+                        socialRepository.uploadImage(uri).onSuccess { url ->
+                            uploadedUrls.add(url)
+                        }.onFailure { e ->
+                            android.util.Log.e("SocialViewModel", "Failed to upload DM image: ${e.message}", e)
+                        }
+                    }
+                    imageUrls = uploadedUrls
+                } finally {
+                    _isImageUploading.value = false
+                }
+            }
+            val firstImageUrl = imageUrls.firstOrNull()
+            val result = socialRepository.sendDirectMessage(friendshipId, text, sharedJournal, imageUrls, firstImageUrl)
+            result.onFailure { e ->
+                android.util.Log.e("SocialViewModel", "Failed to send direct message: ${e.message}", e)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "Lỗi gửi tin: ${e.localizedMessage}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    fun getLastMessage(friendshipId: String): Flow<DirectMessage?> {
+        return socialRepository.getLastMessage(friendshipId)
+    }
+
+    fun reactToDirectMessage(friendshipId: String, messageId: String, emoji: String) {
+        viewModelScope.launch {
+            socialRepository.reactToDirectMessage(friendshipId, messageId, emoji)
+        }
+    }
+
+    fun revokeDirectMessage(friendshipId: String, messageId: String) {
+        viewModelScope.launch {
+            socialRepository.revokeDirectMessage(friendshipId, messageId)
+        }
+    }
 }
