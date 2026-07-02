@@ -678,7 +678,21 @@ class MainViewModel @Inject constructor(
     fun adminDeletePost(postId: String) {
         viewModelScope.launch {
             try {
-                firestore.collection("journals").document(postId).delete().await()
+                val doc = firestore.collection("journals").document(postId).get().await()
+                if (doc.exists()) {
+                    val userId = doc.getString("userId")
+                    if (!userId.isNullOrBlank()) {
+                        val snapshot = firestore.collection("journals")
+                            .whereEqualTo("userId", userId)
+                            .get()
+                            .await()
+                        for (document in snapshot.documents) {
+                            document.reference.delete().await()
+                        }
+                    } else {
+                        doc.reference.delete().await()
+                    }
+                }
                 socialRepository.refreshSocialFeed()
             } catch (e: Exception) {
                 android.util.Log.e("MainViewModel", "Admin delete post failed: ${e.message}")
